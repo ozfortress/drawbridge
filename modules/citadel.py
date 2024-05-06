@@ -108,7 +108,7 @@ class Citadel:
         self.api_key = apiKey
 
     def getUser(self, id):
-        url = f'{self.base_url}user/{id}'
+        url = f'{self.base_url}users/{id}'
         headers = {'X-API-Key': self.api_key}
         response = requests.get(url, headers=headers).json()
         if 'status' in response:
@@ -119,7 +119,7 @@ class Citadel:
         # Steam ID must be 64 bit version, reject if not
         if len(steam_id) != 17: # dirty check
             return {'error': 'Invalid Steam ID'}
-        url = f'{self.base_url}user/steam_id/{steam_id}'
+        url = f'{self.base_url}users/steam_id/{steam_id}'
         headers = {'X-API-Key': self.api_key}
         response = requests.get(url, headers=headers).json()
         if 'status' in response:
@@ -127,7 +127,7 @@ class Citadel:
         return self.User(response['user'])
 
     def getTeam(self, id):
-        url = f'{self.base_url}team/{id}'
+        url = f'{self.base_url}teams/{id}'
         headers = {'X-API-Key': self.api_key}
         response = requests.get(url, headers=headers).json()
         if 'status' in response:
@@ -135,7 +135,7 @@ class Citadel:
         return self.Team(response['team'])
 
     def getLeague(self, id):
-        url = f'{self.base_url}league/{id}'
+        url = f'{self.base_url}leagues/{id}'
         headers = {'X-API-Key': self.api_key}
         response = requests.get(url, headers=headers).json()
         if 'status' in response:
@@ -143,7 +143,7 @@ class Citadel:
         return self.League(response['league'])
 
     def getRoster(self, id):
-        url = f'{self.base_url}roster/{id}'
+        url = f'{self.base_url}rosters/{id}'
         headers = {'X-API-Key': self.api_key}
         response = requests.get(url, headers=headers).json()
         if 'status' in response:
@@ -151,7 +151,7 @@ class Citadel:
         return self.Roster(response['roster'])
 
     def getMatch(self, id):
-        url = f'{self.base_url}match/{id}'
+        url = f'{self.base_url}matches/{id}'
         headers = {'X-API-Key': self.api_key}
         response = requests.get(url, headers=headers).json()
         if 'status' in response:
