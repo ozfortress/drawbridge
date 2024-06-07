@@ -2,16 +2,24 @@ import requests
 
 class Citadel:
     """
-    An interface for the Citadel API.\n
-    Requires a APIKey to be passed in the constructor\n
+    An interface for the Citadel API.
+
+    Requires a APIKey to be passed in the constructor
+
     Optional - Base URL for the API, defaults to 'https://ozfortress.com/api/v1/'
 
-    Methods:\n
-    getUser(id) - Get a user by their Citadel ID\n
-    getUserBySteamID(steam_id) - Get a user by their Steam ID\n
-    getTeam(id) - Get a team by their Citadel ID\n
-    getLeague(id) - Get a league by their Citadel ID\n
-    getRoster(id) - Get a roster by their Citadel ID\n
+    Methods:
+
+    getUser(id) - Get a user by their Citadel ID
+
+    getUserBySteamID(steam_id) - Get a user by their Steam ID
+
+    getTeam(id) - Get a team by their Citadel ID
+
+    getLeague(id) - Get a league by their Citadel ID
+
+    getRoster(id) - Get a roster by their Citadel ID
+
     getMatch(id) - Get a match by their Citadel ID
     """
     class User:
