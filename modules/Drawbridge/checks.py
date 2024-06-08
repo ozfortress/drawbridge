@@ -72,3 +72,5 @@ class Checks:
                 self.guild_cooldowns[ctx.guild.id][key] = time.time() + timeout
                 return True
         return commands.check(predicate)
+
+del discord, commands, app_commands, time

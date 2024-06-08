@@ -98,3 +98,5 @@ class Functions:
             log['log_timestamp'] = int(time.time())
         self.db.insert_log(log)
         self.logger.debug(f'new log {message.author.name}#{message.author.discriminator} ({message.author.id}) - {log_type}')
+
+del database, citadel, discord, logging, time

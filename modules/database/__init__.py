@@ -158,3 +158,5 @@ class Database:
         except mariadb.Error as e:
             print(f"Error: {e}")
             return None
+
+del mariadb

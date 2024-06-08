@@ -111,3 +111,5 @@ class GetTeams():
                 await ctx.response.send_message(content='You do not have permission to run this command.', ephermeral=True)
             else:
                 await ctx.response.send_message(content='An error occurred while running this command.', ephermeral=True)
+
+del discord, commands, os, json, database, citadel

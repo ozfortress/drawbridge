@@ -55,3 +55,5 @@ class Logging():
                     self.teamchannel_cache['refreshAfter'] = time.time() + 3600*24
                 if message.channel.id in self.teamchannel_cache['channels']:
                     Drawbridge.Functions.generate_log(message, True, 0, "DELETE")
+
+del discord, Drawbridge, database, time
