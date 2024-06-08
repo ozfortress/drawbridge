@@ -4,14 +4,11 @@ if __name__ != '__main__':
 import logging
 import os
 from dotenv import load_dotenv
-import time
 import discord
-from discord.ext import commands
 from discord import app_commands
 from modules import citadel
 from modules import database
 from modules import Drawbridge
-import json
 
 
 load_dotenv()
