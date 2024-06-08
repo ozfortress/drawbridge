@@ -1,12 +1,12 @@
 {
-    "content": "## Team Channel\n{TEAM}",
-    "embeds": [
-      {
-        "title": "> Welcome to your Team Channel",
-        "description": "### Team Communication\nThis channel will serve as the hub for your team's private communication between ozfortress admins and your team's captains.\n\n### Reminder\nMatch communication should occur within the appropriate match channels and their associated [ozfortress.com](https://ozfortress.com) Match Thread.",
-        "url": "https://ozfortress.com/teams/{TEAM_ID}",
-        "color": 43962
-      }
-    ],
-    "attachments": []
-  }
+  "content": "## {TEAM_MENTION} Support Channel",
+  "embeds": [
+    {
+      "title": "> View your Team Page",
+      "description": "### Match Communication\nA reminder: __**ALL**__ inter-team communication related to your matches must occur within the weekly generated match channels in this Discord. Failure to do so will result in penalties as per [7.2. Team Captain Discord](https://docs.ozfortress.com/rules/global/#72-team-captain-discord).\n\n### Why does this channel exist?\nThis channel is to allow you to reach out directly to administrators for team or match support. Please only ping your division administrator **once**. Excessive pings will get you slapped.\n\n### Admin Shopping Notice\nPlease do yourselves and us a favour - read [1.5. Admin Shopping](https://docs.ozfortress.com/rules/global/?h=admin+sho#15-admin-shopping). If you receive a ruling you feel is unfair, please elevate it to a more senior administrator (the format's Head Admin or the League Director).",
+      "url": "https://ozfortress.com/teams/{TEAM_ID}",
+      "color": 43962
+    }
+  ],
+  "attachments": []
+}

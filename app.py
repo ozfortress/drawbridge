@@ -170,6 +170,46 @@ async def on_message_delete(message : discord.Message):
 # async def globally_block_dms(ctx):
 #     return ctx.guild is not None # Only allow commands to be run in a guild
 
+def substitute_strings_in_embed(json: dict | list | str, substitutions: dict, depth : int = 0) -> dict | list | str:
+    '''
+    Recursively substitute strings in a json object
+
+    Parameters
+    -----------
+    json: dict
+        The json object to substitute strings in.
+        Accepts list | str as well for recursion, caller should not pass these types.
+    substitutions: dict
+        The substitutions to make
+    depth: int
+        The depth of recursion. Used to prevent infinite recursion. Should not be used by the caller.
+
+    Returns
+    --------
+    dict - The json object with the strings substituted.
+
+    Raises
+    -------
+    ValueError - If the caller passes a list or str as the first argument.
+    '''
+    # Recursively substitute strings in a json object
+    if depth > 5: # Prevent infinite recursion
+        return json
+    if depth == 0 and not isinstance(json, dict):
+        raise ValueError(f'caller should pass a dict as the first argument, received {type(json)}')
+    if isinstance(json, str): #  Self-referenced function to substitute strings in a json object
+        for key, value in substitutions.items():
+            json = json.replace(key, value)
+        return json
+    elif isinstance(json, dict):
+        for key, value in json.items():
+            json[key] = substitute_strings_in_embed(value, substitutions, depth=depth+1)
+        return json
+    elif isinstance(json, list):
+        return [substitute_strings_in_embed(item, substitutions) for item in json]
+    else:
+        return json
+
 def heads_and_devs_only():
     async def predicate(ctx : discord.Interaction):
         if ctx.guild and ctx.guild.id == int(os.getenv('DISCORD_GUILD_ID')):
@@ -250,8 +290,16 @@ async def get_teams(interaction : discord.Interaction, league_id : int, league_s
                 # Load the chat message from embeds/teams.json
 
                 teammessage = json.load(file)
-                teammessage['embeds'][0]['url'] = teammessage['embeds'][1]['url'].replace('{TEAM_ID}', roster['id'])
-                teammessage['content'] = teammessage['content'].replace('{TEAM}', f'<@&{role.id}>')
+                teammessage = substitute_strings_in_embed(teammessage, {
+                    '{TEAM_MENTION}': f'<@&{role.id}>',
+                    '{TEAM_NAME}': roster['name'],
+                    '{TEAM_ID}': roster['id'],
+                    '{DIVISION}': div,
+                    '{LEAGUE_NAME}': league['name'],
+                    '{LEAGUE_SHORTCODE}': league_shortcode,
+                    '{CHANNEL_ID}': str(teamchannel.id),
+                    '{CHANNEL_LINK}': f'<#{teamchannel.id}>',
+                })
                 teammessage['embed'] = teammessage['embeds'][0]
                 del teammessage['embeds']
                 await teamchannel.send(**teammessage)
