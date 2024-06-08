@@ -38,9 +38,9 @@ class Functions:
             return json
         elif isinstance(json, dict):
             for key, value in json.items():
-                json[key] = substitute_strings_in_embed(value, substitutions, depth=depth+1)
+                json[key] = self.substitute_strings_in_embed(value, substitutions, depth=depth+1)
             return json
         elif isinstance(json, list):
-            return [substitute_strings_in_embed(item, substitutions) for item in json]
+            return [self.substitute_strings_in_embed(item, substitutions) for item in json]
         else:
             return json
