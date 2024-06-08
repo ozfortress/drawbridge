@@ -218,7 +218,7 @@ async def get_teams(interaction : discord.Interaction, league_id : int, league_s
         for roster in rosters:
             if roster['division'] == div:
                 r+=1
-                role = await interaction.guild.create_role(name=f'{roster['name']} ({league_shortcode})')
+                role = await interaction.guild.create_role(name=f'{roster['name']} ({league_shortcode})', mentionable=True)
                 overwrites = {
                     role: discord.PermissionOverwrite(read_messages=True),
                 }
