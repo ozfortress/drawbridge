@@ -4,14 +4,15 @@ if __name__ != '__main__':
 import logging
 import os
 from dotenv import load_dotenv
-import subprocess
 import time
 import discord
 from discord.ext import commands
 from discord import app_commands
-import modules.citadel as citadel
-import modules.database as database
+from modules import citadel
+from modules import database
+from modules import Drawbridge
 import json
+
 
 load_dotenv()
 
@@ -24,20 +25,6 @@ intents = discord.Intents.all() # TODO: Change this to only the intents we need
 
 client = discord.Client(intents=intents)
 cmds = app_commands.CommandTree(client)
-
-roles={
-    'Director' : '1243181553522053191', # League Director
-    '6s Head' : '1243184095878709249', # 6s Head Admin
-    'HL Head' : '1243184165072011368', # HL Head Admin
-    '6s Admin' : '1243183240471253134', # 6s Admin
-    'HL Admin' : '1243183285824126976', # HL Admin
-    'Trial Admin' : '1243197012443267113', # Trial Admin
-    'Developers' : '1243183754625814599', # Developers
-    'Approved Casters' : '1243192943548829726', # Approved Casting
-    'Unapproved Casters' : '1243193009768497334', # Unapproved Casting
-    'Captains Bot': '1248508402275975169', # Captains Bot
-    'Staff': '1243181493598031934' # Staff role for all staff members
-}
 
 db = database.Database( conn_params={
     "database": os.getenv('DB_DATABASE'),
@@ -52,7 +39,6 @@ teamchannel_cache={
     },
     'refreshAfter': 0 # timestamp representing the next time the cache should be refreshed
 }
-class Drawbridge: pass
 
 def main():
     logging.basicConfig(filename='logs/drawbridge.log', level='DEBUG', format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -170,60 +156,11 @@ async def on_message_delete(message : discord.Message):
 # async def globally_block_dms(ctx):
 #     return ctx.guild is not None # Only allow commands to be run in a guild
 
-def substitute_strings_in_embed(json: dict | list | str, substitutions: dict, depth : int = 0) -> dict | list | str:
-    '''
-    Recursively substitute strings in a json object
-
-    Parameters
-    -----------
-    json: dict
-        The json object to substitute strings in.
-        Accepts list | str as well for recursion, caller should not pass these types.
-    substitutions: dict
-        The substitutions to make
-    depth: int
-        The depth of recursion. Used to prevent infinite recursion. Should not be used by the caller.
-
-    Returns
-    --------
-    dict - The json object with the strings substituted.
-
-    Raises
-    -------
-    ValueError - If the caller passes a list or str as the first argument.
-    '''
-    # Recursively substitute strings in a json object
-    if depth > 5: # Prevent infinite recursion
-        return json
-    if depth == 0 and not isinstance(json, dict):
-        raise ValueError(f'caller should pass a dict as the first argument, received {type(json)}')
-    if isinstance(json, str): #  Self-referenced function to substitute strings in a json object
-        for key, value in substitutions.items():
-            json = json.replace(key, value)
-        return json
-    elif isinstance(json, dict):
-        for key, value in json.items():
-            json[key] = substitute_strings_in_embed(value, substitutions, depth=depth+1)
-        return json
-    elif isinstance(json, list):
-        return [substitute_strings_in_embed(item, substitutions) for item in json]
-    else:
-        return json
-
-def heads_and_devs_only():
-    async def predicate(ctx : discord.Interaction):
-        if ctx.guild and ctx.guild.id == int(os.getenv('DISCORD_GUILD_ID')):
-            for role in ctx.author.roles:
-                if role.id == roles['Developers'] or role.id == roles['Director'] or role.id == roles['6s Head'] or role.id == roles['HL Head']:
-                    return True
-        return False
-    return commands.check(predicate)
-
+@Drawbridge.Checks.heads_only()
 @cmds.command(
     name='get-teams',
     guild=discord.Object(id=os.getenv('DISCORD_GUILD_ID'))
 )
-@heads_and_devs_only()
 async def get_teams(interaction : discord.Interaction, league_id : int, league_shortcode : str, is_hl : bool = False):
     """Generate team roles and channels for a given league
 
@@ -257,18 +194,18 @@ async def get_teams(interaction : discord.Interaction, league_id : int, league_s
         catoverwrites = {
             interaction.guild.default_role: discord.PermissionOverwrite(read_messages=False),
             # discord.Object(id=(is_hl == True ? roles['HL Admin'] : roles['6s Admin'])) : discord.PermissionOverwrite(read_messages=True),
-            discord.Object(id=roles['6s Head']) : discord.PermissionOverwrite(read_messages=True),
-            discord.Object(id=roles['HL Head']) : discord.PermissionOverwrite(read_messages=True),
-            discord.Object(id=roles['Trial Admin']) : discord.PermissionOverwrite(read_messages=True), # Or false? dunno hey.
-            discord.Object(id=roles['Developers']) : discord.PermissionOverwrite(read_messages=True),
-            discord.Object(id=roles['Approved Casters']) : discord.PermissionOverwrite(read_messages=False),
-            discord.Object(id=roles['Unapproved Casters']) : discord.PermissionOverwrite(read_messages=False),
-            discord.Object(id=roles['Captains Bot']) : discord.PermissionOverwrite(read_messages=True)
+            discord.Object(id=Drawbridge.Checks.roles['6s Head']) : discord.PermissionOverwrite(read_messages=True),
+            discord.Object(id=Drawbridge.Checks.roles['HL Head']) : discord.PermissionOverwrite(read_messages=True),
+            discord.Object(id=Drawbridge.Checks.roles['Trial Admin']) : discord.PermissionOverwrite(read_messages=True), # Or false? dunno hey.
+            discord.Object(id=Drawbridge.Checks.roles['Developers']) : discord.PermissionOverwrite(read_messages=True),
+            discord.Object(id=Drawbridge.Checks.roles['Approved Casters']) : discord.PermissionOverwrite(read_messages=False),
+            discord.Object(id=Drawbridge.Checks.roles['Unapproved Casters']) : discord.PermissionOverwrite(read_messages=False),
+            discord.Object(id=Drawbridge.Checks.roles['Captains Bot']) : discord.PermissionOverwrite(read_messages=True)
         }
         if is_hl:
-            catoverwrites[discord.Object(id=roles['HL Admin'])] = discord.PermissionOverwrite(read_messages=True)
+            catoverwrites[discord.Object(id=Drawbridge.Checks.roles['HL Admin'])] = discord.PermissionOverwrite(read_messages=True)
         else:
-            catoverwrites[discord.Object(id=roles['6s Admin'])] = discord.PermissionOverwrite(read_messages=True)
+            catoverwrites[discord.Object(id=Drawbridge.Checks.roles['6s Admin'])] = discord.PermissionOverwrite(read_messages=True)
 
         channelcategory = await interaction.guild.create_category(f'{div} - {league_shortcode}')
         role = await interaction.guild.create_role(name=f'{div} - {league_shortcode}')
@@ -290,7 +227,7 @@ async def get_teams(interaction : discord.Interaction, league_id : int, league_s
                 # Load the chat message from embeds/teams.json
 
                 teammessage = json.load(file)
-                teammessage = substitute_strings_in_embed(teammessage, {
+                teammessage = Drawbridge.Functions.substitute_strings_in_embed(teammessage, {
                     '{TEAM_MENTION}': f'<@&{role.id}>',
                     '{TEAM_NAME}': roster['name'],
                     '{TEAM_ID}': roster['id'],
@@ -320,20 +257,6 @@ async def get_teams_error(ctx : discord.Interaction, error):
         await ctx.response.send_message(content='You do not have permission to run this command.', ephermeral=True)
     else:
         await ctx.response.send_message(content='An error occurred while running this command.', ephermeral=True)
-
-
-# def checkPackages():
-#     with open('requirements.txt', 'r') as file:
-#         requiredPackages = file.read().splitlines()
-#     installedPackages = subprocess.check_output(['pip', 'freeze']).decode('utf-8').splitlines()
-#     missingPackages = [package for package in requiredPackages if package not in installedPackages]
-#     if missingPackages:
-#         logger.warning(f'The following packages are missing: {missingPackages}')
-#         logger.warning('Installing missing packages...')
-#         subprocess.check_call(['pip', 'install', *missingPackages])
-#         logger.info('All missing packages have been installed.')
-#     else:
-#         logger.info('All packages are already installed.')
 
 if __name__ == '__main__':
     main()
