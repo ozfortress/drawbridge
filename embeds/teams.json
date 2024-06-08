@@ -1,0 +1,12 @@
+{
+    "content": "## Team Channel\n{TEAM}",
+    "embeds": [
+      {
+        "title": "> Welcome to your Team Channel",
+        "description": "### Team Communication\nThis channel will serve as the hub for your team's private communication between ozfortress admins and your team's captains.\n\n### Reminder\nMatch communication should occur within the appropriate match channels and their associated [ozfortress.com](https://ozfortress.com) Match Thread.",
+        "url": "https://ozfortress.com/teams/{TEAM_ID}",
+        "color": 43962
+      }
+    ],
+    "attachments": []
+  }

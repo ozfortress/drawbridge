@@ -11,7 +11,7 @@ from discord.ext import commands
 from discord import app_commands
 import modules.citadel as citadel
 import modules.database as database
-
+import json
 
 load_dotenv()
 
@@ -35,7 +35,8 @@ roles={
     'Developers' : '1243183754625814599', # Developers
     'Approved Casters' : '1243192943548829726', # Approved Casting
     'Unapproved Casters' : '1243193009768497334', # Unapproved Casting
-    'Captains Bot': '1248508402275975169'
+    'Captains Bot': '1248508402275975169', # Captains Bot
+    'Staff': '1243181493598031934' # Staff role for all staff members
 }
 
 db = database.Database( conn_params={
@@ -169,10 +170,20 @@ async def on_message_delete(message : discord.Message):
 # async def globally_block_dms(ctx):
 #     return ctx.guild is not None # Only allow commands to be run in a guild
 
+def heads_and_devs_only():
+    async def predicate(ctx : discord.Interaction):
+        if ctx.guild and ctx.guild.id == int(os.getenv('DISCORD_GUILD_ID')):
+            for role in ctx.author.roles:
+                if role.id == roles['Developers'] or role.id == roles['Director'] or role.id == roles['6s Head'] or role.id == roles['HL Head']:
+                    return True
+        return False
+    return commands.check(predicate)
+
 @cmds.command(
     name='get-teams',
     guild=discord.Object(id=os.getenv('DISCORD_GUILD_ID'))
 )
+@heads_and_devs_only()
 async def get_teams(interaction : discord.Interaction, league_id : int, league_shortcode : str, is_hl : bool = False):
     """Generate team roles and channels for a given league
 
@@ -189,6 +200,7 @@ async def get_teams(interaction : discord.Interaction, league_id : int, league_s
     league = cit.getLeague(league_id)
     rosters = league.rosters
     divs = []
+    file = open('embeds/teams.json', 'r')
     for roster in rosters:
         if roster['division'] not in divs:
             divs.append(roster['division'])
@@ -235,7 +247,14 @@ async def get_teams(interaction : discord.Interaction, league_id : int, league_s
                 }
                 teamchannel = await interaction.guild.create_text_channel(f'{roster['name']} ({league_shortcode})', category=channelcategory, overwrites=overwrites)
 
-                await teamchannel.send(f'Welcome to the {roster['name']} team channel! This is placeholder text.')
+                # Load the chat message from embeds/teams.json
+
+                teammessage = json.load(file)
+                teammessage['embeds'][0]['url'] = teammessage['embeds'][1]['url'].replace('{TEAM_ID}', roster['id'])
+                teammessage['content'] = teammessage['content'].replace('{TEAM}', f'<@&{role.id}>')
+                teammessage['embed'] = teammessage['embeds'][0]
+                del teammessage['embeds']
+                await teamchannel.send(**teammessage)
                 await interaction.response.edit_message(content=f'Generating Division Categories, Team Channels, and Roles.\nLeague: {league['name']}\nDivisions: {d}/{len(divs)}\nTeams: {r}/{len(rosters)}')
                 dbteam = {
                     'team_id': roster['id'],
@@ -247,6 +266,12 @@ async def get_teams(interaction : discord.Interaction, league_id : int, league_s
                 db.insert_team(dbteam)
     await interaction.response.edit_message(content=f'Generated.\nLeague: {league['name']}\nDivisions: {d}/{len(divs)}\nTeams: {r}/{len(rosters)}')
 
+@get_teams.error
+async def get_teams_error(ctx : discord.Interaction, error):
+    if isinstance(error, commands.errors.CheckFailure):
+        await ctx.response.send_message(content='You do not have permission to run this command.', ephermeral=True)
+    else:
+        await ctx.response.send_message(content='An error occurred while running this command.', ephermeral=True)
 
 
 # def checkPackages():
