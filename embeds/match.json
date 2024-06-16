@@ -1,5 +1,5 @@
 {
-    "content": "## Round Name\n{HOME_TEAM} (Home) vs. {AWAY_TEAM} (Away)",
+    "content": "## {ROUND_NAME}\n{HOME_TEAM} (Home) vs. {AWAY_TEAM} (Away)",
     "embeds": [
       {
         "title": "> View your Match Thread",

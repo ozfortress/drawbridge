@@ -71,17 +71,19 @@ class Database:
             query = "SELECT * FROM logs WHERE match_id = %s"
             self.cursor.execute(query, (id,))
             logs = self.cursor.fetchall()
+            return logs;
             # iterate through logs, resolve players and teams
-            match = self.get_match_details(id)
-            teams = []
-            for log in logs:
-                log['match'] = match # Searching by match, so they all have the same match
-                if log['team_id'] not in teams and (log['team_id'] is not None or log['team_id'] != '' or log['team_id'] != '0'):
-                    teams[log['team_id']] = self.get_team(log['team_id']) # cache the team
-                if (log['team_id'] is not None or log['team_id'] != '' or log['team_id'] != '0'):
-                    log['team'] = teams[log['team_id']]
-                else:
-                    log['team'] = None # TODO: Handle admins and casters
+            # match = self.get_match_details(id)
+            # teams = []
+            # for log in logs:
+            #     log['match'] = match # Searching by match, so they all have the same match
+            #     if log['team_id'] not in teams and (log['team_id'] is not None or log['team_id'] != '' or log['team_id'] != '0'):
+            #         teams[log['team_id']] = self.get_team(log['team_id']) # cache the team
+            #     if (log['team_id'] is not None or log['team_id'] != '' or log['team_id'] != '0'):
+            #         log['team'] = teams[log['team_id']]
+            #     else:
+            #         log['team'] = None # TODO: Handle admins and casters
+
 
         except mariadb.Error as e:
             print(f"Error: {e}")
@@ -112,10 +114,46 @@ class Database:
             print(f"Error: {e}")
             return None
 
+    def get_match_by_id(self, match_id):
+        try:
+            query = "SELECT * FROM matches WHERE match_id = %s"
+            self.cursor.execute(query, (match_id,))
+            return self.cursor.fetchone()
+        except mariadb.Error as e:
+            print(f"Error: {e}")
+            return None
+
+    def get_all_unarchived_matches(self) -> list:
+        try:
+            query = "SELECT * FROM matches WHERE archived = 0"
+            self.cursor.execute(query)
+            return self.cursor.fetchall()
+        except mariadb.Error as e:
+            print(f"Error: {e}")
+            return None
+
     def get_team_id_of_role(self, role_id):
         try:
             query = "SELECT team_id FROM teams WHERE role_id = %s"
             self.cursor.execute(query, (role_id,))
+            return self.cursor.fetchone()
+        except mariadb.Error as e:
+            print(f"Error: {e}")
+            return None
+
+    def get_team_by_id(self, team_id):
+        try:
+            query = "SELECT * FROM teams LEFT JOIN divisions ON teams.division = divisions.id WHERE team_id = %s"
+            self.cursor.execute(query, (team_id,))
+            return self.cursor.fetchone()
+        except mariadb.Error as e:
+            print(f"Error: {e}")
+            return None
+
+    def get_div_(self, team_id):
+        try:
+            query = "SELECT * FROM divisions WHERE team_id = %s"
+            self.cursor.execute(query, (team_id,))
             return self.cursor.fetchone()
         except mariadb.Error as e:
             print(f"Error: {e}")
@@ -158,5 +196,24 @@ class Database:
         except mariadb.Error as e:
             print(f"Error: {e}")
             return None
+
+    def insert_match(self, match) -> int:
+        try:
+            query = "INSERT INTO matches (match_id, division, team_home, team_away, channel_id, archived) VALUES (?, ?, ?, ?, ?, ?)"
+            self.cursor.execute(query, (match['match_id'], match['division'], match['team_home'], match['team_away'], match['channel_id'], 0))
+            self.conn.commit()
+            return self.cursor.lastrowid
+        except mariadb.Error as e:
+            print(f"Error: {e}")
+            return None
+    def archive_match(self, match_id):
+        try:
+            query = "UPDATE matches SET archived = 1 WHERE match_id = ?"
+            self.cursor.execute(query, (match_id))
+            self.conn.commit()
+        except mariadb.Error as e:
+            print(f"Error: {e}")
+            return None
+
 
 del mariadb

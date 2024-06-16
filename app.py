@@ -5,7 +5,6 @@ import logging
 import os
 from dotenv import load_dotenv
 import discord
-from discord import app_commands
 from modules import citadel
 from modules import database
 from modules import Drawbridge
@@ -21,7 +20,7 @@ VERSION = '0.0.1'
 intents = discord.Intents.all() # TODO: Change this to only the intents we need
 
 client = discord.Client(intents=intents)
-cmds = app_commands.CommandTree(client)
+cmds = discord.app_commands.CommandTree(client)
 
 db = database.Database( conn_params={
     "database": os.getenv('DB_DATABASE'),
@@ -48,13 +47,15 @@ def main():
 async def on_ready():
     logger.info(f'Logged in as {client.user.name}#{client.user.discriminator} ({client.user.id})')
     Drawbridge.logging.Logging(client, db) # TODO: this... better.
-    import modules.Drawbridge.commands.get_teams as get_teams
-    get_teams.GetTeams(cmds, db, cit) # TODO: this... better.
+
+    # import modules.Drawbridge.commands.tournament as tournament
+    # tournament.GetTeams(cmds, db, cit) # TODO: this... better.
     synced_commands = await cmds.sync(guild=discord.Object(id=os.getenv('DISCORD_GUILD_ID')))
     logger.info(f'Synced {len(synced_commands)} commands.')
     for synced_command in synced_commands:
         logger.debug(f'Synced command: {synced_command.name}')
 
+Drawbridge(cmds, db, cit, logger)
 
 if __name__ == '__main__':
     main()

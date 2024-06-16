@@ -1,6 +1,6 @@
 import discord
-from discord.ext import commands
-from discord import app_commands
+from discord.ext import commands as discord_commands
+# from discord import app_commands
 import time
 class Checks:
     """
@@ -23,25 +23,25 @@ class Checks:
         self.guild_cooldowns = {}
 
     def director_only(self):
-        return app_commands.checks.has_any_role(self.roles['Director'])
+        return discord.app_commands.checks.has_any_role(self.roles['Director'])
 
     def heads_only(self):
-        return app_commands.checks.has_any_role(self.roles['6s Head'], self.roles['HL Head'], self.roles['Director'], self.roles['Developers'])
+        return discord.app_commands.checks.has_any_role(self.roles['6s Head'], self.roles['HL Head'], self.roles['Director'], self.roles['Developers'])
 
     def admin_only(self):
-        return app_commands.checks.has_any_role(self.roles['6s Admin'], self.roles['HL Admin'], self.roles['6s Head'], self.roles['HL Head'], self.roles['Director'], self.roles['Developers'])
+        return discord.app_commands.checks.has_any_role(self.roles['6s Admin'], self.roles['HL Admin'], self.roles['6s Head'], self.roles['HL Head'], self.roles['Director'], self.roles['Developers'])
 
     def trials_only(self):
-        return app_commands.checks.has_any_role(self.roles['Trial Admin'], self.roles['6s Admin'], self.roles['HL Admin'], self.roles['6s Head'], self.roles['HL Head'], self.roles['Director'],  self.roles['Developers'])
+        return discord.app_commands.checks.has_any_role(self.roles['Trial Admin'], self.roles['6s Admin'], self.roles['HL Admin'], self.roles['6s Head'], self.roles['HL Head'], self.roles['Director'],  self.roles['Developers'])
 
     def dev_only(self):
-        return app_commands.checks.has_any_role(self.roles['Developers'], self.roles['Director'])
+        return discord.app_commands.checks.has_any_role(self.roles['Developers'], self.roles['Director'])
 
     def casters_only(self):
-        return app_commands.checks.has_any_role(self.roles['Approved Casters'], self.roles['Unapproved Casters'], self.roles['Director'],  self.roles['Developers'], self.roles['Staff'])
+        return discord.app_commands.checks.has_any_role(self.roles['Approved Casters'], self.roles['Unapproved Casters'], self.roles['Director'],  self.roles['Developers'], self.roles['Staff'])
 
     def staff_only(self):
-        return app_commands.checks.has_any_role(self.roles['Staff'], self.roles['Director'], self.roles['Developers'])
+        return discord.app_commands.checks.has_any_role(self.roles['Staff'], self.roles['Director'], self.roles['Developers'])
 
     def user_cooldown(self, timeout: int | float):
         async def predicate(ctx: discord.Interaction):
@@ -51,11 +51,11 @@ class Checks:
                     self.user_cooldowns[ctx.user.id] = now + timeout
                     return True
                 else:
-                    raise commands.CommandOnCooldown(timeout, self.user_cooldowns[ctx.user.id] - now, commands.BucketType.user)
+                    raise discord_commands.CommandOnCooldown(timeout, self.user_cooldowns[ctx.user.id] - now, discord_commands.BucketType.user)
             else:
                 self.user_cooldowns[ctx.user.id] = time.time() + timeout
                 return True
-        return commands.check(predicate)
+        return discord_commands.check(predicate)
 
     def guild_cooldown(self, key, timeout: int | float):
         async def predicate(ctx: discord.Interaction):
@@ -67,10 +67,10 @@ class Checks:
                     self.guild_cooldowns[ctx.guild.id][key] = now + timeout
                     return True
                 else:
-                    raise commands.CommandOnCooldown(timeout, self.guild_cooldowns[ctx.guild.id][key] - now, commands.BucketType.guild)
+                    raise discord_commands.CommandOnCooldown(timeout, self.guild_cooldowns[ctx.guild.id][key] - now, discord_commands.BucketType.guild)
             else:
                 self.guild_cooldowns[ctx.guild.id][key] = time.time() + timeout
                 return True
-        return commands.check(predicate)
+        return discord_commands.check(predicate)
 
-del discord, commands, app_commands, time
+del discord, discord_commands, time
