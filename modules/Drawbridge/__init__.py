@@ -48,7 +48,7 @@ class Drawbridge:
         for _, module_name, _ in pkgutil.iter_modules([commands_path]):
             module = __import__(f'modules.Drawbridge.commands.{module_name}', fromlist=[module_name])
             self.modules[module_name] = module
-            module.Start(self.cmd_tree, self.db, self.cit)
+            # module.Start(self.cmd_tree, self.db, self.cit)
         for module in self.modules.values():
             if hasattr(module, 'initialize'):
                 module.initialize(self)
