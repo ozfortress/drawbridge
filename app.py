@@ -5,6 +5,7 @@ import logging
 import os
 from dotenv import load_dotenv
 import discord
+from discord.ext import commands as discord_commands
 from modules import citadel
 from modules import database
 from modules import Drawbridge
@@ -19,7 +20,7 @@ VERSION = '0.0.1'
 
 intents = discord.Intents.all() # TODO: Change this to only the intents we need
 
-client = discord.Client(intents=intents)
+client = discord_commands.Bot(".db ", intents=intents)
 # cmds = discord.app_commands.CommandTree(client)
 
 db = database.Database( conn_params={

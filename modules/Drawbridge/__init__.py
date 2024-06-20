@@ -24,15 +24,17 @@ from modules.citadel import Citadel
 from modules.database import Database
 from logging import Logger
 import discord
+from discord.ext import commands as discord_commands
 
 class Drawbridge:
-    def __init__(self, client: discord.Client, db : Database, cit : Citadel, logger : Logger):
+    def __init__(self, client: discord_commands.Bot, db : Database, cit : Citadel, logger : Logger):
         self.client = client
         self.db = db
         self.cit = cit
         self.logger = logger
         self.modules = {}
-        self.cmd_tree = discord.app_commands.CommandTree(client)
+        # self.cmd_tree = discord.app_commands.CommandTree(client)
+        self.cmd_tree = self.client.tree
 
         self.Checks = Checks
         self.Functions = Functions(self.db, self.cit)
@@ -52,7 +54,7 @@ class Drawbridge:
             # module.Start(self.cmd_tree, self.db, self.cit)
         for module in self.modules.values():
             if hasattr(module, 'initialize'):
-                module.initialize(self)
+                await module.initialize(self)
         await self.cmd_tree.sync(guild=discord.Object(id=os.getenv('DISCORD_GUILD_ID')))
 
 __all__ = ['Drawbridge', 'Checks', 'Functions']
