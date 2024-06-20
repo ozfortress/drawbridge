@@ -20,7 +20,7 @@ VERSION = '0.0.1'
 intents = discord.Intents.all() # TODO: Change this to only the intents we need
 
 client = discord.Client(intents=intents)
-cmds = discord.app_commands.CommandTree(client)
+# cmds = discord.app_commands.CommandTree(client)
 
 db = database.Database( conn_params={
     "database": os.getenv('DB_DATABASE'),
@@ -43,18 +43,6 @@ def main():
     logger.info('OZF Drawbridge has started.')
     client.run(os.getenv('DISCORD_TOKEN'))
     Drawbridge.Drawbridge(client, db, cit, logger)
-
-@client.event
-async def on_ready():
-    logger.info(f'Logged in as {client.user.name}#{client.user.discriminator} ({client.user.id})')
-    Drawbridge.logging.Logging(client, db) # TODO: this... better.
-
-    # import modules.Drawbridge.commands.tournament as tournament
-    # tournament.GetTeams(cmds, db, cit) # TODO: this... better.
-    synced_commands = await cmds.sync(guild=discord.Object(id=os.getenv('DISCORD_GUILD_ID')))
-    logger.info(f'Synced {len(synced_commands)} commands.')
-    for synced_command in synced_commands:
-        logger.debug(f'Synced command: {synced_command.name}')
 
 
 
