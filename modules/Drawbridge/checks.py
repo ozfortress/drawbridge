@@ -22,6 +22,20 @@ class Checks:
         self.user_cooldowns = {}
         self.guild_cooldowns = {}
 
+    roles = {
+            'Director' : '1243181553522053191', # League Director
+            '6s Head' : '1243184095878709249', # 6s Head Admin
+            'HL Head' : '1243184165072011368', # HL Head Admin
+            '6s Admin' : '1243183240471253134', # 6s Admin
+            'HL Admin' : '1243183285824126976', # HL Admin
+            'Trial Admin' : '1243197012443267113', # Trial Admin
+            'Developers' : '1243183754625814599', # Developers
+            'Approved Casters' : '1243192943548829726', # Approved Casting
+            'Unapproved Casters' : '1243193009768497334', # Unapproved Casting
+            'Captains Bot': '1248508402275975169', # Captains Bot
+            'Staff': '1243181493598031934' # Staff role for all staff members
+        }
+
     def director_only(self):
         return discord.app_commands.checks.has_any_role(self.roles['Director'])
 

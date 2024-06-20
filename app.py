@@ -41,8 +41,8 @@ def main():
     logger.info(f'Starting OZF Drawbridge v{VERSION}...')
     # checkPackages()
     logger.info('OZF Drawbridge has started.')
-    client.run(os.getenv('DISCORD_TOKEN'))
     Drawbridge.Drawbridge(client, db, cit, logger)
+    client.run(os.getenv('DISCORD_TOKEN'))
 
 
 
