@@ -314,4 +314,4 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 def initialize(drawbridge):
     Tournament(drawbridge.cmd_tree, drawbridge.db, drawbridge.cit)
 
-del discord, os, json, database, citadel, discord_commands
+#del discord, os, json, database, citadel, discord_commands

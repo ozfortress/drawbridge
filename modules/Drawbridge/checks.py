@@ -73,4 +73,4 @@ class Checks:
                 return True
         return discord_commands.check(predicate)
 
-del discord, discord_commands, time
+#del discord, discord_commands, time

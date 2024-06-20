@@ -216,4 +216,4 @@ class Database:
             return None
 
 
-del mariadb
+#del mariadb

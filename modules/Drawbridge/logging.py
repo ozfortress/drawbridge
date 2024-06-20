@@ -1,5 +1,5 @@
 import discord
-import Drawbridge
+from . import functions as Drawbridge
 import modules.database as database
 import time
 import threading
@@ -111,4 +111,4 @@ class Logging():
 
 
 
-del discord, Drawbridge, database, time, threading
+#del discord, Drawbridge, database, time, threading

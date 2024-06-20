@@ -42,6 +42,7 @@ def main():
     # checkPackages()
     logger.info('OZF Drawbridge has started.')
     client.run(os.getenv('DISCORD_TOKEN'))
+    Drawbridge.Drawbridge(client, db, cit, logger)
 
 @client.event
 async def on_ready():
@@ -55,7 +56,7 @@ async def on_ready():
     for synced_command in synced_commands:
         logger.debug(f'Synced command: {synced_command.name}')
 
-Drawbridge(cmds, db, cit, logger)
+
 
 if __name__ == '__main__':
     main()
