@@ -166,4 +166,4 @@ class Citadel:
             raise ValueError(f'{response['status']} - {response['message']}')
         return self.Match(response['match'])
 
-del requests
+# del requests

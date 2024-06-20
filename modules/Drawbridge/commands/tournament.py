@@ -8,20 +8,23 @@ from modules import database
 from modules import citadel
 
 from discord.ext import commands as discord_commands
+from discord.ext import tasks as discord_tasks
 
 __title__ = 'Tournament Commands'
 __description__ = 'Commands for managing tournaments.'
 __version__ = '0.0.1'
 
-
-class Tournament(discord_commands.Cog, group_name='tournament', name='tournamnet', group_description='Commands for managing tournaments.'):
-    def __init__(self, bot:discord_commands.Bot, drawbridge) -> None:
+@Checks.heads_only(Checks)
+@discord.app_commands.guild_only()
+class Tournament(discord_commands.GroupCog, group_name='tournament', name='tournamnet', group_description='Commands for managing tournaments. This is a new string',):
+    def __init__(self, bot:discord_commands.Bot, db, cit, logger) -> None:
         self.bot = bot
-        self.cit = drawbridge.cit
-        self.db = drawbridge.db
-        self.logger = drawbridge.logger
+        self.cit = cit
+        self.db = db
+        self.logger = logger
         self.logger.info('Loaded Tournament Commands.')
-    tournament = discord.app_commands.Group(name='tournament', description='Commands for managing ozfortress tournaments, including generating match channels and starting/ending tournaments', guild_only=True, guild_ids=[os.getenv('DISCORD_GUILD_ID')])
+
+    # tournament = discord.app_commands.Group(name='tournament', description='Commands for managing ozfortress tournaments, including generating match channels and starting/ending tournaments', guild_only=True, guild_ids=[os.getenv('DISCORD_GUILD_ID')])
 
         # @Checks.heads_only(Checks)
 
@@ -35,10 +38,20 @@ class Tournament(discord_commands.Cog, group_name='tournament', name='tournamnet
 
 
 
-    @Checks.heads_only(Checks)
-    @tournament.command(
-        name='start',
-        # guild=discord.Object(id=os.getenv('DISCORD_GUILD_ID'))
+    # @Checks.heads_only(Checks)
+    # @client.command(
+    #     name='start',
+    #     # guild=discord.Object(id=os.getenv('DISCORD_GUILD_ID'))
+    # )
+
+    @discord_commands.command(
+        name='test'
+    )
+    async def test(self, interaction : discord.Interaction):
+        await interaction.response.send_message('Test command.', ephemeral=True)
+
+    @discord_commands.command(
+        name='start'
     )
     async def start(self, interaction : discord.Interaction, league_id : int, league_shortcode : str, is_hl : bool = False):
         """Generate team roles and channels for a given league
@@ -130,10 +143,13 @@ class Tournament(discord_commands.Cog, group_name='tournament', name='tournamnet
                     self.db.insert_team(dbteam)
         await interaction.response.edit_message(content=f'Generated.\nLeague: {league['name']}\nDivisions: {d}/{len(divs)}\nTeams: {r}/{len(rosters)}')
 
-    @Checks.heads_only(Checks)
-    @tournament.command(
-        name='end',
-        #guild=discord.Object(id=os.getenv('DISCORD_GUILD_ID'))
+    # @Checks.heads_only(Checks)
+    # @tournament.command(
+    #     name='end',
+    #     #guild=discord.Object(id=os.getenv('DISCORD_GUILD_ID'))
+    # )
+    @discord_commands.command(
+        name='end'
     )
     async def end(self, interaction : discord.Interaction, league_id : int):
         """End a tournament and archive all channels and roles
@@ -160,10 +176,13 @@ class Tournament(discord_commands.Cog, group_name='tournament', name='tournamnet
 
 
         await interaction.response.edit_message(content='Tournament ended. All channels and roles have been archived.', ephemeral=True)
-    @Checks.heads_only(Checks)
-    @tournament.command(
-        name='roundgen',
-        #guild=discord.Object(id=os.getenv('DISCORD_GUILD_ID'))
+    # @Checks.heads_only(Checks)
+    # @tournament.command(
+    #     name='roundgen',
+    #     #guild=discord.Object(id=os.getenv('DISCORD_GUILD_ID'))
+    # )
+    @discord_commands.command(
+        name='roundgen'
     )
     async def roundgen(self, interaction : discord.Interaction, league_id : int, round_number : int = None):
         """Generate match channels for a given round of a league
@@ -250,10 +269,13 @@ class Tournament(discord_commands.Cog, group_name='tournament', name='tournamnet
                         'channel_id': match_channel.id
                     })
         await interaction.response.edit_message(content='Matches generated.', ephemeral=True)
-    @Checks.heads_only(Checks)
-    @tournament.command(
-        name='roundend',
-        #guild=discord.Object(id=os.getenv('DISCORD_GUILD_ID'))
+    # @Checks.heads_only(Checks)
+    # @tournament.command(
+    #     name='roundend',
+    #     #guild=discord.Object(id=os.getenv('DISCORD_GUILD_ID'))
+    # )
+    @discord_commands.command(
+        name='roundend'
     )
     async def roundend(self, interaction : discord.Interaction, league_id : int, match_id : int = None):
         """End a round of a tournament and archive all channels
@@ -295,10 +317,13 @@ class Tournament(discord_commands.Cog, group_name='tournament', name='tournamnet
             self.db.archive_match(match_id)
 
         await interaction.response.edit_message(content='Round ended. All channels have been archived.', ephemeral=True)
-    @Checks.heads_only(Checks)
-    @tournament.command(
-        name='archive',
-        #guild=discord.Object(id=os.getenv('DISCORD_GUILD_ID'))
+    # @Checks.heads_only(Checks)
+    # @tournament.command(
+    #     name='archive',
+    #     #guild=discord.Object(id=os.getenv('DISCORD_GUILD_ID'))
+    # )
+    @discord_commands.command(
+        name='archive'
     )
     async def archive(self, interaction : discord.Interaction, match_id : int):
         """Archive all channels and roles for a league
@@ -318,7 +343,10 @@ class Tournament(discord_commands.Cog, group_name='tournament', name='tournamnet
     #         await ctx.response.send_message(content='An error occurred while running this command.', ephermeral=True)
 
 
-async def initialize(drawbridge):
-    await drawbridge.client.add_cog(Tournament(drawbridge.client, drawbridge))
+async def initialize(bot, db, cit, logger):
+    await bot.add_cog(Tournament(bot, db, cit, logger), guilds=[discord.Object(id=os.getenv('DISCORD_GUILD_ID'))])
+    # list = await bot.tree.sync(guild=discord.Object(id=os.getenv('DISCORD_GUILD_ID')))
+    # logger.info(f'Loaded Tournament Commands: {list}')
+
 
 #del discord, os, json, database, citadel, discord_commands

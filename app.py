@@ -6,6 +6,7 @@ import os
 from dotenv import load_dotenv
 import discord
 from discord.ext import commands as discord_commands
+from discord.ext import tasks as discord_tasks
 from modules import citadel
 from modules import database
 from modules import Drawbridge
@@ -42,9 +43,20 @@ def main():
     logger.info(f'Starting OZF Drawbridge v{VERSION}...')
     # checkPackages()
     logger.info('OZF Drawbridge has started.')
-    Drawbridge.Drawbridge(client, db, cit, logger)
+    # Drawbridge.Drawbridge(client, db, cit, logger)
     client.run(os.getenv('DISCORD_TOKEN'))
 
+@client.event
+async def on_ready():
+    logger.info(f'Logged in as {client.user.name}#{client.user.discriminator} ({client.user.id})')
+    # await Drawbridge.load_all_commands(
+    await Drawbridge.initialize(client, db, cit, logger)
+
+@discord_tasks.loop(seconds=5)
+async def check_commands():
+    logger.info('DEBUG - Checking commands')
+    for cmd in client.tree.walk_commands(guild=discord.Object(id=os.getenv('DISCORD_GUILD_ID'))):
+        logger.info(f'DEBUG: {cmd.name} - {type(cmd)}')
 
 
 if __name__ == '__main__':
