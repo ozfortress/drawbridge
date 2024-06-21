@@ -7,6 +7,7 @@ import json
 from modules import database
 from modules import citadel
 
+from discord import app_commands
 from discord.ext import commands as discord_commands
 from discord.ext import tasks as discord_tasks
 
@@ -44,13 +45,13 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
     #     # guild=discord.Object(id=os.getenv('DISCORD_GUILD_ID'))
     # )
 
-    @discord_commands.command(
+    @app_commands.command(
         name='test'
     )
     async def test(self, interaction : discord.Interaction):
         await interaction.response.send_message('Test command.', ephemeral=True)
 
-    @discord_commands.command(
+    @app_commands.command(
         name='start'
     )
     async def start(self, interaction : discord.Interaction, league_id : int, league_shortcode : str, is_hl : bool = False):
@@ -148,7 +149,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
     #     name='end',
     #     #guild=discord.Object(id=os.getenv('DISCORD_GUILD_ID'))
     # )
-    @discord_commands.command(
+    @app_commands.command(
         name='end'
     )
     async def end(self, interaction : discord.Interaction, league_id : int):
@@ -181,7 +182,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
     #     name='roundgen',
     #     #guild=discord.Object(id=os.getenv('DISCORD_GUILD_ID'))
     # )
-    @discord_commands.command(
+    @app_commands.command(
         name='roundgen'
     )
     async def roundgen(self, interaction : discord.Interaction, league_id : int, round_number : int = None):
@@ -274,7 +275,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
     #     name='roundend',
     #     #guild=discord.Object(id=os.getenv('DISCORD_GUILD_ID'))
     # )
-    @discord_commands.command(
+    @app_commands.command(
         name='roundend'
     )
     async def roundend(self, interaction : discord.Interaction, league_id : int, match_id : int = None):
@@ -322,7 +323,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
     #     name='archive',
     #     #guild=discord.Object(id=os.getenv('DISCORD_GUILD_ID'))
     # )
-    @discord_commands.command(
+    @app_commands.command(
         name='archive'
     )
     async def archive(self, interaction : discord.Interaction, match_id : int):
