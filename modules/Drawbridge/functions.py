@@ -43,7 +43,7 @@ class Functions:
             raise ValueError(f'caller should pass a dict as the first argument, received {type(json)}')
         if isinstance(json, str): #  Self-referenced function to substitute strings in a json object
             for key, value in substitutions.items():
-                json = json.replace(key, value)
+                json = json.replace(key, str(value))
             return json
         elif isinstance(json, dict):
             for key, value in json.items():
