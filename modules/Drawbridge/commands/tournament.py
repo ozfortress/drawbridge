@@ -134,7 +134,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                         '{CHANNEL_LINK}': f'<#{teamchannel.id}>',
                     }
                     teammessage = self.functions.substitute_strings_in_embed(teammessage, subsitutions)
-                    teammessage['embed'] = teammessage['embeds'][0]
+                    teammessage['embed'] = discord.Embed(**teammessage['embeds'][0])
                     del teammessage['embeds']
                     await teamchannel.send(**teammessage)
                     await interaction.edit_original_response(content=f'Generating Division Categories, Team Channels, and Roles.\nLeague: {league.name}\nDivisions: {d}/{len(divs)}\nTeams: {r}/{len(rosters)}')
@@ -275,7 +275,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                         '{CHANNEL_ID}': str(match_channel.id),
                         '{CHANNEL_LINK}': f'<#{match_channel.id}>'
                     })
-                    match_message['embed'] = match_message['embeds'][0]
+                    match_message['embed'] = discord.Embed(**match_message['embeds'][0])
                     del match_message['embeds']
                     await match_channel.send(**match_message)
                     # Update the database
