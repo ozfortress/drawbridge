@@ -24,6 +24,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         self.db = db
         self.logger = logger
         self.logger.info('Loaded Tournament Commands.')
+        self.functions = Functions(self.db, self.cit)
 
     # tournament = discord.app_commands.Group(name='tournament', description='Commands for managing ozfortress tournaments, including generating match channels and starting/ending tournaments', guild_only=True, guild_ids=[os.getenv('DISCORD_GUILD_ID')])
 
@@ -54,7 +55,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
     @app_commands.command(
         name='start'
     )
-    async def start(self, interaction : discord.Interaction, league_id : int, league_shortcode : str, is_hl : bool = False):
+    async def start(self, interaction : discord.Interaction, league_id : int, league_shortcode: str):
         """Generate team roles and channels for a given league
 
         Parameters
@@ -63,13 +64,14 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             The League ID to generate teams for
         league_shortcode: str
             The Shortcode for this league (eg: HL 27, 6s 30 ), this will be appended to role names.
-        is_hl: bool
-            Whether the league is Highlander or not. Default is False.
         """
+
         await interaction.response.send_message('Generating teams...', ephemeral=True)
         league = self.cit.getLeague(league_id)
+        is_hl = 'highlander' in league.name.lower()
         rosters = league.rosters
         divs = []
+
         file = open('embeds/teams.json', 'r')
         for roster in rosters:
             if roster['division'] not in divs:
@@ -79,7 +81,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             # role = await ctx.guild.create_role(name=role_name)
             # db.insert_team(roster)
 
-        await interaction.response.edit_message(content=f'Generating Division Categories, Team Channels, and Roles.\nLeague: {league['name']}\nDivisions: {len(divs)}\nTeams: {len(rosters)}')
+        await interaction.edit_original_response(content=f'Generating Division Categories, Team Channels, and Roles.\nLeague: {league.name}\nDivisions: {len(divs)}\nTeams: {len(rosters)}')
         r=0 #counters
         d=0 #counters
         for div in divs:
@@ -101,9 +103,11 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 catoverwrites[discord.Object(id=Checks.roles['6s Admin'])] = discord.PermissionOverwrite(read_messages=True)
 
             channelcategory = await interaction.guild.create_category(f'{div} - {league_shortcode}')
+
             role = await interaction.guild.create_role(name=f'{div} - {league_shortcode}')
             dbdiv = {
-                'division': div,
+                'league_id': league_id,
+                'division_name': div,
                 'role_id': role.id,
                 'category_id': channelcategory.id
             }
@@ -118,37 +122,35 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     teamchannel = await interaction.guild.create_text_channel(f'{roster['name']} ({league_shortcode})', category=channelcategory, overwrites=overwrites)
 
                     # Load the chat message from embeds/teams.json
+                    # THIS SHIT DON'T WORK AND I'M TOO TIRED TO FIX
 
-                    teammessage = json.load(file)
-                    teammessage = Functions.substitute_strings_in_embed(teammessage, {
-                        '{TEAM_MENTION}': f'<@&{role.id}>',
-                        '{TEAM_NAME}': roster['name'],
-                        '{TEAM_ID}': roster['id'],
-                        '{DIVISION}': div,
-                        '{LEAGUE_NAME}': league['name'],
-                        '{LEAGUE_SHORTCODE}': league_shortcode,
-                        '{CHANNEL_ID}': str(teamchannel.id),
-                        '{CHANNEL_LINK}': f'<#{teamchannel.id}>',
-                    })
-                    teammessage['embed'] = teammessage['embeds'][0]
-                    del teammessage['embeds']
-                    await teamchannel.send(**teammessage)
-                    await interaction.response.edit_message(content=f'Generating Division Categories, Team Channels, and Roles.\nLeague: {league['name']}\nDivisions: {d}/{len(divs)}\nTeams: {r}/{len(rosters)}')
+                    # teammessage = json.load(file)
+                    # subsitutions = {
+                    #     '{TEAM_MENTION}': f'<@&{role.id}>',
+                    #     '{TEAM_NAME}': roster['name'],
+                    #     '{TEAM_ID}': roster['id'],
+                    #     '{DIVISION}': div,
+                    #     '{LEAGUE_NAME}': league.name,
+                    #     '{LEAGUE_SHORTCODE}': league_shortcode,
+                    #     '{CHANNEL_ID}': str(teamchannel.id),
+                    #     '{CHANNEL_LINK}': f'<#{teamchannel.id}>',
+                    # }
+                    # teammessage = self.functions.substitute_strings_in_embed(teammessage, subsitutions)
+                    # teammessage['embed'] = teammessage['embeds'][0]
+                    # del teammessage['embeds']
+                    # await teamchannel.send(**teammessage)
+                    await interaction.edit_original_response(content=f'Generating Division Categories, Team Channels, and Roles.\nLeague: {league.name}\nDivisions: {d}/{len(divs)}\nTeams: {r}/{len(rosters)}')
                     dbteam = {
                         'team_id': roster['id'],
+                        'league_id': league_id,
                         'role_id': role.id,
                         'team_channel': teamchannel.id,
                         'division': divid,
                         'team_name': roster['name']
                     }
                     self.db.insert_team(dbteam)
-        await interaction.response.edit_message(content=f'Generated.\nLeague: {league['name']}\nDivisions: {d}/{len(divs)}\nTeams: {r}/{len(rosters)}')
+        await interaction.edit_original_response(content=f'Generated.\nLeague: {league.name}\nDivisions: {d}/{len(divs)}\nTeams: {r}/{len(rosters)}')
 
-    # @Checks.heads_only(Checks)
-    # @tournament.command(
-    #     name='end',
-    #     #guild=discord.Object(id=os.getenv('DISCORD_GUILD_ID'))
-    # )
     @app_commands.command(
         name='end'
     )
@@ -160,23 +162,40 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         league_id: int
             The League ID to end the tournament for
         """
+
         await interaction.response.send_message('Ending tournament...', ephemeral=True)
-        # Ending a League: Need to follow these steps:
-        # 1. Archive all channels // NOT IMPLEMENTED, SKIP FOR NOW
-        # 2. Delete all team roles
-        # 3. Delete all team channels
-        # 4. Delete all division roles
-        # 5. Delete all division categories
-        # 6. Delete all league roles
-        # 7. Delete all league categories
-        # 8. Delete all league channels
-        # Update the database to reflect these changes at each step
-        # TODO
 
+        divs = self.db.get_divs_by_league(league_id)
+        guild = interaction.guild
+        teams = self.db.get_teams_by_league(league_id)
 
+        for channel in guild.channels:
+            for team in teams:
+                if channel.id == team[4]:
+                    await channel.delete()
+                    break
 
+        for role in guild.roles:
+            for team in teams:
+                if role.id == team[2]:
+                    await role.delete()
+                    break
 
-        await interaction.response.edit_message(content='Tournament ended. All channels and roles have been archived.', ephemeral=True)
+        for div in divs:
+            for category in guild.categories:
+                if category.id == div[4]:
+                    await category.delete()
+                    break
+            for role in guild.roles:
+                if role.id == div[3]:
+                    await role.delete()
+                    break
+
+        self.db.delete_teams_by_league(league_id)
+        self.db.delete_divisions_by_league(league_id)
+
+        await interaction.edit_original_response(content='Tournament ended. All channels and roles have been archived.')
+
     # @Checks.heads_only(Checks)
     # @tournament.command(
     #     name='roundgen',

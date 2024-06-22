@@ -71,7 +71,7 @@ class Database:
             query = "SELECT * FROM logs WHERE match_id = %s"
             self.cursor.execute(query, (id,))
             logs = self.cursor.fetchall()
-            return logs;
+            return logs
             # iterate through logs, resolve players and teams
             # match = self.get_match_details(id)
             # teams = []
@@ -150,13 +150,22 @@ class Database:
             print(f"Error: {e}")
             return None
 
-    def get_div_(self, team_id):
+    def get_divs_by_league(self, league_id):
         try:
-            query = "SELECT * FROM divisions WHERE team_id = %s"
-            self.cursor.execute(query, (team_id,))
-            return self.cursor.fetchone()
+            query = "SELECT * FROM divisions WHERE league_id=?"
+            self.cursor.execute(query, (league_id,))
+            return self.cursor.fetchall()
         except mariadb.Error as e:
-            print(f"Error: {e}")
+            print(f"Error in get_divs_by_league: {e}")
+            return None
+        
+    def get_teams_by_league(self, league_id):
+        try:
+            query = 'SELECT * FROM teams WHERE league_id=?'
+            self.cursor.execute(query, (league_id,))
+            return self.cursor.fetchall()
+        except mariadb.Error as e:
+            print(f'Error in get_teams_by_league: {e}')
             return None
 
     def get_team_channels(self):
@@ -179,22 +188,22 @@ class Database:
 
     def insert_div(self, div) -> int:
         try:
-            query = "INSERT INTO divisions (division, role_id, category_id) VALUES (?, ?, ?)"
-            self.cursor.execute(query, (div['division'], div['role_id'], div['category_id']))
+            query = "INSERT INTO divisions (league_id, division_name, role_id, category_id) VALUES (?, ?, ?, ?)"
+            self.cursor.execute(query, (div['league_id'], div['division_name'], div['role_id'], div['category_id']))
             self.conn.commit()
             return self.cursor.lastrowid
         except mariadb.Error as e:
-            print(f"Error: {e}")
+            print(f"Error at insert_div: {e}")
             return None
 
     def insert_team(self, team) -> int:
         try:
-            query = "INSERT INTO teams (team_id, role_id, team_channel, division, team_name) VALUES (?, ?, ?, ?, ?)"
-            self.cursor.execute(query, (team['team_id'], team['role_id'], team['team_channel'], team['division'], team['team_name']))
+            query = "INSERT INTO teams (team_id, league_id, role_id, team_channel, division, team_name) VALUES (?, ?, ?, ?, ?, ?)"
+            self.cursor.execute(query, (team['team_id'], team['league_id'], team['role_id'], team['team_channel'], team['division'], team['team_name']))
             self.conn.commit()
             return self.cursor.lastrowid
         except mariadb.Error as e:
-            print(f"Error: {e}")
+            print(f"Error at insert_team: {e}")
             return None
 
     def insert_match(self, match) -> int:
@@ -214,6 +223,28 @@ class Database:
         except mariadb.Error as e:
             print(f"Error: {e}")
             return None
+        
+    # cleanup stuff
 
+    def delete_divisions_by_league(self, league_id):
+        try:
+            query = 'DELETE FROM divisions WHERE league_id=?'
+            self.cursor.execute(query, (league_id,))
+            self.conn.commit()
+            return self.cursor.lastrowid
+        except mariadb.Error as e:
+            print(f'Error: {e}')
+            return None
+        
+    def delete_teams_by_league(self, league_id):
+        try:
+            query = 'DELETE FROM teams WHERE league_id=?'
+            self.cursor.execute(query, (league_id,))
+            self.conn.commit()
+            return self.cursor.lastrowid
+        except mariadb.Error as e:
+            print(f'Error: {e}')
+            return None
+        
 
 #del mariadb
