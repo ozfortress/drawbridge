@@ -72,7 +72,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         rosters = league.rosters
         divs = []
 
-        file = open('embeds/teams.json', 'r')
+        rawteammessage = json.load(open('embeds/teams.json', 'r'))
         for roster in rosters:
             if roster['division'] not in divs:
                 divs.append(roster['division'])
@@ -122,7 +122,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     teamchannel = await interaction.guild.create_text_channel(f'{roster['name']} ({league_shortcode})', category=channelcategory, overwrites=overwrites)
 
                     # Load the chat message from embeds/teams.json
-                    teammessage = json.load(file)
+
                     subsitutions = {
                         '{TEAM_MENTION}': f'<@&{role.id}>',
                         '{TEAM_NAME}': roster['name'],
@@ -133,7 +133,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                         '{CHANNEL_ID}': str(teamchannel.id),
                         '{CHANNEL_LINK}': f'<#{teamchannel.id}>',
                     }
-                    teammessage = self.functions.substitute_strings_in_embed(teammessage, subsitutions)
+                    teammessage = self.functions.substitute_strings_in_embed(rawteammessage, subsitutions)
                     teammessage['embed'] = discord.Embed(**teammessage['embeds'][0])
                     del teammessage['embeds']
                     await teamchannel.send(**teammessage)
