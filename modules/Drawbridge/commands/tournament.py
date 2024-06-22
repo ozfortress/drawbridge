@@ -122,23 +122,21 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     teamchannel = await interaction.guild.create_text_channel(f'{roster['name']} ({league_shortcode})', category=channelcategory, overwrites=overwrites)
 
                     # Load the chat message from embeds/teams.json
-                    # THIS SHIT DON'T WORK AND I'M TOO TIRED TO FIX
-
-                    # teammessage = json.load(file)
-                    # subsitutions = {
-                    #     '{TEAM_MENTION}': f'<@&{role.id}>',
-                    #     '{TEAM_NAME}': roster['name'],
-                    #     '{TEAM_ID}': roster['id'],
-                    #     '{DIVISION}': div,
-                    #     '{LEAGUE_NAME}': league.name,
-                    #     '{LEAGUE_SHORTCODE}': league_shortcode,
-                    #     '{CHANNEL_ID}': str(teamchannel.id),
-                    #     '{CHANNEL_LINK}': f'<#{teamchannel.id}>',
-                    # }
-                    # teammessage = self.functions.substitute_strings_in_embed(teammessage, subsitutions)
-                    # teammessage['embed'] = teammessage['embeds'][0]
-                    # del teammessage['embeds']
-                    # await teamchannel.send(**teammessage)
+                    teammessage = json.load(file)
+                    subsitutions = {
+                        '{TEAM_MENTION}': f'<@&{role.id}>',
+                        '{TEAM_NAME}': roster['name'],
+                        '{TEAM_ID}': roster['id'],
+                        '{DIVISION}': div,
+                        '{LEAGUE_NAME}': league.name,
+                        '{LEAGUE_SHORTCODE}': league_shortcode,
+                        '{CHANNEL_ID}': str(teamchannel.id),
+                        '{CHANNEL_LINK}': f'<#{teamchannel.id}>',
+                    }
+                    teammessage = self.functions.substitute_strings_in_embed(teammessage, subsitutions)
+                    teammessage['embed'] = teammessage['embeds'][0]
+                    del teammessage['embeds']
+                    await teamchannel.send(**teammessage)
                     await interaction.edit_original_response(content=f'Generating Division Categories, Team Channels, and Roles.\nLeague: {league.name}\nDivisions: {d}/{len(divs)}\nTeams: {r}/{len(rosters)}')
                     dbteam = {
                         'team_id': roster['id'],
