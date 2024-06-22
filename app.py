@@ -21,7 +21,7 @@ VERSION = '0.0.1'
 
 intents = discord.Intents.all() # TODO: Change this to only the intents we need
 
-client = discord_commands.Bot(".db ", intents=intents)
+client = discord_commands.AutoShardedBot(".db ", intents=intents, shard_count=2)
 # cmds = discord.app_commands.CommandTree(client)
 
 db = database.Database( conn_params={
