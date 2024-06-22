@@ -133,7 +133,9 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                         '{CHANNEL_ID}': str(teamchannel.id),
                         '{CHANNEL_LINK}': f'<#{teamchannel.id}>',
                     }
-                    teammessage = self.functions.substitute_strings_in_embed(rawteammessage, subsitutions)
+                    temprawteammessage = dict(rawteammessage)
+                    teammessage = self.functions.substitute_strings_in_embed(temprawteammessage, subsitutions)
+                    print(teammessage)
                     teammessage['embed'] = discord.Embed(**teammessage['embeds'][0])
                     del teammessage['embeds']
                     await teamchannel.send(**teammessage)
