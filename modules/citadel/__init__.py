@@ -1,3 +1,17 @@
+"""
+CItadel API Wrapper for ozfortress.com
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+:copyright: (c) 2024-present ozfortress"""
+
+__title__ = 'citadel'
+__author__ = 'ozfortress'
+__license__ = 'None'
+__version__ = '0.0.1'
+__copyright__ = 'Copyright 2024-present ozfortress'
+
+__path__ = __import__('pkgutil').extend_path(__path__, __name__)
+
 import requests
 import json
 
@@ -14,6 +28,19 @@ class Citadel:
     Raises:
         ValueError: If the API key is not provided when initializing the Citadel API.
     """
+    class APIException(Exception):
+        """
+        An exception raised when an error occurs while interacting with the Citadel API.
+
+        Attributes:
+            status (int): The status code of the error response.
+            message (str): The error message returned by the API.
+        """
+        def __init__(self, status: int, message: str) -> None:
+            self.status = status
+            self.message = message
+
+
     class _BaseCitadelObject:
         def __init__(self, data: dict) -> None:
             pass
@@ -220,14 +247,39 @@ class Citadel:
         self._api_key: str = apiKey
 
     def getUser(self, id: int) -> User:
+        """
+        Retrieves a user from the API based on the provided ID.
+
+        Args:
+            id (int): The ID of the user to retrieve.
+
+        Returns:
+            User: An instance of the User class representing the retrieved user.
+
+        Raises:
+            Citadel.APIException: If the API response contains a status and message indicating an error.
+        """
         url = f'{self._base_url}users/{id}'
         headers = {'X-API-Key': self._api_key}
         response: dict = requests.get(url, headers=headers).json()
         if 'status' in response:
-            raise ValueError(f'{response['status']} - {response['message']}')
+            raise Citadel.APIException(response['status'], response['message'])
         return self.User(response['user'])
 
     def getUserBySteamID(self, steam_id: str|int) -> User:
+        """
+        Retrieves a user by their Steam ID.
+
+        Args:
+            steam_id (str|int): The Steam ID of the user. Must be a 64-bit version.
+
+        Returns:
+            User: The user object corresponding to the given Steam ID.
+
+        Raises:
+            ValueError: If the Steam ID is invalid or not a 64-bit version.
+            Citadel.APIException: If the API response contains an error status.
+        """
         # Steam ID must be 64 bit version, reject if not
         if len(steam_id) != 17 | steam_id.isdigit() == False: # dirty check
             raise ValueError('Invalid Steam ID, must be 64 bit version')
@@ -235,39 +287,89 @@ class Citadel:
         headers = {'X-API-Key': self._api_key}
         response: dict = requests.get(url, headers=headers).json()
         if 'status' in response:
-            raise ValueError(f'{response['status']} - {response['message']}')
+            raise Citadel.APIException(response['status'], response['message'])
         return self.User(response['user'])
 
     def getTeam(self, id: int) -> Team:
+        """
+        Retrieves a team from the API based on the provided ID.
+
+        Args:
+            id (int): The ID of the team to retrieve.
+
+        Returns:
+            Team: An instance of the Team class representing the retrieved team.
+
+        Raises:
+            Citadel.APIException: If the API response contains a status and message indicating an error.
+        """
         url = f'{self._base_url}teams/{id}'
         headers = {'X-API-Key': self._api_key}
         response: dict = requests.get(url, headers=headers).json()
         if 'status' in response:
-            raise ValueError(f'{response['status']} - {response['message']}')
+            raise Citadel.APIException(response['status'], response['message'])
         return self.Team(response['team'])
 
     def getLeague(self, id: int) -> League:
+        """
+        Retrieves information about a specific league.
+
+        Args:
+            id (int): The ID of the league to retrieve.
+
+        Returns:
+            League: An instance of the League class representing the retrieved league.
+
+        Raises:
+            Citadel.APIException: If the API response contains an error status.
+
+        """
         url = f'{self._base_url}leagues/{id}'
         headers = {'X-API-Key': self._api_key}
         response: dict = requests.get(url, headers=headers).json()
         if 'status' in response:
-            raise ValueError(f'{response['status']} - {response['message']}')
+            raise Citadel.APIException(response['status'], response['message'])
         return self.League(response['league'])
 
     def getRoster(self, id: int) -> Roster:
+        """
+        Retrieves a roster based on the given ID.
+
+        Args:
+            id (int): The ID of the roster to retrieve.
+
+        Returns:
+            Roster: The retrieved roster object.
+
+        Raises:
+            Citadel.APIException: If the response contains a status and message.
+
+        """
         url = f'{self._base_url}rosters/{id}'
         headers = {'X-API-Key': self._api_key}
         response: dict = requests.get(url, headers=headers).json()
         if 'status' in response:
-            raise ValueError(f'{response['status']} - {response['message']}')
+            raise Citadel.APIException(response['status'], response['message'])
         return self.Roster(response['roster'])
 
     def getMatch(self, id: int) -> Match:
+        """
+        Retrieves a match with the given ID from the API.
+
+        Args:
+            id (int): The ID of the match to retrieve.
+
+        Returns:
+            Match: The retrieved match object.
+
+        Raises:
+            Citadel.APIException: If the API response contains an error status.
+        """
         url = f'{self._base_url}matches/{id}'
         headers = {'X-API-Key': self._api_key}
         response: dict = requests.get(url, headers=headers).json()
         if 'status' in response:
-            raise ValueError(f'{response['status']} - {response['message']}')
+            raise Citadel.APIException(response['status'], response['message'])
         return self.Match(response['match'])
 
-# del requests
+__all__ = ['Citadel']
