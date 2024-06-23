@@ -218,8 +218,8 @@ class Database:
 
     def insert_match(self, match) -> int:
         try:
-            query = "INSERT INTO matches (match_id, division, team_home, team_away, channel_id, archived) VALUES (?, ?, ?, ?, ?, ?)"
-            self.cursor.execute(query, (match['match_id'], match['division'], match['team_home'], match['team_away'], match['channel_id'], 0))
+            query = "INSERT INTO matches (match_id, division, team_home, team_away, channel_id, archived, league_id) VALUES (?, ?, ?, ?, ?, ?, ?)"
+            self.cursor.execute(query, (match['match_id'], match['division'], match['team_home'], match['team_away'], match['channel_id'], 0, match['league_id']))
             self.conn.commit()
             return self.cursor.lastrowid
         except mariadb.Error as e:
@@ -236,6 +236,15 @@ class Database:
         
     # cleanup stuff
 
+    def get_match_channels_by_league(self, league_id):
+        try:
+            query = 'SELECT channel_id FROM matches WHERE league_id=?;'
+            self.cursor.execute(query, (league_id,))
+            return self.cursor.fetchall()
+        except mariadb.Error as e:
+            print(f'Error in get_match_channels_by_league: {e}')
+            return None
+
     def delete_divisions_by_league(self, league_id):
         try:
             query = 'DELETE FROM divisions WHERE league_id=?'
@@ -249,6 +258,16 @@ class Database:
     def delete_teams_by_league(self, league_id):
         try:
             query = 'DELETE FROM teams WHERE league_id=?'
+            self.cursor.execute(query, (league_id,))
+            self.conn.commit()
+            return self.cursor.lastrowid
+        except mariadb.Error as e:
+            print(f'Error: {e}')
+            return None
+        
+    def delete_matches_by_league(self, league_id):
+        try:
+            query = 'DELETE FROM matches WHERE league_id=?'
             self.cursor.execute(query, (league_id,))
             self.conn.commit()
             return self.cursor.lastrowid

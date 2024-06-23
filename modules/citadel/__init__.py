@@ -235,6 +235,7 @@ class Citadel:
                 self.league: Citadel.League = data['league'] # League
                 self.home_team: Citadel.Roster = data['home_team'] # Roster
                 self.away_team: Citadel.Roster = data['away_team'] # Roster
+                self.league_id = data['league']['id']
             except KeyError as e:
                 raise ValueError(f'Missing required field: {e}')
 

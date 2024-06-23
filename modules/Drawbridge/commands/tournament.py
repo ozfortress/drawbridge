@@ -169,12 +169,16 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         divs = self.db.get_divs_by_league(league_id)
         guild = interaction.guild
         teams = self.db.get_teams_by_league(league_id)
+        match_channels = self.db.get_match_channels_by_league(league_id)
 
         for channel in guild.channels:
             for team in teams:
                 if channel.id == team[4]:
                     await channel.delete()
                     break
+            for match_channel in match_channels:
+                if channel.id == match_channel[0]:
+                    await channel.delete()
 
         for role in guild.roles:
             for team in teams:
@@ -194,6 +198,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
         self.db.delete_teams_by_league(league_id)
         self.db.delete_divisions_by_league(league_id)
+        self.db.delete_matches_by_league(league_id)
 
         await interaction.edit_original_response(content='Tournament ended. All channels and roles have been archived.')
 
@@ -323,7 +328,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 'division': team_home['division'],
                 'team_home': team_home['team_id'],
                 'team_away': 0,
-                'channel_id': 0 # 0 for bye
+                'channel_id': 0, # 0 for bye,
+                'league_id': match.league_id
             })
         else:
             team_home = self.db.get_team_by_id(match.home_team['team_id'])
@@ -373,7 +379,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 'division': team_home[5], # division
                 'team_home': team_home[0], # team_id
                 'team_away': team_away[0], # team_id
-                'channel_id': match_channel.id
+                'channel_id': match_channel.id,
+                'league_id': match.league_id
             })
         
         await interaction.edit_original_response(content='Matches generated.')
@@ -464,7 +471,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         # at this point we'd hand off to the archival process, but that's firmly TODO:
         # Update the database
         self.db.archive_match(match_id)
-        
+
         await interaction.edit_original_response(content='Round ended. All channels have been archived.')
     
     @app_commands.command(
