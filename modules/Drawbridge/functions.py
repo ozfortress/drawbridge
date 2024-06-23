@@ -2,7 +2,7 @@ import modules.database as database
 import modules.citadel as citadel
 import discord
 import logging
-import time
+import datetime
 
 class Functions:
     """
@@ -65,11 +65,10 @@ class Functions:
         else:
             if not match_id:
                 return None
-            print('HI! ' + str(match_id))
             match = self.db.get_match_details(match_id)
             teamsRoles = []
-            teamsRoles.append(match[2].role_id)
-            teamsRoles.append(match[3].role_id)
+            teamsRoles.append(match[2])
+            teamsRoles.append(match[3])
             log['match_id'] = match_id
 
             for teamRole in teamsRoles:
@@ -96,7 +95,7 @@ class Functions:
             log['message_content'] = after.content
             log['log_timestamp'] = after.edited_at
         if log_type == "DELETE":
-            log['log_timestamp'] = int(time.time())
+            log['log_timestamp'] = datetime.datetime.now()
         self.db.insert_log(log)
         self.logger.debug(f'new log {message.author.name}#{message.author.discriminator} ({message.author.id}) - {log_type}')
 

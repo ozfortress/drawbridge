@@ -9,7 +9,6 @@ from discord.ext import commands as discord_commands
 
 class Logging(discord_commands.Cog):
     def __init__(self, client : discord_commands.Bot, db : database.Database, cit):
-        print('logging system init')
         self.db = db
         self.client = client
         self.teamchannel_cache={
@@ -21,10 +20,8 @@ class Logging(discord_commands.Cog):
 
     @discord_commands.Cog.listener()
     async def on_message(self,message : discord.Message):
-        print('on_message')
         match_id = self.db.get_match_id_of_channel(message.channel.id)
         if match_id:
-            print('generating a log for create')
             self.functions.generate_log(message, False, match_id[0], "CREATE")
         #else:
             # Verify cache is up to date
