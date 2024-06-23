@@ -241,37 +241,43 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     })
                 else:
                     # We now know who the two teams are, lets get their roles
-                    team_home = self.db.get_team_by_id(round['home_team'])
-                    team_away = self.db.get_team_by_id(round['away_team'])
+                    #print(str(round.home_team))
+                    #print(str(round.away_team))
+                    print(str(round.home_team['team_id']))
+                    print(str(round.away_team['team_id']))
+                    team_home = self.db.get_team_by_id(round.home_team['team_id'])
+                    team_away = self.db.get_team_by_id(round.away_team['team_id'])
                     # Team roles
-                    role_home = discord.Object(id=team_home['role_id'])
-                    role_away = discord.Object(id=team_away['role_id'])
+                    role_home = discord.Object(id=team_home[2]) # role_id is 2
+                    role_away = discord.Object(id=team_away[2])
                     # Category ID for the division
-                    category_id = self.db.get_div_(team_home['team_id'])['category_id'] # always pull from home team
+                    category_id = self.db.get_div_by_name(round.home_team['division'])[4] # always pull from home team, 4 is category_id btw
+                    print('type is ' + str(type(category_id)))
 
                     # Create the match channel
                     overrides = {
                         role_home: discord.PermissionOverwrite(read_messages=True),
                         role_away: discord.PermissionOverwrite(read_messages=True),
-                        Checks.roles['6s Head']: discord.PermissionOverwrite(read_messages=True),
-                        Checks.roles['HL Head']: discord.PermissionOverwrite(read_messages=True),
-                        Checks.roles['Trial Admin']: discord.PermissionOverwrite(read_messages=True),
-                        Checks.roles['Developers']: discord.PermissionOverwrite(read_messages=True),
-                        Checks.roles['Approved Casters']: discord.PermissionOverwrite(read_messages=True),
-                        Checks.roles['Unapproved Casters']: discord.PermissionOverwrite(read_messages=True),
-                        Checks.roles['Captains Bot']: discord.PermissionOverwrite(read_messages=True),
-                        Checks.roles['HL Admin']: discord.PermissionOverwrite(read_messages=True),
-                        Checks.roles['6s Admin']: discord.PermissionOverwrite(read_messages=True),
+                        discord.Object(id = Checks.roles['6s Head']): discord.PermissionOverwrite(read_messages=True),
+                        discord.Object(id = Checks.roles['HL Head']): discord.PermissionOverwrite(read_messages=True),
+                        discord.Object(id = Checks.roles['Trial Admin']): discord.PermissionOverwrite(read_messages=True),
+                        discord.Object(id = Checks.roles['Developers']): discord.PermissionOverwrite(read_messages=True),
+                        discord.Object(id = Checks.roles['Approved Casters']): discord.PermissionOverwrite(read_messages=True),
+                        discord.Object(id = Checks.roles['Unapproved Casters']): discord.PermissionOverwrite(read_messages=True),
+                        discord.Object(id = Checks.roles['Captains Bot']): discord.PermissionOverwrite(read_messages=True),
+                        discord.Object(id = Checks.roles['HL Admin']): discord.PermissionOverwrite(read_messages=True),
+                        discord.Object(id = Checks.roles['6s Admin']): discord.PermissionOverwrite(read_messages=True),
                         interaction.guild.default_role: discord.PermissionOverwrite(read_messages=False)
                     }
-                    match_channel = await interaction.guild.create_text_channel(f'{team_home['team_name']}-⚔️-{team_away['team_name']}-Round-{match['round_number']}-{match['id']}', category=discord.Object(id=category_id), overwrites=overrides)
+                    match_channel = await interaction.guild.create_text_channel(f'{team_home[3]}-⚔️-{team_away[3]}-Round-{match['round_number']}-{match['id']}', category=discord.Object(id=category_id), overwrites=overrides)
+                    #match_channel = await interaction.guild.create_text_channel(f'{team_home[3]}-⚔️-{team_away[3]}-Round-{match['round_number']}-{match['id']}', category=discord.Object(id=category_id))
                     # Load the chat message from embeds/match.json
                     match_message = json.load(open('embeds/match.json', 'r'))
                     if match['round_name'] == '':
                         match['round_name'] = f'Round {match['round_number']}'
                     match_message = Functions.substitute_strings_in_embed(match_message, {
-                        '{TEAM_HOME}': team_home['team_name'],
-                        '{TEAM_AWAY}': team_away['team_name'],
+                        '{TEAM_HOME}': team_home[3], # team_name
+                        '{TEAM_AWAY}': team_away[3], # team_name
                         '{ROUND_NAME}': match['round_name'],
                         '{MATCH_ID}': match['id'],
                         '{CHANNEL_ID}': str(match_channel.id),

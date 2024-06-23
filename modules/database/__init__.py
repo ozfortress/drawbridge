@@ -143,7 +143,8 @@ class Database:
 
     def get_team_by_id(self, team_id):
         try:
-            query = "SELECT * FROM teams LEFT JOIN divisions ON teams.division = divisions.id WHERE team_id = %s"
+            #query = "SELECT * FROM teams LEFT JOIN divisions ON teams.division = divisions.id WHERE team_id = %s"
+            query = 'SELECT * FROM teams WHERE team_id=?;'
             self.cursor.execute(query, (team_id,))
             return self.cursor.fetchone()
         except mariadb.Error as e:
@@ -194,6 +195,15 @@ class Database:
             return self.cursor.lastrowid
         except mariadb.Error as e:
             print(f"Error at insert_div: {e}")
+            return None
+        
+    def get_div_by_name(self, div_name):
+        try:
+            query = 'SELECT * FROM divisions WHERE division_name=?;'
+            self.cursor.execute(query, (div_name,))
+            return self.cursor.fetchone()
+        except mariadb.Error as e:
+            print(f'Error at get_div_by_name: {e}')
             return None
 
     def insert_team(self, team) -> int:
