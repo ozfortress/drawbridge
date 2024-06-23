@@ -87,23 +87,36 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         d=0 #counters
         for div in divs:
             d+=1
-            catoverwrites = {
-                interaction.guild.default_role: discord.PermissionOverwrite(read_messages=False),
-                # discord.Object(id=(is_hl == True ? roles['HL Admin'] : roles['6s Admin'])) : discord.PermissionOverwrite(read_messages=True),
-                discord.Object(id=Checks.roles['6s Head']) : discord.PermissionOverwrite(read_messages=True),
-                discord.Object(id=Checks.roles['HL Head']) : discord.PermissionOverwrite(read_messages=True),
-                discord.Object(id=Checks.roles['Trial Admin']) : discord.PermissionOverwrite(read_messages=True), # Or false? dunno hey.
-                discord.Object(id=Checks.roles['Developers']) : discord.PermissionOverwrite(read_messages=True),
-                discord.Object(id=Checks.roles['Approved Casters']) : discord.PermissionOverwrite(read_messages=False),
-                discord.Object(id=Checks.roles['Unapproved Casters']) : discord.PermissionOverwrite(read_messages=False),
-                discord.Object(id=Checks.roles['Captains Bot']) : discord.PermissionOverwrite(read_messages=True)
-            }
-            if is_hl:
-                catoverwrites[discord.Object(id=Checks.roles['HL Admin'])] = discord.PermissionOverwrite(read_messages=True)
-            else:
-                catoverwrites[discord.Object(id=Checks.roles['6s Admin'])] = discord.PermissionOverwrite(read_messages=True)
+            # catoverwrites = {
+            #     interaction.guild.default_role: discord.PermissionOverwrite(read_messages=False),
+            #     # discord.Object(id=(is_hl == True ? roles['HL Admin'] : roles['6s Admin'])) : discord.PermissionOverwrite(read_messages=True),
+            #     discord.Object(id=Checks.roles['6s Head']) : discord.PermissionOverwrite(read_messages=True),
+            #     discord.Object(id=Checks.roles['HL Head']) : discord.PermissionOverwrite(read_messages=True),
+            #     discord.Object(id=Checks.roles['Trial Admin']) : discord.PermissionOverwrite(read_messages=True), # Or false? dunno hey.
+            #     discord.Object(id=Checks.roles['Developers']) : discord.PermissionOverwrite(read_messages=True),
+            #     discord.Object(id=Checks.roles['Approved Casters']) : discord.PermissionOverwrite(read_messages=False),
+            #     discord.Object(id=Checks.roles['Unapproved Casters']) : discord.PermissionOverwrite(read_messages=False),
+            #     discord.Object(id=Checks.roles['Captains Bot']) : discord.PermissionOverwrite(read_messages=True)
+            # }
+            # if is_hl:
+            #     catoverwrites[discord.Object(id=Checks.roles['HL Admin'])] = discord.PermissionOverwrite(read_messages=True)
+            # else:
+            #     catoverwrites[discord.Object(id=Checks.roles['6s Admin'])] = discord.PermissionOverwrite(read_messages=True)
 
-            channelcategory = await interaction.guild.create_category(f'{div} - {league_shortcode}')
+            overrides = {
+                interaction.guild.default_role: discord.PermissionOverwrite(view_channel=False),
+                interaction.guild.get_role(Checks.roles['6s Head']): discord.PermissionOverwrite(view_channel=True),
+                interaction.guild.get_role(Checks.roles['HL Head']): discord.PermissionOverwrite(view_channel=True),
+                interaction.guild.get_role(Checks.roles['Trial Admin']): discord.PermissionOverwrite(view_channel=True),
+                interaction.guild.get_role(Checks.roles['Developers']): discord.PermissionOverwrite(view_channel=True),
+                interaction.guild.get_role(Checks.roles['Approved Casters']): discord.PermissionOverwrite(view_channel=True),
+                interaction.guild.get_role(Checks.roles['Unapproved Casters']): discord.PermissionOverwrite(view_channel=True),
+                interaction.guild.get_role(Checks.roles['Captains Bot']): discord.PermissionOverwrite(view_channel=True),
+                interaction.guild.get_role(Checks.roles['HL Admin']): discord.PermissionOverwrite(view_channel=True),
+                interaction.guild.get_role(Checks.roles['6s Admin']): discord.PermissionOverwrite(view_channel=True)
+            }
+
+            channelcategory = await interaction.guild.create_category(f'{div} - {league_shortcode}', overwrites=overrides)
 
             role = await interaction.guild.create_role(name=f'{div} - {league_shortcode}')
             dbdiv = {
@@ -118,7 +131,17 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     r+=1
                     role = await interaction.guild.create_role(name=f'{roster['name']} ({league_shortcode})', mentionable=True)
                     overwrites = {
-                        role: discord.PermissionOverwrite(read_messages=True),
+                        interaction.guild.default_role: discord.PermissionOverwrite(view_channel=False),
+                        interaction.guild.get_role(Checks.roles['6s Head']): discord.PermissionOverwrite(view_channel=True),
+                        interaction.guild.get_role(Checks.roles['HL Head']): discord.PermissionOverwrite(view_channel=True),
+                        interaction.guild.get_role(Checks.roles['Trial Admin']): discord.PermissionOverwrite(view_channel=True),
+                        interaction.guild.get_role(Checks.roles['Developers']): discord.PermissionOverwrite(view_channel=True),
+                        interaction.guild.get_role(Checks.roles['Approved Casters']): discord.PermissionOverwrite(view_channel=True),
+                        interaction.guild.get_role(Checks.roles['Unapproved Casters']): discord.PermissionOverwrite(view_channel=True),
+                        interaction.guild.get_role(Checks.roles['Captains Bot']): discord.PermissionOverwrite(view_channel=True),
+                        interaction.guild.get_role(Checks.roles['HL Admin']): discord.PermissionOverwrite(view_channel=True),
+                        interaction.guild.get_role(Checks.roles['6s Admin']): discord.PermissionOverwrite(view_channel=True),
+                        role: discord.PermissionOverwrite(view_channel=True)
                     }
                     teamchannel = await interaction.guild.create_text_channel(f'{roster['name']} ({league_shortcode})', category=channelcategory, overwrites=overwrites)
                     team_id = roster['team_id']
@@ -171,6 +194,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         teams = self.db.get_teams_by_league(league_id)
         match_channels = self.db.get_match_channels_by_league(league_id)
 
+        await interaction.edit_original_response(content='Deleting channels... (1/3)')
+
         for channel in guild.channels:
             for team in teams:
                 if channel.id == team[4]:
@@ -180,11 +205,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 if channel.id == match_channel[0]:
                     await channel.delete()
 
-        for role in guild.roles:
-            for team in teams:
-                if role.id == team[2]:
-                    await role.delete()
-                    break
+        await interaction.edit_original_response(content='Deleting categories... (2/3)')
 
         for div in divs:
             for category in guild.categories:
@@ -193,6 +214,14 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     break
             for role in guild.roles:
                 if role.id == div[3]:
+                    await role.delete()
+                    break
+
+        await interaction.edit_original_response(content='Deleting roles... (3/3)')
+
+        for role in guild.roles:
+            for team in teams:
+                if role.id == team[2]:
                     await role.delete()
                     break
 
@@ -342,18 +371,18 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             category_id = self.db.get_div_by_name(match.home_team['division'])[4] # always pull from home team, 4 is category_id btw
             
             overrides = {
-                interaction.guild.default_role: discord.PermissionOverwrite(read_messages=False),
-                interaction.guild.get_role(team_home[2]): discord.PermissionOverwrite(read_messages=True),
-                interaction.guild.get_role(team_away[2]): discord.PermissionOverwrite(read_messages=True),
-                interaction.guild.get_role(Checks.roles['6s Head']): discord.PermissionOverwrite(read_messages=True),
-                interaction.guild.get_role(Checks.roles['HL Head']): discord.PermissionOverwrite(read_messages=True),
-                interaction.guild.get_role(Checks.roles['Trial Admin']): discord.PermissionOverwrite(read_messages=True),
-                interaction.guild.get_role(Checks.roles['Developers']): discord.PermissionOverwrite(read_messages=True),
-                interaction.guild.get_role(Checks.roles['Approved Casters']): discord.PermissionOverwrite(read_messages=True),
-                interaction.guild.get_role(Checks.roles['Unapproved Casters']): discord.PermissionOverwrite(read_messages=True),
-                interaction.guild.get_role(Checks.roles['Captains Bot']): discord.PermissionOverwrite(read_messages=True),
-                interaction.guild.get_role(Checks.roles['HL Admin']): discord.PermissionOverwrite(read_messages=True),
-                interaction.guild.get_role(Checks.roles['6s Admin']): discord.PermissionOverwrite(read_messages=True)
+                interaction.guild.default_role: discord.PermissionOverwrite(view_channel=False),
+                interaction.guild.get_role(team_home[2]): discord.PermissionOverwrite(view_channel=True),
+                interaction.guild.get_role(team_away[2]): discord.PermissionOverwrite(view_channel=True),
+                interaction.guild.get_role(Checks.roles['6s Head']): discord.PermissionOverwrite(view_channel=True),
+                interaction.guild.get_role(Checks.roles['HL Head']): discord.PermissionOverwrite(view_channel=True),
+                interaction.guild.get_role(Checks.roles['Trial Admin']): discord.PermissionOverwrite(view_channel=True),
+                interaction.guild.get_role(Checks.roles['Developers']): discord.PermissionOverwrite(view_channel=True),
+                interaction.guild.get_role(Checks.roles['Approved Casters']): discord.PermissionOverwrite(view_channel=True),
+                interaction.guild.get_role(Checks.roles['Unapproved Casters']): discord.PermissionOverwrite(view_channel=True),
+                interaction.guild.get_role(Checks.roles['Captains Bot']): discord.PermissionOverwrite(view_channel=True),
+                interaction.guild.get_role(Checks.roles['HL Admin']): discord.PermissionOverwrite(view_channel=True),
+                interaction.guild.get_role(Checks.roles['6s Admin']): discord.PermissionOverwrite(view_channel=True)
             }
             #for key in overrides:
                 #print(key)
