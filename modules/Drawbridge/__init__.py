@@ -29,7 +29,7 @@ from discord.ext import tasks as discord_tasks
 
 async def initialize(client: discord_commands.Bot, db : Database, cit : Citadel, logger : Logger):
     commands_path = os.path.join(os.path.dirname(__file__), 'commands')
-    client.add_cog(Logging(client, db, cit)) # Manually add the logging module.
+    await client.add_cog(Logging(client, db, cit)) # Manually add the logging module.
     modules = {}
     for _, module_name, _ in pkgutil.iter_modules([commands_path]):
         logger.info(f'Loading module: {module_name} - {commands_path}')
