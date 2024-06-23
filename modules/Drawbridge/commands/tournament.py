@@ -257,18 +257,18 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
                     # Create the match channel
                     overrides = {
+                        interaction.guild.default_role: discord.PermissionOverwrite(read_messages=False),
                         role_home: discord.PermissionOverwrite(read_messages=True),
                         role_away: discord.PermissionOverwrite(read_messages=True),
-                        discord.Object(id = Checks.roles['6s Head']): discord.PermissionOverwrite(read_messages=True),
-                        discord.Object(id = Checks.roles['HL Head']): discord.PermissionOverwrite(read_messages=True),
-                        discord.Object(id = Checks.roles['Trial Admin']): discord.PermissionOverwrite(read_messages=True),
-                        discord.Object(id = Checks.roles['Developers']): discord.PermissionOverwrite(read_messages=True),
-                        discord.Object(id = Checks.roles['Approved Casters']): discord.PermissionOverwrite(read_messages=True),
-                        discord.Object(id = Checks.roles['Unapproved Casters']): discord.PermissionOverwrite(read_messages=True),
-                        discord.Object(id = Checks.roles['Captains Bot']): discord.PermissionOverwrite(read_messages=True),
-                        discord.Object(id = Checks.roles['HL Admin']): discord.PermissionOverwrite(read_messages=True),
-                        discord.Object(id = Checks.roles['6s Admin']): discord.PermissionOverwrite(read_messages=True),
-                        interaction.guild.default_role: discord.PermissionOverwrite(read_messages=False)
+                        discord.Object(id=Checks.roles['6s Head']): discord.PermissionOverwrite(read_messages=True),
+                        discord.Object(id=Checks.roles['HL Head']): discord.PermissionOverwrite(read_messages=True),
+                        discord.Object(id=Checks.roles['Trial Admin']): discord.PermissionOverwrite(read_messages=True),
+                        discord.Object(id=Checks.roles['Developers']): discord.PermissionOverwrite(read_messages=True),
+                        discord.Object(id=Checks.roles['Approved Casters']): discord.PermissionOverwrite(read_messages=True),
+                        discord.Object(id=Checks.roles['Unapproved Casters']): discord.PermissionOverwrite(read_messages=True),
+                        discord.Object(id=Checks.roles['Captains Bot']): discord.PermissionOverwrite(read_messages=True),
+                        discord.Object(id=Checks.roles['HL Admin']): discord.PermissionOverwrite(read_messages=True),
+                        discord.Object(id=Checks.roles['6s Admin']): discord.PermissionOverwrite(read_messages=True)
                     }
                     match_channel = await interaction.guild.create_text_channel(f'{team_home[3]}-⚔️-{team_away[3]}-Round-{match['round_number']}-{match['id']}', category=discord.Object(id=category_id), overwrites=overrides)
                     #match_channel = await interaction.guild.create_text_channel(f'{team_home[3]}-⚔️-{team_away[3]}-Round-{match['round_number']}-{match['id']}', category=discord.Object(id=category_id))
