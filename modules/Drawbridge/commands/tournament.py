@@ -196,9 +196,10 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     await role.delete()
                     break
 
+        self.db.delete_matches_by_league(league_id)
         self.db.delete_teams_by_league(league_id)
         self.db.delete_divisions_by_league(league_id)
-        self.db.delete_matches_by_league(league_id)
+        
 
         await interaction.edit_original_response(content='Tournament ended. All channels and roles have been archived.')
 
