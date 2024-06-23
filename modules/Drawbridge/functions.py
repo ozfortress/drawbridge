@@ -57,7 +57,7 @@ class Functions:
     def generate_log(self, message : discord.Message, is_team : bool, match_id=0, log_type="CREATE", after : discord.Message=None):
         log = {}
         if is_team:
-            team = database.get_team_by_channel_id(message.channel.id)
+            team = self.db.get_team_by_channel_id(message.channel.id)
             if not team:
                 return None
             log['match_id'] = 0
@@ -65,15 +65,16 @@ class Functions:
         else:
             if not match_id:
                 return None
+            print('HI! ' + str(match_id))
             match = self.db.get_match_details(match_id)
             teamsRoles = []
-            teamsRoles.append(match['team_home'].role_id)
-            teamsRoles.append(match['team_away'].role_id)
+            teamsRoles.append(match[2].role_id)
+            teamsRoles.append(match[3].role_id)
             log['match_id'] = match_id
 
             for teamRole in teamsRoles:
                 if teamRole in message.author.roles:
-                    log['team'] = database.get_team_id_of_role(teamRole)
+                    log['team'] = self.db.get_team_id_of_role(teamRole)
                     break
             if 'team' not in log:
                 log['team'] = None # Admin or Caster?

@@ -26,12 +26,12 @@ class Database:
 
     def get_match_details(self,id):
         try:
-            query = "SELECT * FROM matches WHERE match_id = %s"
+            query = "SELECT * FROM matches WHERE match_id=?"
             self.cursor.execute(query, (id,))
             # resolve team_home and team_away
             match = self.cursor.fetchone()
-            match['team_home'] = self.get_team(match['team_home'])
-            match['team_away'] = self.get_team(match['team_away'])
+            #match['team_home'] = self.get_team(match[2])
+            #match['team_away'] = self.get_team(match[3])
 
             return match
             # return self.cursor.fetchone()
@@ -228,7 +228,7 @@ class Database:
     def archive_match(self, match_id):
         try:
             query = "UPDATE matches SET archived = 1 WHERE match_id = ?"
-            self.cursor.execute(query, (match_id))
+            self.cursor.execute(query, (match_id,))
             self.conn.commit()
         except mariadb.Error as e:
             print(f"Error: {e}")

@@ -51,6 +51,7 @@ async def on_ready():
     logger.info(f'Logged in as {client.user.name}#{client.user.discriminator} ({client.user.id})')
     # await Drawbridge.load_all_commands(
     await Drawbridge.initialize(client, db, cit, logger)
+    Drawbridge.Logging(client, db, cit)
 
 @discord_tasks.loop(seconds=5)
 async def check_commands():
