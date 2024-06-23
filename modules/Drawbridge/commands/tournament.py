@@ -15,6 +15,7 @@ __title__ = 'Tournament Commands'
 __description__ = 'Commands for managing tournaments.'
 __version__ = '0.0.1'
 
+
 @Checks.heads_only(Checks)
 @discord.app_commands.guild_only()
 class Tournament(discord_commands.GroupCog, group_name='tournament', name='tournamnet', group_description='Commands for managing tournaments. This is a new string',):
@@ -275,7 +276,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     match_message = json.load(open('embeds/match.json', 'r'))
                     if match['round_name'] == '':
                         match['round_name'] = f'Round {match['round_number']}'
-                    match_message = Functions.substitute_strings_in_embed(match_message, {
+                    match_message = self.functions.substitute_strings_in_embed(match_message, {
                         '{TEAM_HOME}': team_home[3], # team_name
                         '{TEAM_AWAY}': team_away[3], # team_name
                         '{ROUND_NAME}': match['round_name'],
