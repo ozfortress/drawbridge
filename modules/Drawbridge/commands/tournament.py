@@ -312,6 +312,12 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 'league_id': match.league_id
             })
 
+            # Lets also say something in their team channel
+            team_home_channel = discord.Object(id=team_home[4]) # team_channel
+            team_away_channel = discord.Object(id=team_away[4]) # team_channel
+            await team_home_channel.send(f'Match for round {match.round_number} has been generated. Please head to {match_channel.mention} to organise your match.')
+            await team_away_channel.send(f'Match for round {match.round_number} has been generated. Please head to {match_channel.mention} to organise your match.')
+
         await interaction.edit_original_response(content='Matches generated.')
 
     @app_commands.command(
