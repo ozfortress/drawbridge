@@ -336,7 +336,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
             await interaction.edit_original_response(content='Matches generated.')
         except Exception as e:
-            self.logger.error(f'Error generating match: {e}')
+            self.logger.error(f'Error generating match: {e}', exc_info=True)
             await interaction.edit_original_response(content=f'An error occurred while generating matches.\n ```\n{e}\n```')
 
     @app_commands.command(
