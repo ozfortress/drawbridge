@@ -292,8 +292,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             if match.round_name == '':
                 match.round_name = f'Round {match.round_number}'
             matchmessage = json.loads(self.functions.substitute_strings_in_embed(tempmatchmessage, {
-                '{TEAM_HOME}': f'<@{team_home[2]}>', # team role as a mention
-                '{TEAM_AWAY}': f'<@{team_away[2]}>', # team role as a mention
+                '{TEAM_HOME}': f'<@&{team_home[2]}>', # team role as a mention
+                '{TEAM_AWAY}': f'<@&{team_away[2]}>', # team role as a mention
                 '{ROUND_NAME}': match.round_name,
                 '{MATCH_ID}': match_id,
                 '{CHANNEL_ID}': str(match_channel.id),
