@@ -54,6 +54,19 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         await interaction.response.send_message('Test command.', ephemeral=True)
 
     @app_commands.command(
+        name='test'
+    )
+    async def test(self, interaction : discord.Interaction, league_id : int):
+        league = self.cit.getLeague(league_id)
+        rosters = league.rosters
+
+        for roster in rosters:
+            print(roster['name'] + ' ' + str(roster['team_id']))
+
+        rawteammessage = json.load(open('embeds/teams.json', 'r'))
+        await interaction.response.send_message(str(type(rawteammessage['embeds'])))
+
+    @app_commands.command(
         name='start'
     )
     async def start(self, interaction : discord.Interaction, league_id : int, league_shortcode: str):
@@ -69,11 +82,13 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
         await interaction.response.send_message('Generating teams...', ephemeral=True)
         league = self.cit.getLeague(league_id)
-        is_hl = 'highlander' in league.name.lower()
         rosters = league.rosters
         divs = []
 
-        rawteammessage = json.load(open('embeds/teams.json', 'r'))
+        rawteammessage = ''
+        with open('embeds/teams.json', 'r') as file:
+            rawteammessage = file.read()
+        
         for roster in rosters:
             if roster['division'] not in divs:
                 divs.append(roster['division'])
@@ -87,22 +102,6 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         d=0 #counters
         for div in divs:
             d+=1
-            # catoverwrites = {
-            #     interaction.guild.default_role: discord.PermissionOverwrite(read_messages=False),
-            #     # discord.Object(id=(is_hl == True ? roles['HL Admin'] : roles['6s Admin'])) : discord.PermissionOverwrite(read_messages=True),
-            #     discord.Object(id=Checks.roles['6s Head']) : discord.PermissionOverwrite(read_messages=True),
-            #     discord.Object(id=Checks.roles['HL Head']) : discord.PermissionOverwrite(read_messages=True),
-            #     discord.Object(id=Checks.roles['Trial Admin']) : discord.PermissionOverwrite(read_messages=True), # Or false? dunno hey.
-            #     discord.Object(id=Checks.roles['Developers']) : discord.PermissionOverwrite(read_messages=True),
-            #     discord.Object(id=Checks.roles['Approved Casters']) : discord.PermissionOverwrite(read_messages=False),
-            #     discord.Object(id=Checks.roles['Unapproved Casters']) : discord.PermissionOverwrite(read_messages=False),
-            #     discord.Object(id=Checks.roles['Captains Bot']) : discord.PermissionOverwrite(read_messages=True)
-            # }
-            # if is_hl:
-            #     catoverwrites[discord.Object(id=Checks.roles['HL Admin'])] = discord.PermissionOverwrite(read_messages=True)
-            # else:
-            #     catoverwrites[discord.Object(id=Checks.roles['6s Admin'])] = discord.PermissionOverwrite(read_messages=True)
-
             overrides = {
                 interaction.guild.default_role: discord.PermissionOverwrite(view_channel=False),
                 interaction.guild.get_role(Checks.roles['6s Head']): discord.PermissionOverwrite(view_channel=True),
@@ -125,6 +124,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 'role_id': role.id,
                 'category_id': channelcategory.id
             }
+            i = 0
             divid = self.db.insert_div(dbdiv)
             for roster in rosters:
                 if roster['division'] == div:
@@ -145,9 +145,6 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     }
                     teamchannel = await interaction.guild.create_text_channel(f'{roster['name']} ({league_shortcode})', category=channelcategory, overwrites=overwrites)
                     team_id = roster['team_id']
-
-                    # Load the chat message from embeds/teams.json
-
                     subsitutions = {
                         '{TEAM_MENTION}': f'<@&{role.id}>',
                         '{TEAM_NAME}': roster['name'],
@@ -158,8 +155,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                         '{CHANNEL_ID}': str(teamchannel.id),
                         '{CHANNEL_LINK}': f'<#{teamchannel.id}>',
                     }
-                    temprawteammessage = dict(rawteammessage)
-                    teammessage = self.functions.substitute_strings_in_embed(temprawteammessage, subsitutions)
+                    temprawteammessage = str(rawteammessage)
+                    teammessage = json.loads(self.functions.substitute_strings_in_embed(temprawteammessage, subsitutions))
                     teammessage['embed'] = discord.Embed(**teammessage['embeds'][0])
                     del teammessage['embeds']
                     await teamchannel.send(**teammessage)
@@ -232,102 +229,6 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
         await interaction.edit_original_response(content='Tournament ended. All channels and roles have been archived.')
 
-    # @app_commands.command(
-    #     name='roundgen'
-    # )
-    # async def roundgen(self, interaction : discord.Interaction, league_id : int, round_number : int = None):
-    #     """Generate match channels for a given round of a league
-
-    #     Parameters
-    #     -----------
-    #     league_id: int
-    #         The League ID to generate matches for
-    #     round_number: int (optional)
-    #         The round number to generate matches for. If not provided, will generate all matches to date.
-    #     """
-    #     await interaction.response.send_message('Generating matches...', ephemeral=True)
-    #     league = self.cit.getLeague(league_id)
-    #     # loop through league.matches and generate channels for each match, provided they are in the correct round
-    #     for match in league.matches:
-    #         if round_number is None or match['round_number'] == round_number:
-    #             # generate match channels
-    #             round = self.cit.getMatch(match['id'])
-    #             # Did we already generate this match?
-    #             if self.db.get_match_by_id(match['id']) is not None:
-    #                 # We already generated this match, skip it.
-    #                 continue
-    #             # Is this a bye?
-    #             elif round.away_team is None:
-    #                 # This is a bye, we don't need to generate a channel for this.
-    #                 team_home = self.db.get_team_by_id(round['home_team'])
-    #                 role_home = discord.Object(id=team_home['role_id'])
-    #                 team_channel = discord.Object(id=team_home['team_channel'])
-    #                 await team_channel.send(f'Matches for round {match['round_number']} were just generated. {role_home.mention} have a bye this round, and thus will be awarded a win.') #TODO - JSON embed for this
-    #                 self.db.insert_match({
-    #                     'match_id': match['id'],
-    #                     'division': team_home['division'],
-    #                     'team_home': team_home['team_id'],
-    #                     'team_away': 0,
-    #                     'channel_id': 0 # 0 for bye
-    #                 })
-    #             else:
-    #                 # We now know who the two teams are, lets get their roles
-    #                 #print(str(round.home_team))
-    #                 #print(str(round.away_team))
-    #                 #print(str(round.home_team['team_id']))
-    #                 #print(str(round.away_team['team_id']))
-    #                 team_home = self.db.get_team_by_id(round.home_team['team_id'])
-    #                 team_away = self.db.get_team_by_id(round.away_team['team_id'])
-    #                 # Team roles
-    #                 role_home = discord.Object(id=team_home[2]) # role_id is 2
-    #                 role_away = discord.Object(id=team_away[2])
-    #                 # Category ID for the division
-    #                 category_id = self.db.get_div_by_name(round.home_team['division'])[4] # always pull from home team, 4 is category_id btw
-                    
-    #                 overrides = {
-    #                     interaction.guild.default_role: discord.PermissionOverwrite(read_messages=False),
-    #                     interaction.guild.get_role(team_home[2]): discord.PermissionOverwrite(read_messages=True),
-    #                     interaction.guild.get_role(team_away[2]): discord.PermissionOverwrite(read_messages=True),
-    #                     interaction.guild.get_role(int(Checks.roles['6s Head'])): discord.PermissionOverwrite(read_messages=True),
-    #                     interaction.guild.get_role(int(Checks.roles['HL Head'])): discord.PermissionOverwrite(read_messages=True),
-    #                     interaction.guild.get_role(int(Checks.roles['Trial Admin'])): discord.PermissionOverwrite(read_messages=True),
-    #                     interaction.guild.get_role(int(Checks.roles['Developers'])): discord.PermissionOverwrite(read_messages=True),
-    #                     interaction.guild.get_role(int(Checks.roles['Approved Casters'])): discord.PermissionOverwrite(read_messages=True),
-    #                     interaction.guild.get_role(int(Checks.roles['Unapproved Casters'])): discord.PermissionOverwrite(read_messages=True),
-    #                     interaction.guild.get_role(int(Checks.roles['Captains Bot'])): discord.PermissionOverwrite(read_messages=True),
-    #                     interaction.guild.get_role(int(Checks.roles['HL Admin'])): discord.PermissionOverwrite(read_messages=True),
-    #                     interaction.guild.get_role(int(Checks.roles['6s Admin'])): discord.PermissionOverwrite(read_messages=True)
-    #                 }
-    #                 for key in overrides:
-    #                     print(key)
-    #                 match_channel = await interaction.guild.create_text_channel(f'{team_home[3]}-⚔️-{team_away[3]}-Round-{match['round_number']}-{match['id']}', category=discord.Object(id=category_id), overwrites=overrides)
-    #                 #match_channel = await interaction.guild.create_text_channel(f'{team_home[3]}-⚔️-{team_away[3]}-Round-{match['round_number']}-{match['id']}', category=discord.Object(id=category_id))
-    #                 # Load the chat message from embeds/match.json
-    #                 match_message = json.load(open('embeds/match.json', 'r'))
-    #                 if match['round_name'] == '':
-    #                     match['round_name'] = f'Round {match['round_number']}'
-    #                 match_message = self.functions.substitute_strings_in_embed(match_message, {
-    #                     '{TEAM_HOME}': team_home[3], # team_name
-    #                     '{TEAM_AWAY}': team_away[3], # team_name
-    #                     '{ROUND_NAME}': match['round_name'],
-    #                     '{MATCH_ID}': match['id'],
-    #                     '{CHANNEL_ID}': str(match_channel.id),
-    #                     '{CHANNEL_LINK}': f'<#{match_channel.id}>'
-    #                 })
-    #                 match_message['embed'] = discord.Embed(**match_message['embeds'][0])
-    #                 del match_message['embeds']
-    #                 await match_channel.send(**match_message)
-    #                 # Update the database
-    #                 self.db.insert_match({
-    #                     'match_id': match['id'],
-    #                     'division': team_home[5], # division
-    #                     'team_home': team_home[0], # team_id
-    #                     'team_away': team_away[0], # team_id
-    #                     'channel_id': match_channel.id
-    #                 })
-    #     #await interaction.response.edit_message(content='Matches generated.', ephemeral=True)
-    #     await interaction.edit_original_response(content='Matches generated.')
-
     @app_commands.command(
         name='roundgen'
     )
@@ -347,6 +248,10 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             await interaction.edit_original_response(content='This match has already been generated.')
             return
         
+        rawmatchmessage = ''
+        with open('embeds/match.json', 'r') as file:
+            rawmatchmessage = file.read()
+        
         if match.away_team is None:
             # This is a bye, we don't need to generate a channel for this.
             team_home = self.db.get_team_by_id(match['home_team'])
@@ -362,14 +267,11 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 'league_id': match.league_id
             })
         else:
+            # Team roles
             team_home = self.db.get_team_by_id(match.home_team['team_id'])
             team_away = self.db.get_team_by_id(match.away_team['team_id'])
-            # Team roles
-            #role_home = discord.Object(id=team_home[2]) # role_id is 2
-            #role_away = discord.Object(id=team_away[2])
             # Category ID for the division
             category_id = self.db.get_div_by_name(match.home_team['division'])[4] # always pull from home team, 4 is category_id btw
-            
             overrides = {
                 interaction.guild.default_role: discord.PermissionOverwrite(view_channel=False),
                 interaction.guild.get_role(team_home[2]): discord.PermissionOverwrite(view_channel=True),
@@ -384,25 +286,22 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 interaction.guild.get_role(Checks.roles['HL Admin']): discord.PermissionOverwrite(view_channel=True),
                 interaction.guild.get_role(Checks.roles['6s Admin']): discord.PermissionOverwrite(view_channel=True)
             }
-            #for key in overrides:
-                #print(key)
             match_channel = await interaction.guild.create_text_channel(f'{team_home[3]}-⚔️-{team_away[3]}-Round-{match.round_number}-{match_id}', category=discord.Object(id=category_id), overwrites=overrides)
-            #match_channel = await interaction.guild.create_text_channel(f'{team_home[3]}-⚔️-{team_away[3]}-Round-{match['round_number']}-{match['id']}', category=discord.Object(id=category_id))
-            # Load the chat message from embeds/match.json
-            match_message = json.load(open('embeds/match.json', 'r'))
+            # Load the message
+            tempmatchmessage = str(rawmatchmessage)
             if match.round_name == '':
                 match.round_name = f'Round {match.round_number}'
-            match_message = self.functions.substitute_strings_in_embed(match_message, {
+            matchmessage = json.loads(self.functions.substitute_strings_in_embed(tempmatchmessage, {
                 '{TEAM_HOME}': team_home[3], # team_name
                 '{TEAM_AWAY}': team_away[3], # team_name
                 '{ROUND_NAME}': match.round_name,
                 '{MATCH_ID}': match_id,
                 '{CHANNEL_ID}': str(match_channel.id),
                 '{CHANNEL_LINK}': f'<#{match_channel.id}>'
-            })
-            match_message['embed'] = discord.Embed(**match_message['embeds'][0])
-            del match_message['embeds']
-            await match_channel.send(**match_message)
+            }))
+            matchmessage['embed'] = discord.Embed(**matchmessage['embeds'][0])
+            del matchmessage['embeds']
+            await match_channel.send(**matchmessage)
             # Update the database
             self.db.insert_match({
                 'match_id': match_id,
@@ -414,50 +313,6 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             })
         
         await interaction.edit_original_response(content='Matches generated.')
-
-    # @app_commands.command(
-    #     name='roundend'
-    # )
-    # async def roundend(self, interaction : discord.Interaction, league_id : int, match_id : int = None):
-    #     """End a round of a tournament and archive all channels
-
-    #     Parameters
-    #     -----------
-    #     league_id: int
-    #         The League ID to end the round for
-    #     match_id: int (optional)
-    #         OPTIONAL: Match ID to end. If not supplied, ends all matches currently active
-    #     """
-    #     await interaction.response.send_message('Ending round...', ephemeral=True)
-    #     # Ending a Round: Need to follow these steps:
-    #     # 1. Archive all channels #TODO
-    #     # 2. Update the database to reflect these changes
-
-    #     if match_id is not None:
-    #         match = self.db.get_match_by_id(match_id)
-    #         if match is None:
-    #             await interaction.response.edit_message(content='Match not found.', ephemeral=True)
-    #             return
-    #         if match['channel_id'] == 0:
-    #             await interaction.response.edit_message(content='Match is a bye, cannot end.', ephemeral=True)
-    #             return
-    #         if match['archived'] == 1:
-    #             await interaction.response.edit_message(content='Match has already been archived.', ephemeral=True)
-    #             return
-    #         match_channel = discord.Object(id=match['channel_id'])
-    #         await match_channel.send('Match has ended. This channel will now be archived.')
-    #         # Make the channel read only
-    #         overwrites = match_channel.overwrites
-    #         for overwrite in overwrites:
-    #             if overwrite[0] != interaction.guild.default_role:
-    #                 overwrites[overwrite[0]] = discord.PermissionOverwrite(read_messages=True, send_messages=False)
-    #         await match_channel.edit(overwrites=overwrites)
-
-    #         # at this point we'd hand off to the archival process, but that's firmly TODO:
-    #         # Update the database
-    #         self.db.archive_match(match_id)
-
-    #     await interaction.response.edit_message(content='Round ended. All channels have been archived.', ephemeral=True)
 
     @app_commands.command(
         name='roundend'

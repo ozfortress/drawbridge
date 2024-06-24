@@ -14,45 +14,10 @@ class Functions:
         self.logger = logging.getLogger(__name__)
         pass
 
-    def substitute_strings_in_embed(self, json: dict | list | str, substitutions: dict, depth : int = 0) -> dict | list | str:
-        '''
-        Recursively substitute strings in a json object
-
-        Parameters
-        -----------
-        json: dict
-            The json object to substitute strings in.
-            Accepts list | str as well for recursion, caller should not pass these types.
-        substitutions: dict
-            The substitutions to make
-        depth: int
-            The depth of recursion. Used to prevent infinite recursion. Should not be used by the caller.
-
-        Returns
-        --------
-        dict - The json object with the strings substituted.
-
-        Raises
-        -------
-        ValueError - If the caller passes a list or str as the first argument.
-        '''
-        # Recursively substitute strings in a json object
-        if depth > 5: # Prevent infinite recursion
-            return json
-        if depth == 0 and not isinstance(json, dict):
-            raise ValueError(f'caller should pass a dict as the first argument, received {type(json)}')
-        if isinstance(json, str): #  Self-referenced function to substitute strings in a json object
-            for key, value in substitutions.items():
-                json = json.replace(key, str(value))
-            return json
-        elif isinstance(json, dict):
-            for key, value in json.items():
-                json[key] = self.substitute_strings_in_embed(value, substitutions, depth=depth+1)
-            return json
-        elif isinstance(json, list):
-            return [self.substitute_strings_in_embed(item, substitutions) for item in json]
-        else:
-            return json
+    def substitute_strings_in_embed(self, json: str, substitutions: dict) -> str:
+        for k,v in substitutions.items():
+            json = json.replace(k, str(v))
+        return json
 
     def generate_log(self, message : discord.Message, is_team : bool, match_id=0, log_type="CREATE", after : discord.Message=None):
         log = {}
