@@ -262,10 +262,10 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             return
         if match.away_team is None:
             # This is a bye, we don't need to generate a channel for this.
-            team_home = self.db.get_team_by_id(match.home_team)
+            team_home = self.db.get_team_by_id(match.home_team.id)
             self.logger.debug(f'{match}')
-            role_home = discord.Object(id=team_home['role_id'])
-            team_channel = discord.Object(id=team_home['team_channel'])
+            role_home = discord.Object(id=team_home.role_id)
+            team_channel = discord.Object(id=team_home.team_channel)
             await team_channel.send(f'Matches for round {match.round_number} were just generated. {role_home.mention} have a bye this round, and thus will be awarded a win.') #TODO - JSON embed for this
             self.db.insert_match({
                 'match_id': match.id,
