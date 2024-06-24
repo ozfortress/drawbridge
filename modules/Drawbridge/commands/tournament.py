@@ -315,8 +315,11 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             # Lets also say something in their team channel
             team_home_channel = discord.Object(id=team_home['team_channel']) # team_channel
             team_away_channel = discord.Object(id=team_away['team_channel']) # team_channel
-            await team_home_channel.send(f'Match for round {match.round_number} has been generated. Please head to {match_channel.mention} to organise your match.')
-            await team_away_channel.send(f'Match for round {match.round_number} has been generated. Please head to {match_channel.mention} to organise your match.')
+            try:
+                await team_home_channel.send(f'Match for round {match.round_number} has been generated. Please head to {match_channel.mention} to organise your match.')
+                await team_away_channel.send(f'Match for round {match.round_number} has been generated. Please head to {match_channel.mention} to organise your match.')
+            except Exception as e:
+                self.logger.error(f'Error sending message to team channels: {e}')
 
         await interaction.edit_original_response(content='Matches generated.')
 
