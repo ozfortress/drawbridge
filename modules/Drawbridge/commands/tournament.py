@@ -88,7 +88,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         rawteammessage = ''
         with open('embeds/teams.json', 'r') as file:
             rawteammessage = file.read()
-        
+
         for roster in rosters:
             if roster['division'] not in divs:
                 divs.append(roster['division'])
@@ -225,7 +225,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         self.db.delete_matches_by_league(league_id)
         self.db.delete_teams_by_league(league_id)
         self.db.delete_divisions_by_league(league_id)
-        
+
 
         await interaction.edit_original_response(content='Tournament ended. All channels and roles have been archived.')
 
@@ -243,15 +243,15 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
         await interaction.response.send_message('Generating matches...', ephemeral=True)
         match = self.cit.getMatch(match_id)
-        
+
         if self.db.get_match_by_id(match_id) is not None:
             await interaction.edit_original_response(content='This match has already been generated.')
             return
-        
+
         rawmatchmessage = ''
         with open('embeds/match.json', 'r') as file:
             rawmatchmessage = file.read()
-        
+
         if match.away_team is None:
             # This is a bye, we don't need to generate a channel for this.
             team_home = self.db.get_team_by_id(match['home_team'])
@@ -292,8 +292,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             if match.round_name == '':
                 match.round_name = f'Round {match.round_number}'
             matchmessage = json.loads(self.functions.substitute_strings_in_embed(tempmatchmessage, {
-                '{TEAM_HOME}': team_home[3], # team_name
-                '{TEAM_AWAY}': team_away[3], # team_name
+                '{TEAM_HOME}': f'<@{team_home[2]}>', # team role as a mention
+                '{TEAM_AWAY}': f'<@{team_away[2]}>', # team role as a mention
                 '{ROUND_NAME}': match.round_name,
                 '{MATCH_ID}': match_id,
                 '{CHANNEL_ID}': str(match_channel.id),
@@ -311,7 +311,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 'channel_id': match_channel.id,
                 'league_id': match.league_id
             })
-        
+
         await interaction.edit_original_response(content='Matches generated.')
 
     @app_commands.command(
@@ -358,7 +358,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         self.db.archive_match(match_id)
 
         await interaction.edit_original_response(content='Round ended. All channels have been archived.')
-    
+
     @app_commands.command(
         name='archive'
     )
