@@ -266,7 +266,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 # self.logger.debug(f' ==== PASSING THIS {match.home_team['team_id']}')
                 team_home = self.db.get_team_by_id(match.home_team['team_id'])
                 # self.logger.debug(f'{match}')
-                role_home = self.bot.get_guild(os.getenv('DISCORD_GUILD_ID')).get_role(team_home[2])
+                role_home = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID'))).get_role(team_home[2])
                 # team_channel = discord.Object(id=team_home[4])
                 team_channel = self.bot.get_channel(team_home[4])
                 await team_channel.send(f'Matches for round {match.round_number} were just generated. {role_home.mention} have a bye this round, and thus will be awarded a win.') #TODO - JSON embed for this
