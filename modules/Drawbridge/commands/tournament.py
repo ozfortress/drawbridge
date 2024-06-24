@@ -252,6 +252,14 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         with open('embeds/match.json', 'r') as file:
             rawmatchmessage = file.read()
 
+        if match.home_team is None:
+            await interaction.edit_original_response(content='Match not found. See console output for more info')
+            self.logger.error(f'Match not found: {match_id}')
+            try:
+                self.logger.debug(f'match: {match}')
+            except Exception as e:
+                self.logger.error(f'Error printing match: {e}')
+            return
         if match.away_team is None:
             # This is a bye, we don't need to generate a channel for this.
             team_home = self.db.get_team_by_id(match.home_team)
