@@ -298,7 +298,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     interaction.guild.get_role(Checks.roles['HL Admin']): discord.PermissionOverwrite(view_channel=True),
                     interaction.guild.get_role(Checks.roles['6s Admin']): discord.PermissionOverwrite(view_channel=True)
                 }
-                cat = self.bot.get_guild(os.getenv('DISCORD_GUILD_ID')).get_channel(category_id)
+                cat = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID'))).get_channel(category_id)
                 match_channel = await interaction.guild.create_text_channel(f'{team_home[3]}-⚔️-{team_away[3]}-Round-{match.round_number}-{match_id}', category=cat, overwrites=overrides)
                 # Load the message
                 tempmatchmessage = str(rawmatchmessage)
