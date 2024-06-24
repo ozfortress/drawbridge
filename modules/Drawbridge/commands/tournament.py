@@ -262,8 +262,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             return
         if match.away_team is None:
             # This is a bye, we don't need to generate a channel for this.
-            self.logger.debug(f' ==== PASSING THIS {match.home_team.id}')
-            team_home = self.db.get_team_by_id(match.home_team.id)
+            self.logger.debug(f' ==== PASSING THIS {match.home_team['id']}')
+            team_home = self.db.get_team_by_id(match.home_team['id'])
             self.logger.debug(f'{match}')
             role_home = discord.Object(id=team_home.role_id)
             team_channel = discord.Object(id=team_home.team_channel)
