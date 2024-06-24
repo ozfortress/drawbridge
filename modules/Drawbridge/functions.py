@@ -19,30 +19,19 @@ class Functions:
             json = json.replace(k, str(v))
         return json
 
-    def generate_log(self, message : discord.Message, is_team : bool, match_id=0, log_type="CREATE", after : discord.Message=None):
+    def generate_log(self, message : discord.Message, is_team : bool, match_id, team_id, log_type="CREATE", after : discord.Message=None):
         log = {}
         if is_team:
-            team = self.db.get_team_by_channel_id(message.channel.id)
-            if not team:
-                return None
-            log['match_id'] = 0
-            log['team'] = team['team_id']
+            log['team_id'] = team_id
+            log['match_id'] = None
         else:
-            if not match_id:
-                return None
             match = self.db.get_match_details(match_id)
             teamsRoles = []
             teamsRoles.append(match[2])
             teamsRoles.append(match[3])
             log['match_id'] = match_id
-
-            for teamRole in teamsRoles:
-                if teamRole in message.author.roles:
-                    log['team'] = self.db.get_team_id_of_role(teamRole)
-                    break
-            if 'team' not in log:
-                log['team'] = None # Admin or Caster?
-                #TODO: Handle Admins and Casters
+            log['team_id'] = None
+        
         log['user_id'] = message.author.id
         log['user_name'] = message.author.name
         log['user_nick'] = message.author.nick
@@ -62,6 +51,4 @@ class Functions:
         if log_type == "DELETE":
             log['log_timestamp'] = datetime.datetime.now()
         self.db.insert_log(log)
-        self.logger.debug(f'new log {message.author.name}#{message.author.discriminator} ({message.author.id}) - {log_type}')
-
-#del database, citadel, discord, logging, time
+        #self.logger.debug(f'new log {message.author.name}#{message.author.discriminator} ({message.author.id}) - {log_type}')

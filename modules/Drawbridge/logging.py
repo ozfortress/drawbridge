@@ -22,7 +22,13 @@ class Logging(discord_commands.Cog):
     async def on_message(self,message : discord.Message):
         match_id = self.db.get_match_id_of_channel(message.channel.id)
         if match_id:
-            self.functions.generate_log(message, False, match_id[0], "CREATE")
+            self.functions.generate_log(message, False, match_id[0], None, "CREATE")
+            return
+        
+        team_id = self.db.get_team_id_of_channel(message.channel.id)
+        if team_id:
+            self.functions.generate_log(message, True, None, team_id[0], "CREATE")
+
         #else:
             # Verify cache is up to date
             # if self.teamchannel_cache['refreshAfter'] < time.time():
@@ -37,7 +43,11 @@ class Logging(discord_commands.Cog):
     async def on_message_edit(self, before : discord.Message, after : discord.Message):
         match_id = self.db.get_match_id_of_channel(after.channel.id)
         if match_id:
-            self.functions.generate_log(before, False, match_id[0], "EDIT", after)
+            self.functions.generate_log(before, False, match_id[0], None, "EDIT", after)
+        
+        team_id = self.db.get_team_id_of_channel(before.channel.id)
+        if team_id:
+            self.functions.generate_log(before, True, None, team_id[0], "EDIT", after)
         #else:
             # Verify cache is up to date
             # if self.teamchannel_cache['refreshAfter'] < time.time():
@@ -53,7 +63,11 @@ class Logging(discord_commands.Cog):
         # WARNING - UNRELIABLE - MIGHT MISS OLD MSGS if they arent in cache.
         match_id = self.db.get_match_id_of_channel(message.channel.id)
         if match_id:
-            self.functions.generate_log(message, False, match_id[0], "DELETE")
+            self.functions.generate_log(message, False, match_id[0], None, "DELETE")
+        
+        team_id = self.db.get_team_id_of_channel(message.channel.id)
+        if team_id:
+            self.functions.generate_log(message, True, None, team_id[0], "DELETE")
         #else:
             # Verify cache is up to date
             # if self.teamchannel_cache['refreshAfter'] < time.time():

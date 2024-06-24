@@ -157,6 +157,17 @@ class Database:
             except mariadb.Error as e:
                 print(f"Error: {e}")
                 return None
+    
+    def get_team_id_of_channel(self, channel_id):
+        with self.pool.get_connection() as conn:
+            try:
+                cursor = conn.cursor()
+                query = 'SELECT team_id FROM teams WHERE team_channel=?;'
+                cursor.execute(query, (channel_id,))
+                return cursor.fetchone()
+            except mariadb.Error as e:
+                print(f"Error: {e}")
+                return None
 
     def get_team_by_id(self, team_id):
         with self.pool.get_connection() as conn:
@@ -207,8 +218,8 @@ class Database:
         with self.pool.get_connection() as conn:
             try:
                 cursor = conn.cursor()
-                query = "INSERT INTO logs (match_id, user_id, user_name, user_nick, user_avatar, team, message_id, message_content, message_additionals, log_type, log_timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-                cursor.execute(query, (log['match_id'], log['user_id'], log['user_name'], log['user_nick'], log['user_avatar'], log['team'], log['message_id'], log['message_content'], log['message_additionals'], log['log_type'], log['log_timestamp']))
+                query = "INSERT INTO logs (match_id, user_id, user_name, user_nick, user_avatar, team_id, message_id, message_content, message_additionals, log_type, log_timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                cursor.execute(query, (log['match_id'], log['user_id'], log['user_name'], log['user_nick'], log['user_avatar'], log['team_id'], log['message_id'], log['message_content'], log['message_additionals'], log['log_type'], log['log_timestamp']))
                 conn.commit()
             except mariadb.Error as e:
                 print(f"Error: {e}")
