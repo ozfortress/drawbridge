@@ -266,8 +266,9 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 # self.logger.debug(f' ==== PASSING THIS {match.home_team['team_id']}')
                 team_home = self.db.get_team_by_id(match.home_team['team_id'])
                 # self.logger.debug(f'{match}')
-                role_home = discord.Object(id=team_home[2])
-                team_channel = discord.Object(id=team_home[4])
+                role_home = self.bot.get_guild(os.getenv('DISCORD_GUILD_ID')).get_role(team_home[2])
+                # team_channel = discord.Object(id=team_home[4])
+                team_channel = self.bot.get_channel(team_home[4])
                 await team_channel.send(f'Matches for round {match.round_number} were just generated. {role_home.mention} have a bye this round, and thus will be awarded a win.') #TODO - JSON embed for this
                 self.db.insert_match({
                     'match_id': match.id,
@@ -297,7 +298,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     interaction.guild.get_role(Checks.roles['HL Admin']): discord.PermissionOverwrite(view_channel=True),
                     interaction.guild.get_role(Checks.roles['6s Admin']): discord.PermissionOverwrite(view_channel=True)
                 }
-                match_channel = await interaction.guild.create_text_channel(f'{team_home[3]}-⚔️-{team_away[3]}-Round-{match.round_number}-{match_id}', category=discord.Object(id=category_id), overwrites=overrides)
+                cat = self.bot.get_guild(os.getenv('DISCORD_GUILD_ID')).get_channel(category_id)
+                match_channel = await interaction.guild.create_text_channel(f'{team_home[3]}-⚔️-{team_away[3]}-Round-{match.round_number}-{match_id}', category=cat, overwrites=overrides)
                 # Load the message
                 tempmatchmessage = str(rawmatchmessage)
                 if match.round_name == '':
@@ -325,8 +327,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
                 # Lets also say something in their team channel
                 try:
-                    team_home_channel = discord.Object(id=team_home[4]) # team_channel
-                    team_away_channel = discord.Object(id=team_away[4]) # team_channel
+                    team_home_channel = self.bot.get_channel(team_home[4]) # team_channel
+                    team_away_channel = self.bot.get_channel(team_away[4]) # team_channel
                     await team_home_channel.send(f'Match for round {match.round_number} has been generated. Please head to {match_channel.mention} to organise your match.')
                     await team_away_channel.send(f'Match for round {match.round_number} has been generated. Please head to {match_channel.mention} to organise your match.')
                 except Exception as e:
@@ -403,8 +405,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
     #         await ctx.response.send_message(content='An error occurred while running this command.', ephermeral=True)
 
 
-async def initialize(bot, db, cit, logger):
-    await bot.add_cog(Tournament(bot, db, cit, logger), guilds=[discord.Object(id=os.getenv('DISCORD_GUILD_ID'))])
+async def initialize(bot: discord_commands.Bot, db, cit, logger):
+    await bot.add_cog(Tournament(bot, db, cit, logger), guilds=[bot.get_guild(int(os.getenv('DISCORD_GUILD_ID')))])
     # list = await bot.tree.sync(guild=discord.Object(id=os.getenv('DISCORD_GUILD_ID')))
     # logger.info(f'Loaded Tournament Commands: {list}')
 
