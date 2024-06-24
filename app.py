@@ -10,6 +10,8 @@ from discord.ext import tasks as discord_tasks
 from modules import citadel
 from modules import database
 from modules import Drawbridge
+import subprocess
+import datetime
 
 
 load_dotenv()
@@ -51,6 +53,19 @@ async def on_ready():
     logger.info(f'Logged in as {client.user.name}#{client.user.discriminator} ({client.user.id})')
     # await Drawbridge.load_all_commands(
     await Drawbridge.initialize(client, db, cit, logger)
+
+    botmisc= discord.Object(id=1254427486058582128)
+    def get_latest_commit():
+        try:
+            latest_commit = subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode().strip()
+            return latest_commit
+        except subprocess.CalledProcessError:
+            return None
+
+    latest_commit = get_latest_commit()
+    now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    if latest_commit:
+        await botmisc.send(f'Bot has been started\ntime: {now}\ncommit `{latest_commit}`')
     #Drawbridge.Logging(client, db, cit)
 
 @discord_tasks.loop(seconds=5)
