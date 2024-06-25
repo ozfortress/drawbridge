@@ -66,9 +66,9 @@ async def on_ready():
     commit_info = subprocess.check_output(['git', 'show', '-s', '--format=%B%n%an', latest_commit]).decode().strip().split('\n')
     commit_message = commit_info[0]
     commit_author = commit_info[1]
-    now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    now = int(datetime.datetime.now().timestamp())
     if latest_commit:
-        await botmisc.send(f'# Bot has been started\n- time: {now}\n- commit `{latest_commit}`\n- author: {commit_author}\n```\n{commit_message}```')
+        await botmisc.send(f'# Bot has been started\n- time: <t:{now}>\n- commit `{latest_commit}`\n- author: {commit_author}\n```\n{commit_message}```')
     #Drawbridge.Logging(client, db, cit)
 
 @discord_tasks.loop(seconds=5)
