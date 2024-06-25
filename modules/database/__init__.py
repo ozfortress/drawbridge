@@ -1,22 +1,44 @@
 import mariadb
+import re
 
 class Database:
     """
     An interface for the Drawbridge Database.
-
-    TODO: CACHED RESPONSES!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! VRY IMPORTENT
     """
 
     def __init__(self, conn_params):
         self._throw_if_bad_config(conn_params)
         conn_params['pool_name'] = 'drawbridge'
         self.pool = mariadb.ConnectionPool(**conn_params)
+        # self._create_db_if_not_exists() # TODO: TEST THIS
 
     def _throw_if_bad_config(self, conn_params):
         if "host" not in conn_params: raise KeyError('No Host provided for DB connection')
         if "database" not in conn_params: raise KeyError('No Database provided for DB connection')
         if "user" not in conn_params: raise KeyError('No User provided for DB connection')
         if "password" not in conn_params: raise KeyError('No Password provided for DB connection')
+
+    def _create_db_if_not_exists(self):
+        with self.pool.get_connection() as conn:
+            try:
+                cursor = conn.cursor()
+                # test the DB has been created
+                cursor.execute("SHOW TABLES")
+                # if the DB is empty, create the tables
+                if cursor.rowcount == 0:
+                    query = ''
+                    for line in open('db.sql'):
+                        if re.match(r'--', line): continue #ignore comments
+                        if not re.search(r';$', line): query = query + line
+                        else:
+                            query = query + line
+                            try:
+                                cursor.execute(query)
+                            except Exception as e:
+                                print(f"Error: {e}")
+                            query = ''
+            except mariadb.Error as e:
+                print(f"Error: {e}")
 
     def close(self):
         self.pool.close()
@@ -157,7 +179,7 @@ class Database:
             except mariadb.Error as e:
                 print(f"Error: {e}")
                 return None
-    
+
     def get_team_id_of_channel(self, channel_id):
         with self.pool.get_connection() as conn:
             try:
@@ -191,7 +213,7 @@ class Database:
             except mariadb.Error as e:
                 print(f"Error in get_divs_by_league: {e}")
                 return None
-        
+
     def get_teams_by_league(self, league_id):
         with self.pool.get_connection() as conn:
             try:
@@ -236,7 +258,7 @@ class Database:
             except mariadb.Error as e:
                 print(f"Error at insert_div: {e}")
                 return None
-        
+
     def get_div_by_name(self, div_name):
         with self.pool.get_connection() as conn:
             try:
@@ -271,7 +293,7 @@ class Database:
             except mariadb.Error as e:
                 print(f"Error: {e}")
                 return None
-            
+
     def archive_match(self, match_id):
         with self.pool.get_connection() as conn:
             try:
@@ -282,7 +304,7 @@ class Database:
             except mariadb.Error as e:
                 print(f"Error: {e}")
                 return None
-        
+
     # cleanup stuff
 
     def get_match_channels_by_league(self, league_id):
@@ -307,7 +329,7 @@ class Database:
             except mariadb.Error as e:
                 print(f'Error: {e}')
                 return None
-        
+
     def delete_teams_by_league(self, league_id):
         with self.pool.get_connection() as conn:
             try:
@@ -319,7 +341,7 @@ class Database:
             except mariadb.Error as e:
                 print(f'Error: {e}')
                 return None
-        
+
     def delete_matches_by_league(self, league_id):
         with self.pool.get_connection() as conn:
             try:
