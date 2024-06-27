@@ -283,7 +283,20 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 team_home = self.db.get_team_by_id(match.home_team['team_id'])
                 team_away = self.db.get_team_by_id(match.away_team['team_id'])
                 # Category ID for the division
-                category_id = self.db.get_div_by_name(match.home_team['division'])[4] # always pull from home team, 4 is category_id btw
+                # category_id = self.db.get_div_by_name(match.home_team['division'])[4] # always pull from home team, 4 is category_id btw
+                divs = self.db.get_divs_by_league(match.league_id) # Div name could be different depending on league. Account for this.
+                if len(divs) == 0:
+                    await interaction.edit_original_response(content='No divisions found for the league for this match???? Pester shigbeard, this shouldn\'t happen.')
+                    return
+                category_id = 0
+                for d in divs:
+                    if d[1] == match.home_team['division']:
+                        category_id = d[4]
+                        break
+                if category_id == 0:
+                    await interaction.edit_original_response(content='Division not found for the match. Pester shigbeard, this shouldn\'t happen.')
+                    return
+
                 overrides = {
                     interaction.guild.default_role: discord.PermissionOverwrite(view_channel=False),
                     interaction.guild.get_role(team_home[2]): discord.PermissionOverwrite(view_channel=True),
