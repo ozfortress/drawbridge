@@ -416,23 +416,31 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         matches = self.db.get_matches_not_yet_archived()
         leagueids = []
         leagues=[]
+        divids=[]
+        divs=[]
         for team in teams:
             if team[1] not in leagueids:
                 leagueids.append(team[1])
                 leagues.append(self.cit.getLeague(team[1]))
+            if team[5] not in divids:
+                divids.append(team[5])
+                divs.append(self.db.get_div_by_id(team[5]))
+
 
         rawlaunchpadmessage = ''
         for leagues in leagues:
             rawlaunchpadmessage += f'# {leagues.name}\n'
             rawlaunchpadmessage += f'## Teams\n'
-            for team in teams:
-                if team[1] == leagues.id:
-                    rawlaunchpadmessage += f'- {team[3]} -> <#{team[4]}>\n'
-            rawlaunchpadmessage += f'\n## Matches\n'
-            for match in matches:
-                if match[6] == leagues.id:
-                    rawlaunchpadmessage += f'- {match[0]} -> <#{match[4]}> (<https://ozfortress.com/matches/{match[0]}>)\n'
-            rawlaunchpadmessage += '\n\n'
+            for div in divs:
+                rawlaunchpadmessage += f'### {div[1]}\n'
+                for team in teams:
+                    if team[1] == leagues.id & team[5] == div[0]:
+                        rawlaunchpadmessage += f'- {team[3]} -> <#{team[4]}>\n'
+                rawlaunchpadmessage += f'## Matches\n'
+                for match in matches:
+                    if match[6] == leagues.id & match[1] == div[0]:
+                        rawlaunchpadmessage += f'- [{match[0]}](<https://ozfortress.com/matches/{match[0]}>) -> <#{match[4]}>\n'
+            rawlaunchpadmessage += '\n'
         launchpadmessages = []
         # split on the first \n under 2000 chars
         while len(rawlaunchpadmessage) > 2000:

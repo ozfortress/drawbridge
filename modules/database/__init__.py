@@ -283,6 +283,17 @@ class Database:
                 print(f'Error at get_div_by_name: {e}')
                 return None
 
+    def get_div_by_id (self, div_id):
+        with self.pool.get_connection() as conn:
+            try:
+                query = 'SELECT * FROM divisions WHERE id=?;'
+                cursor = conn.cursor()
+                cursor.execute(query, (div_id,))
+                return cursor.fetchone()
+            except mariadb.Error as e:
+                print(f'Error at get_div_by_id: {e}')
+                return None
+
     def insert_team(self, team) -> int:
         with self.pool.get_connection() as conn:
             try:
