@@ -402,8 +402,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         description='Generate a launchpad for all matches and team channels currently active'
     )
     async def launchpad(self, interaction : discord.Interaction, share : bool=False):
-        self.logger.debug(f'Generating Launchpad. Share: {share}')
-        await interaction.response.send_message('Generating Launchpad...', ephemeral=share)
+        # self.logger.debug(f'Generating Launchpad. Share: {share}')
+        await interaction.response.send_message('Generating Launchpad...', ephemeral=(not share))
         teams = self.db.get_all_teams()
         matches = self.db.get_matches_not_yet_archived()
         leagueids = []
@@ -446,10 +446,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             rawlaunchpadmessage = rawlaunchpadmessage[index:]
         launchpadmessages.append(rawlaunchpadmessage)
         for message in launchpadmessages:
-            if share:
-                await interaction.followup.send(content=message, ephemeral=False)
-            else:
-                await interaction.followup.send(content=message, ephemeral=True)
+            await interaction.followup.send(content=message, ephemeral=(not share))
 
     @app_commands.command(
         name='archive'
