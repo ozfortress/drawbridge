@@ -432,7 +432,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             rawlaunchpadmessage += f'# {leagues.name}\n'
             rawlaunchpadmessage += f'## Teams\n'
             for div in divs:
-                if div[0] == leagues.id:
+                if div[2] == leagues.id:
                     rawlaunchpadmessage += f'### {div[1]}\n'
                     for team in teams:
                         if (team[1] == leagues.id) and (team[5] == div[0]):
