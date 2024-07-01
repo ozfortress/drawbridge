@@ -433,8 +433,18 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 if match[6] == leagues.id:
                     rawlaunchpadmessage += f'- {match[0]} -> <#{match[5]}> (https://ozfortress.com/matches/{match[0]})\n'
             rawlaunchpadmessage += '\n\n'
-
-        await interaction.edit_original_response(content=rawlaunchpadmessage)
+        launchpadmessages = []
+        # split on the first \n under 2000 chars
+        while len(rawlaunchpadmessage) > 2000:
+            index = rawlaunchpadmessage[:2000].rfind('\n')
+            launchpadmessages.append(rawlaunchpadmessage[:index])
+            rawlaunchpadmessage = rawlaunchpadmessage[index:]
+        launchpadmessages.append(rawlaunchpadmessage)
+        for message in launchpadmessages:
+            if share:
+                await interaction.followup.send(content=message, ephemeral=False)
+            else:
+                await interaction.followup.send(content=message, ephemeral=True)
 
     @app_commands.command(
         name='archive'
