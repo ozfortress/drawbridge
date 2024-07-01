@@ -431,7 +431,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             rawlaunchpadmessage += f'\n## Matches\n'
             for match in matches:
                 if match[6] == leagues.id:
-                    rawlaunchpadmessage += f'- {match[0]} -> <#{match[5]}> (https://ozfortress.com/matches/{match[0]})\n'
+                    rawlaunchpadmessage += f'- {match[0]} -> <#{match[4]}> (<https://ozfortress.com/matches/{match[0]}>)\n'
             rawlaunchpadmessage += '\n\n'
         launchpadmessages = []
         # split on the first \n under 2000 chars
