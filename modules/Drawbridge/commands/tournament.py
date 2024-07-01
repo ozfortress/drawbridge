@@ -434,11 +434,11 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             for div in divs:
                 rawlaunchpadmessage += f'### {div[1]}\n'
                 for team in teams:
-                    if team[1] == leagues.id & team[5] == div[0]:
+                    if (team[1] == leagues.id) and (team[5] == div[0]):
                         rawlaunchpadmessage += f'- {team[3]} -> <#{team[4]}>\n'
                 rawlaunchpadmessage += f'## Matches\n'
                 for match in matches:
-                    if match[6] == leagues.id & match[1] == div[0]:
+                    if (match[6] == leagues.id) and (match[1] == div[0]):
                         rawlaunchpadmessage += f'- [{match[0]}](<https://ozfortress.com/matches/{match[0]}>) -> <#{match[4]}>\n'
             rawlaunchpadmessage += '\n'
         launchpadmessages = []
