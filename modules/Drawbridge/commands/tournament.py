@@ -404,7 +404,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
     async def launchpad(self, interaction : discord.Interaction, share : bool=False):
         await interaction.response.send_message('Generating Launchpad...', ephemeral=share)
         teams = self.db.get_all_teams()
-        matches = self.db.get_all_matches()
+        matches = self.db.get_matches_not_yet_archived()
         leagueids = []
         leagues=[]
         for team in teams:
