@@ -402,15 +402,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         description='Generate a launchpad for all matches and team channels currently active'
     )
     async def launchpad(self, interaction : discord.Interaction, share : bool=False):
-        if share == "True":
-            share = True
-        else:
-            share = False
-
-        if share == 1:
-            share = True
-        else:
-            share = False
+        self.logger.debug(f'Generating Launchpad. Share: {share}')
         await interaction.response.send_message('Generating Launchpad...', ephemeral=share)
         teams = self.db.get_all_teams()
         matches = self.db.get_matches_not_yet_archived()
@@ -439,7 +431,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                             rawlaunchpadmessage += f'- {team[3]} -> <#{team[4]}>\n'
                     rawlaunchpadmessage += f'### Matches\n'
                     for match in matches:
-                        self.logger.debug(f'Match league id {match[6]} == {leagues.id} and match div id {match[1]} == {div[0]}')
+                        # self.logger.debug(f'Match league id {match[6]} == {leagues.id} and match div id {match[1]} == {div[0]}')
                         if (int(match[6]) == int(leagues.id)) and (int(match[1]) == int(div[0])):
                             if match[4] == 0:
                                 rawlaunchpadmessage += f'- [{match[0]}](<https://ozfortress.com/matches/{match[0]}>) -> Bye\n'
