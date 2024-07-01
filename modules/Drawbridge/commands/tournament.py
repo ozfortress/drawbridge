@@ -440,7 +440,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     rawlaunchpadmessage += f'### Matches\n'
                     for match in matches:
                         self.logger.debug(f'Match league id {match[6]} == {leagues.id} and match div id {match[1]} == {div[0]}')
-                        if (match[6] == leagues.id) and (match[1] == div[0]):
+                        if (int(match[6]) == int(leagues.id)) and (int(match[1]) == int(div[0])):
                             if match[4] == 0:
                                 rawlaunchpadmessage += f'- [{match[0]}](<https://ozfortress.com/matches/{match[0]}>) -> Bye\n'
                             else:
