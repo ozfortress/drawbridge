@@ -430,29 +430,21 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         rawlaunchpadmessage = ''
         for leagues in leagues:
             rawlaunchpadmessage += f'# {leagues.name}\n'
-            rawlaunchpadmessage += f'## Teams\n'
             for div in divs:
-                if div[2] == leagues.id:
-                    rawlaunchpadmessage += f'### {div[1]}\n'
+                if div[2] == leagues.id: ## Does the league_id field match the league we're looking at?
+                    rawlaunchpadmessage += f'## {div[1]}\n'
+                    rawlaunchpadmessage += f'### Teams\n'
                     for team in teams:
                         if (team[1] == leagues.id) and (team[5] == div[0]):
                             rawlaunchpadmessage += f'- {team[3]} -> <#{team[4]}>\n'
-                    rawlaunchpadmessage += f'## Matches\n'
+                    rawlaunchpadmessage += f'### Matches\n'
                     for match in matches:
-                        c = 0
-                        if c==0:
-                            self.logger.debug(f'{match}')
-                            self.logger.debug(f'{div}')
-                            self.logger.debug(f'{leagues}')
-                            c+=1
+                        self.logger.debug(f'Match league id {match[6]} == {leagues.id} and match div id {match[1]} == {div[0]}')
                         if (match[6] == leagues.id) and (match[1] == div[0]):
                             if match[4] == 0:
                                 rawlaunchpadmessage += f'- [{match[0]}](<https://ozfortress.com/matches/{match[0]}>) -> Bye\n'
                             else:
                                 rawlaunchpadmessage += f'- [{match[0]}](<https://ozfortress.com/matches/{match[0]}>) -> <#{match[4]}>\n'
-                            c+=1
-                        if c == 0:
-                            rawlaunchpadmessage += f'- No matches\n'
                     rawlaunchpadmessage += '\n'
         launchpadmessages = []
         # split on the first \n under 2000 chars
