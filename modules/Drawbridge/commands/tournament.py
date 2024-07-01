@@ -19,7 +19,7 @@ __version__ = '0.0.1'
 @Checks.heads_only(Checks)
 @discord.app_commands.guild_only()
 class Tournament(discord_commands.GroupCog, group_name='tournament', name='tournamnet', group_description='Commands for managing tournaments. This is a new string',):
-    def __init__(self, bot:discord_commands.Bot, db, cit, logger) -> None:
+    def __init__(self, bot:discord_commands.Bot, db:database.Database, cit:citadel.Citadel, logger) -> None:
         self.bot = bot
         self.cit = cit
         self.db = db
@@ -396,6 +396,36 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         self.db.archive_match(match_id)
 
         await interaction.edit_original_response(content='Round ended. All channels have been archived.')
+
+    @app_commands.command(
+        name='launchpad',
+        description='Generate a launchpad for all matches and team channels currently active'
+    )
+    async def launchpad(self, interaction : discord.Interaction, share : bool=False):
+        await interaction.response.send_message('Generating Launchpad...', ephemeral=share)
+        teams = self.db.get_all_teams()
+        matches = self.db.get_all_matches()
+        leagueids = []
+        leagues=[]
+        for team in teams:
+            if team[1] not in leagueids:
+                leagueids.append(team[1])
+                leagues.append(self.cit.getLeague(team[1]))
+
+        rawlaunchpadmessage = ''
+        for leagues in leagues:
+            rawlaunchpadmessage += f'# {leagues.name}\n'
+            rawlaunchpadmessage += f'## Teams\n'
+            for team in teams:
+                if team[1] == leagues.id:
+                    rawlaunchpadmessage += f'- {team[3]} -> <#{team[4]}>\n'
+            rawlaunchpadmessage += f'\n## Matches\n'
+            for match in matches:
+                if match[6] == leagues.id:
+                    rawlaunchpadmessage += f'- {match[0]} -> <#{match[5]}> (https://ozfortress.com/matches/{match[0]})\n'
+            rawlaunchpadmessage += '\n\n'
+
+        await interaction.edit_original_response(content=rawlaunchpadmessage, ephemeral=share)
 
     @app_commands.command(
         name='archive'

@@ -12,6 +12,19 @@ class Database:
         self.pool = mariadb.ConnectionPool(**conn_params)
         # self._create_db_if_not_exists() # TODO: TEST THIS
 
+    def __del__(self):
+        self.close()
+
+    def health_check(self):
+        with self.pool.get_connection() as conn:
+            try:
+                cursor = conn.cursor()
+                cursor.execute("SELECT 1")
+                return True
+            except mariadb.Error as e:
+                print(f"Error: {e}")
+                return False
+
     def _throw_if_bad_config(self, conn_params):
         if "host" not in conn_params: raise KeyError('No Host provided for DB connection')
         if "database" not in conn_params: raise KeyError('No Database provided for DB connection')
@@ -350,6 +363,120 @@ class Database:
                 cursor.execute(query, (league_id,))
                 conn.commit()
                 return cursor.lastrowid
+            except mariadb.Error as e:
+                print(f'Error: {e}')
+                return None
+
+    def get_no_of_matches(self):
+        with self.pool.get_connection() as conn:
+            try:
+                cursor = conn.cursor()
+                query = 'SELECT COUNT(*) FROM matches;'
+                cursor.execute(query)
+                return cursor.fetchone()
+            except mariadb.Error as e:
+                print(f'Error: {e}')
+                return None
+
+    def get_no_of_teams(self):
+        with self.pool.get_connection() as conn:
+            try:
+                cursor = conn.cursor()
+                query = 'SELECT COUNT(*) FROM teams;'
+                cursor.execute(query)
+                return cursor.fetchone()
+            except mariadb.Error as e:
+                print(f'Error: {e}')
+                return None
+
+    def get_no_of_divisions(self):
+        with self.pool.get_connection() as conn:
+            try:
+                cursor = conn.cursor()
+                query = 'SELECT COUNT(*) FROM divisions;'
+                cursor.execute(query)
+                return cursor.fetchone()
+            except mariadb.Error as e:
+                print(f'Error: {e}')
+                return None
+
+
+    def get_no_of_logs(self):
+        with self.pool.get_connection() as conn:
+            try:
+                cursor = conn.cursor()
+                query = 'SELECT COUNT(*) FROM logs;'
+                cursor.execute(query)
+                return cursor.fetchone()
+            except mariadb.Error as e:
+                print(f'Error: {e}')
+                return None
+
+    def check_link_status(self, user_id):
+        with self.pool.get_connection() as conn:
+            try:
+                cursor = conn.cursor()
+                query = 'SELECT link_status FROM linked_users WHERE discord_id = ?'
+                cursor.execute(query, (user_id,))
+                return cursor.fetchone()
+            except mariadb.Error as e:
+                print(f'Error: {e}')
+                return None
+
+    def check_for_linked_steamid(self, steam_id):
+        with self.pool.get_connection() as conn:
+            try:
+                cursor = conn.cursor()
+                query = 'SELECT * FROM linked_users WHERE steam_id = ?'
+                cursor.execute(query, (steam_id,))
+                return cursor.fetchone()
+            except mariadb.Error as e:
+                print(f'Error: {e}')
+                return None
+
+    def start_link(self, user_id, link_code):
+        with self.pool.get_connection() as conn:
+            try:
+                cursor = conn.cursor()
+                query = 'INSERT INTO linked_users (discord_id, link_code, link_status) VALUES (?, ?, ?)'
+                cursor.execute(query, (user_id, link_code, 0))
+                conn.commit()
+            except mariadb.Error as e:
+                print(f'Error: {e}')
+                return None
+
+    def link_steam_to_discord(self,steam_id, link_code, cit_id):
+        with self.pool.get_connection() as conn:
+            try:
+                cursor = conn.cursor()
+                query = 'UPDATE linked_users SET steam_id = ?, link_status = ?, citadel_id = ? WHERE link_code = ?'
+                status = 1
+                if cit_id is None:
+                    status = 2
+                cursor.execute(query, (steam_id, status, cit_id, link_code))
+                conn.commit()
+            except mariadb.Error as e:
+                print(f'Error: {e}')
+                return None
+
+    def get_matches_not_yet_archived(self):
+        with self.pool.get_connection() as conn:
+            try:
+                cursor = conn.cursor()
+                query = 'SELECT * FROM matches WHERE archived = 0 AND channel_id IS NOT NULL;'
+                cursor.execute(query)
+                return cursor.fetchall()
+            except mariadb.Error as e:
+                print(f'Error: {e}')
+                return None
+
+    def get_all_teams(self):
+        with self.pool.get_connection() as conn:
+            try:
+                cursor = conn.cursor()
+                query = 'SELECT * FROM teams;'
+                cursor.execute(query)
+                return cursor.fetchall()
             except mariadb.Error as e:
                 print(f'Error: {e}')
                 return None
