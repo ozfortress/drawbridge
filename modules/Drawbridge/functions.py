@@ -31,10 +31,10 @@ class Functions:
             teamsRoles.append(match[3])
             log['match_id'] = match_id
             log['team_id'] = None
-        
+
         log['user_id'] = message.author.id
         log['user_name'] = message.author.name
-        log['user_nick'] = message.author.nick
+        log['user_nick'] = getattr(message.author, 'nick', message.author.name)
         log['user_avatar'] = message.author.display_avatar.url
         log['message_id'] = message.id
         log['message_content'] = message.content
