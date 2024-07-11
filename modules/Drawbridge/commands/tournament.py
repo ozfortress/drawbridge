@@ -4,6 +4,7 @@ from ..logging import *
 import discord
 import os
 import json
+import random
 from modules import database
 from modules import citadel
 
@@ -368,13 +369,13 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
         match = self.db.get_match_by_id(match_id)
         if match is None:
-            await interaction.response.edit_message(content='Match not found.', ephemeral=True)
+            await interaction.response.edit_message(content='Match not found.')
             return
         if match[4] == 0: # channel_id
-            await interaction.response.edit_message(content='Match is a bye, cannot end.', ephemeral=True)
+            await interaction.response.edit_message(content='Match is a bye, cannot end.')
             return
         if match[5] == 1: # archived
-            await interaction.response.edit_message(content='Match has already been archived.', ephemeral=True)
+            await interaction.response.edit_message(content='Match has already been archived.')
             return
         #match_channel = discord.Object(id=match[4])
         match_channel = interaction.guild.get_channel(match[4])
@@ -396,6 +397,124 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         self.db.archive_match(match_id)
 
         await interaction.edit_original_response(content='Round ended. All channels have been archived.')
+
+    @app_commands.command(
+            name='randomdemocheck',
+            description='Announces a truly random demo check, given a League ID. Automatically picks a team in the league, and a match to check'
+    )
+    async def randomdemocheck(self, interaction : discord.Interaction, league_id : int, round_number : int=None):
+        await interaction.response.send_message('Announcing random demo check...', ephemeral=True)
+        try:
+            league = self.cit.getLeague(league_id)
+            if league is None:
+                await interaction.edit_original_response(content='League not found. Aborting.', ephemeral=True)
+                return
+            # Confirm we are monitoring this league
+            if self.db.get_divs_by_league(league_id) is None:
+                await interaction.edit_original_response(content='League not being monitored. Aborting.', ephemeral=True)
+                return
+            # Get all teams in the league
+            teams = self.db.get_teams_by_league(league_id)
+            # Get all matches in the league
+            matches = self.db.get_matches_by_league(league_id)
+
+            # Pick a random team
+            team = teams[random.randint(0, len(teams)-1)]
+            # Pick a random match these guys played in
+            match = None
+            if round_number is not None:
+                for m in matches:
+                    if m[2] == team[0] and m[5] == round_number:
+                        match = m
+                        break
+            else:
+                while (match is None) or (match[3] != team[0] and match[2] != team[0]):
+                    if match[3] != 0:
+                        match = matches[random.randint(0, len(matches)-1)]
+            cit_match = self.cit.getMatch(match[0])
+            if cit_match is None:
+                await interaction.edit_original_response(content='Match not found. Aborting.', ephemeral=True)
+                return
+            players = []
+            if cit_match.home_team.id == team[0]:
+                for player in cit_match.home_team.players:
+                    players.append(player.name)
+            elif cit_match.away_team.id == team[0]:
+                for player in cit_match.away_team.players:
+                    players.append(player.name)
+
+            player = players[random.randint(0, len(players)-1)]
+            # get a random player from citadel
+            teamchannel = interaction.guild.get_channel(team[4])
+            tempmsg = ''
+            with open('embeds/democheck.json', 'r') as file:
+                tempmsg = file.read()
+            subs = {
+                '{PLAYER}': player,
+                '{MATCH_ID}': match[0],
+                '{TEAM}': f'<@{team[2]}>'
+            }
+            msg = json.loads(self.functions.substitute_strings_in_embed(tempmsg, subs))
+            msg['embed'] = discord.Embed(**msg['embeds'][0])
+            del msg['embeds']
+            await teamchannel.send(**msg)
+            await interaction.edit_original_response(content='Random demo check announced.')
+        except Exception as e:
+            self.logger.error(f'Error announcing random demo check: {e}', exc_info=True)
+            await interaction.edit_original_response(content='An error occurred while announcing the random demo check.')
+
+
+    @app_commands.command(
+        name='democheck',
+        description='Announces a random demo check for a given match. At this stage, a team id, a match ID and Player Name must be provided.'
+    )
+    async def democheck(self, interaction : discord.Interaction, team_id: int, match_id : int, player_name : str):
+        """Announces a demo check for a given match
+
+        Parameters
+        -----------
+        match_id: int
+            Match ID to check
+        player_name: str
+            Player name to check
+        """
+
+        await interaction.response.send_message('Announcing demo check...', ephemeral=True)
+        try:
+            match = self.db.get_match_by_id(match_id)
+            team = self.db.get_team_by_id(team_id)
+            if match is None:
+                await interaction.edit_original_response(content='Match not found. Aborting.', ephemeral=True)
+                return
+            if team is None:
+                await interaction.edit_original_response(content='Team not found. Aborting.', ephemeral=True)
+                return
+            if match[4] == 0:
+                await interaction.edit_original_response(content='Match is a bye, cannot check. Aborting.', ephemeral=True)
+                return
+            if team[0] != match[2] and team[0] != match[3]:
+                await interaction.edit_original_response(content='Team did not play in match. Aborting.', ephemeral=True)
+                return
+
+            teamchannel = interaction.guild.get_channel(team[4])
+            tempmsg = ''
+            with open('embeds/democheck.json', 'r') as file:
+                tempmsg = file.read()
+            subs = {
+                '{PLAYER}': player_name,
+                '{MATCH_ID}': match_id,
+                '{TEAM}': f'<@{team[2]}>'
+            }
+            msg = json.loads(self.functions.substitute_strings_in_embed(tempmsg, subs))
+            msg['embed'] = discord.Embed(**msg['embeds'][0])
+            del msg['embeds']
+            await teamchannel.send(**msg)
+            await interaction.edit_original_response(content='Demo check announced.')
+        except Exception as e:
+            self.logger.error(f'Error announcing demo check: {e}', exc_info=True)
+            await interaction.edit_original_response(content='An error occurred while announcing the demo check.')
+
+
 
     @app_commands.command(
         name='launchpad',
