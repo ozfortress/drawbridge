@@ -491,3 +491,62 @@ class Database:
             except mariadb.Error as e:
                 print(f'Error: {e}')
                 return None
+
+    def is_a_team_channel(self, team_channel):
+        with self.pool.get_connection() as conn:
+            try:
+                cursor = conn.cursor()
+                query = 'SELECT team_channel FROM teams WHERE team_channel = ?;'
+                cursor.execute(query)
+                # if the channel is not in the database, return None
+                if cursor.rowcount == 0:
+                    return False
+                else:
+                    return True
+            except mariadb.Error as e:
+                print(f'Error: {e}')
+                return None
+
+    def get_league_info(self, league_id):
+        with self.pool.get_connection() as conn:
+            try:
+                cursor = conn.cursor()
+                query = 'SELECT * FROM leagues WHERE league_id = ?;'
+                cursor.execute(query, (league_id,))
+                return cursor.fetchone()
+            except mariadb.Error as e:
+                print(f'Error: {e}')
+                return None
+
+    def update_team_channel(self, team_id, channel_id):
+        with self.pool.get_connection() as conn:
+            try:
+                cursor = conn.cursor()
+                query = 'UPDATE teams SET team_channel = ? WHERE team_id = ?;'
+                cursor.execute(query, (channel_id, team_id))
+                conn.commit()
+            except mariadb.Error as e:
+                print(f'Error: {e}')
+                return None
+
+    def get_match_by_channel_id(self, channel_id):
+        with self.pool.get_connection() as conn:
+            try:
+                cursor = conn.cursor()
+                query = 'SELECT * FROM matches WHERE channel_id = ?;'
+                cursor.execute(query, (channel_id,))
+                return cursor.fetchone()
+            except mariadb.Error as e:
+                print(f'Error: {e}')
+                return None
+
+    def update_match_channel(self, match_id, channel_id):
+        with self.pool.get_connection() as conn:
+            try:
+                cursor = conn.cursor()
+                query = 'UPDATE matches SET channel_id = ? WHERE match_id = ?;'
+                cursor.execute(query, (channel_id, match_id))
+                conn.commit()
+            except mariadb.Error as e:
+                print(f'Error: {e}')
+                return None
