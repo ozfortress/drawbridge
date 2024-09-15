@@ -550,3 +550,14 @@ class Database:
             except mariadb.Error as e:
                 print(f'Error: {e}')
                 return None
+
+    def create_league_info(self, league_id, league_name, league_shortcode):
+        with self.pool.get_connection() as conn:
+            try:
+                cursor = conn.cursor()
+                query = 'INSERT INTO leagues (league_id, league_name, league_shortcode) VALUES (?, ?, ?);'
+                cursor.execute(query, (league_id, league_name, league_shortcode))
+                conn.commit()
+            except mariadb.Error as e:
+                print(f'Error: {e}')
+                return None

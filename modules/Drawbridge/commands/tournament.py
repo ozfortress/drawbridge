@@ -99,6 +99,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             # db.insert_team(roster)
 
         await interaction.edit_original_response(content=f'Generating Division Categories, Team Channels, and Roles.\nLeague: {league.name}\nDivisions: {len(divs)}\nTeams: {len(rosters)}')
+        self.db.create_league_info(league_id, league.name, league_shortcode)
         r=0 #counters
         d=0 #counters
         for div in divs:
