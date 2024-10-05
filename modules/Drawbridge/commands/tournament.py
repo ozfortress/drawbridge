@@ -313,7 +313,18 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     interaction.guild.get_role(Checks.roles['6s Admin']): discord.PermissionOverwrite(view_channel=True)
                 }
                 cat = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID'))).get_channel(category_id)
-                match_channel = await interaction.guild.create_text_channel(f'{team_home[3]}-⚔️-{team_away[3]}-Round-{match.round_number}-{match_id}', category=cat, overwrites=overrides)
+                channel_name = f'{team_home[3]}-⚔️-{team_away[3]}-Round-{match.round_number}-{match_id}'
+                trimmed = False
+                if len(channel_name) > 100:
+                    trimmed_home_team = team_home[3][:10]
+                    trimmed_away_team = team_away[3][:10]
+                    channel_name = f'{trimmed_home_team}-⚔️-{trimmed_away_team}-Round-{match.round_number}-{match_id}'
+                    if len(channel_name) > 100:
+                        trimmed = True
+                        channel_name = f'Round-{match.round_number}-{match_id}'
+                if trimmed:
+                    self.logger.warning(f'Channel name too long, trimming to {channel_name}')
+                match_channel = await interaction.guild.create_text_channel(channel_name, category=cat, overwrites=overrides)
                 # Load the message
                 tempmatchmessage = str(rawmatchmessage)
                 if match.round_name == '':
@@ -345,6 +356,9 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     team_away_channel = self.bot.get_channel(team_away[4]) # team_channel
                     await team_home_channel.send(f'Match for round {match.round_number} has been generated. Please head to {match_channel.mention} to organise your match.')
                     await team_away_channel.send(f'Match for round {match.round_number} has been generated. Please head to {match_channel.mention} to organise your match.')
+                    if trimmed:
+                        await team_home_channel.send(f'Heads up: Due to a discord limitation, we had to trim your match name down to {channel_name}. We apologise for any inconvenience.')
+                        await team_away_channel.send(f'Heads up: Due to a discord limitation, we had to trim your match name down to {channel_name}. We apologise for any inconvenience.')
                 except Exception as e:
                     self.logger.error(f'Error sending message to team channels: {e}')
 
