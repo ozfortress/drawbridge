@@ -8,6 +8,7 @@ class Checks:
     def __init__(self):
         self.roles = {
             'Director' : 1243181553522053191, # League Director
+            'AC Head' : 1292336761627873322, # Anti-Cheat Head Admin
             '6s Head' : 1243184095878709249, # 6s Head Admin
             'HL Head' : 1243184165072011368, # HL Head Admin
             '6s Admin' : 1243183240471253134, # 6s Admin
@@ -24,6 +25,7 @@ class Checks:
 
     roles = {
             'Director' : 1243181553522053191, # League Director
+            'AC Head' : 1292336761627873322, # Anti-Cheat Head Admin
             '6s Head' : 1243184095878709249, # 6s Head Admin
             'HL Head' : 1243184165072011368, # HL Head Admin
             '6s Admin' : 1243183240471253134, # 6s Admin
@@ -40,13 +42,13 @@ class Checks:
         return discord.app_commands.checks.has_any_role(self.roles['Director'])
 
     def heads_only(self):
-        return discord.app_commands.checks.has_any_role(self.roles['6s Head'], self.roles['HL Head'], self.roles['Director'], self.roles['Developers'])
+        return discord.app_commands.checks.has_any_role(self.roles['6s Head'], self.roles['HL Head'], self.roles['AC Head'], self.roles['Director'], self.roles['Developers'])
 
     def admin_only(self):
-        return discord.app_commands.checks.has_any_role(self.roles['6s Admin'], self.roles['HL Admin'], self.roles['6s Head'], self.roles['HL Head'], self.roles['Director'], self.roles['Developers'])
+        return discord.app_commands.checks.has_any_role(self.roles['6s Admin'], self.roles['HL Admin'], self.roles['6s Head'], self.roles['HL Head'], self.roles['AC Head'], self.roles['Director'], self.roles['Developers'])
 
     def trials_only(self):
-        return discord.app_commands.checks.has_any_role(self.roles['Trial Admin'], self.roles['6s Admin'], self.roles['HL Admin'], self.roles['6s Head'], self.roles['HL Head'], self.roles['Director'],  self.roles['Developers'])
+        return discord.app_commands.checks.has_any_role(self.roles['Trial Admin'], self.roles['6s Admin'], self.roles['HL Admin'], self.roles['6s Head'], self.roles['HL Head'], self.roles['AC Head'], self.roles['Director'],  self.roles['Developers'])
 
     def dev_only(self):
         return discord.app_commands.checks.has_any_role(self.roles['Developers'], self.roles['Director'])
@@ -86,5 +88,6 @@ class Checks:
                 self.guild_cooldowns[ctx.guild.id][key] = time.time() + timeout
                 return True
         return discord_commands.check(predicate)
+
 
 #del discord, discord_commands, time
