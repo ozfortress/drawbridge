@@ -11,13 +11,13 @@ jobs:
 
     steps:
       - name: Pull latest changes in drawbridge/src
-        working-directory: /opt/ozf_projects/drawbridge/src
+        working-directory: /opt/ozf-projects/drawbridge/src
         run: |
           git checkout main
           git pull origin main
 
       - name: Build and deploy with Docker Compose
-        working-directory: /opt/ozf_projects/drawbridge
+        working-directory: /opt/ozf-projects/drawbridge
         run: |
           docker compose build
           docker compose up -d
