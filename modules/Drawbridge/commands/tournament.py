@@ -17,7 +17,7 @@ __description__ = 'Commands for managing tournaments.'
 __version__ = '0.0.1'
 
 
-@Checks.heads_only(Checks)
+@Checks.is_head(Checks)
 @discord.app_commands.guild_only()
 class Tournament(discord_commands.GroupCog, group_name='tournament', name='tournamnet', group_description='Commands for managing tournaments. This is a new string',):
     def __init__(self, bot:discord_commands.Bot, db:database.Database, cit:citadel.Citadel, logger) -> None:
@@ -27,26 +27,6 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         self.logger = logger
         self.logger.info('Loaded Tournament Commands.')
         self.functions = Functions(self.db, self.cit)
-
-    # tournament = discord.app_commands.Group(name='tournament', description='Commands for managing ozfortress tournaments, including generating match channels and starting/ending tournaments', guild_only=True, guild_ids=[os.getenv('DISCORD_GUILD_ID')])
-
-        # @Checks.heads_only(Checks)
-
-        # @command_tree.(
-        #     name='tournament',
-        #     guild=discord.Object(id=os.getenv('DISCORD_GUILD_ID'))
-        # )
-        # async def tournament(interaction : discord.Interaction):
-        #     """Base command for tournament management"""
-        #     await interaction.response.send_message('Please specify a subcommand.', ephemeral=True)
-
-
-
-    # @Checks.heads_only(Checks)
-    # @client.command(
-    #     name='start',
-    #     # guild=discord.Object(id=os.getenv('DISCORD_GUILD_ID'))
-    # )
 
     @app_commands.command(
         name='test'
@@ -104,17 +84,12 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         for div in divs:
             d+=1
             overrides = {
-                interaction.guild.default_role: discord.PermissionOverwrite(view_channel=False),
-                interaction.guild.get_role(Checks.roles['6s Head']): discord.PermissionOverwrite(view_channel=True),
-                interaction.guild.get_role(Checks.roles['HL Head']): discord.PermissionOverwrite(view_channel=True),
-                interaction.guild.get_role(Checks.roles['Trial Admin']): discord.PermissionOverwrite(view_channel=True),
-                interaction.guild.get_role(Checks.roles['Developers']): discord.PermissionOverwrite(view_channel=True),
-                interaction.guild.get_role(Checks.roles['Approved Casters']): discord.PermissionOverwrite(view_channel=True),
-                interaction.guild.get_role(Checks.roles['Unapproved Casters']): discord.PermissionOverwrite(view_channel=True),
-                interaction.guild.get_role(Checks.roles['Captains Bot']): discord.PermissionOverwrite(view_channel=True),
-                interaction.guild.get_role(Checks.roles['HL Admin']): discord.PermissionOverwrite(view_channel=True),
-                interaction.guild.get_role(Checks.roles['6s Admin']): discord.PermissionOverwrite(view_channel=True)
+                interaction.guild.default_role: discord.PermissionOverwrite(view_channel=False)
             }
+
+            all_access = Checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'CASTER', 'BOT')
+            for role in all_access:
+                overrides[interaction.guild.get_role(role)] = discord.PermissionOverwrite(view_channel=True)
 
             channelcategory = await interaction.guild.create_category(f'{div} - {league_shortcode}', overwrites=overrides)
 
@@ -133,18 +108,17 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     role = await interaction.guild.create_role(name=f'{roster['name']} ({league_shortcode})', mentionable=True)
                     overwrites = {
                         interaction.guild.default_role: discord.PermissionOverwrite(view_channel=False),
-                        interaction.guild.get_role(Checks.roles['6s Head']): discord.PermissionOverwrite(view_channel=True),
-                        interaction.guild.get_role(Checks.roles['HL Head']): discord.PermissionOverwrite(view_channel=True),
-                        interaction.guild.get_role(Checks.roles['Trial Admin']): discord.PermissionOverwrite(view_channel=True),
-                        interaction.guild.get_role(Checks.roles['Developers']): discord.PermissionOverwrite(view_channel=True),
-                        # interaction.guild.get_role(Checks.roles['Approved Casters']): discord.PermissionOverwrite(view_channel=True),
-                        # interaction.guild.get_role(Checks.roles['Unapproved Casters']): discord.PermissionOverwrite(view_channel=True),
-                        interaction.guild.get_role(Checks.roles['Captains Bot']): discord.PermissionOverwrite(view_channel=True),
-                        interaction.guild.get_role(Checks.roles['HL Admin']): discord.PermissionOverwrite(view_channel=True),
-                        interaction.guild.get_role(Checks.roles['6s Admin']): discord.PermissionOverwrite(view_channel=True),
                         role: discord.PermissionOverwrite(view_channel=True)
                     }
-                    teamchannel = await interaction.guild.create_text_channel(f'{roster['name']} ({league_shortcode})', category=channelcategory, overwrites=overwrites)
+
+                    all_access = Checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'BOT')
+                    for role in all_access:
+                        overrides[interaction.guild.get_role(role)] = discord.PermissionOverwrite(view_channel=True)
+                    channel_name = f'🛡️{roster['name']} ({league_shortcode})'
+                    if len(channel_name) > 45:
+                        channel_name = f'🛡️{roster['name'][:20]} ({league_shortcode})'
+                        self.logger.warning(f'Channel name for {roster['name']} is too long, trimming to {channel_name}')
+                    teamchannel = await interaction.guild.create_text_channel(channel_name, category=channelcategory, overwrites=overwrites)
                     team_id = roster['team_id']
                     subsitutions = {
                         '{TEAM_MENTION}': f'<@&{role.id}>',
@@ -302,33 +276,25 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     interaction.guild.default_role: discord.PermissionOverwrite(view_channel=False),
                     interaction.guild.get_role(team_home[2]): discord.PermissionOverwrite(view_channel=True),
                     interaction.guild.get_role(team_away[2]): discord.PermissionOverwrite(view_channel=True),
-                    interaction.guild.get_role(Checks.roles['6s Head']): discord.PermissionOverwrite(view_channel=True),
-                    interaction.guild.get_role(Checks.roles['HL Head']): discord.PermissionOverwrite(view_channel=True),
-                    interaction.guild.get_role(Checks.roles['Trial Admin']): discord.PermissionOverwrite(view_channel=True),
-                    interaction.guild.get_role(Checks.roles['Developers']): discord.PermissionOverwrite(view_channel=True),
-                    interaction.guild.get_role(Checks.roles['Approved Casters']): discord.PermissionOverwrite(view_channel=True),
-                    interaction.guild.get_role(Checks.roles['Unapproved Casters']): discord.PermissionOverwrite(view_channel=True),
-                    interaction.guild.get_role(Checks.roles['Captains Bot']): discord.PermissionOverwrite(view_channel=True),
-                    interaction.guild.get_role(Checks.roles['HL Admin']): discord.PermissionOverwrite(view_channel=True),
-                    interaction.guild.get_role(Checks.roles['6s Admin']): discord.PermissionOverwrite(view_channel=True)
                 }
+                all_access = Checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'CASTER', 'BOT')
+                for role in all_access:
+                    overrides[interaction.guild.get_role(role)] = discord.PermissionOverwrite(view_channel=True)
+
                 cat = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID'))).get_channel(category_id)
-                channel_name = f'{team_home[3]}-⚔️-{team_away[3]}-Round-{match.round_number}-{match_id}'
+                if match.round_name == '':
+                    match.round_name = f'Round {match.round_number}'
+                channel_name = f'🗡️-{match_id}-{team_home[3]}-vs-{team_away[3]}-{match.round_name}'
                 trimmed = False
                 if len(channel_name) > 100:
                     trimmed_home_team = team_home[3][:10]
                     trimmed_away_team = team_away[3][:10]
-                    channel_name = f'{trimmed_home_team}-⚔️-{trimmed_away_team}-Round-{match.round_number}-{match_id}'
-                    if len(channel_name) > 100:
-                        trimmed = True
-                        channel_name = f'Round-{match.round_number}-{match_id}'
-                if trimmed:
-                    self.logger.warning(f'Channel name too long, trimming to {channel_name}')
+                    channel_name = f'🗡️{match_id}-{trimmed_home_team}-vs-{trimmed_away_team}-{match.round_name}'
+                    self.logger.warning(f'Channel name too long when generating match {match.round_number} {team_home[3]} vs {team_away[3]}, trimming to {channel_name}')
                 match_channel = await interaction.guild.create_text_channel(channel_name, category=cat, overwrites=overrides)
                 # Load the message
                 tempmatchmessage = str(rawmatchmessage)
-                if match.round_name == '':
-                    match.round_name = f'Round {match.round_number}'
+
                 matchmessage = json.loads(self.functions.substitute_strings_in_embed(tempmatchmessage, {
                     '{TEAM_HOME}': f'<@&{team_home[2]}>', # team role as a mention
                     '{TEAM_AWAY}': f'<@&{team_away[2]}>', # team role as a mention
@@ -411,7 +377,6 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         self.db.archive_match(match_id)
 
         await interaction.edit_original_response(content='Round ended. All channels have been archived.')
-
     # @app_commands.command(
     #         name='randomdemocheck',
     #         description='Announces a truly random demo check, given a League ID. Automatically picks a team in the league, and a match to check'

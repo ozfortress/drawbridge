@@ -1,63 +1,96 @@
 import discord
+from typing import List
 from discord.ext import commands as discord_commands
 # from discord import app_commands
 import time
+import os
 class Checks:
     """
     All Checks used by Drawbridge."""
     def __init__(self):
-        self.roles = {
-            'Director' : 1243181553522053191, # League Director
-            'AC Head' : 1292336761627873322, # Anti-Cheat Head Admin
-            '6s Head' : 1243184095878709249, # 6s Head Admin
-            'HL Head' : 1243184165072011368, # HL Head Admin
-            '6s Admin' : 1243183240471253134, # 6s Admin
-            'HL Admin' : 1243183285824126976, # HL Admin
-            'Trial Admin' : 1243197012443267113, # Trial Admin
-            'Developers' : 1243183754625814599, # Developers
-            'Approved Casters' : 1243192943548829726, # Approved Casting
-            'Unapproved Casters' : 1243193009768497334, # Unapproved Casting
-            'Captains Bot': 1248508402275975169, # Captains Bot
-            'Staff': 1243181493598031934 # Staff role for all staff members
-        }
+        self.roles = {key.upper(): value for key, value in os.environ.items() if key.upper().startswith('ROLE_')}
         self.user_cooldowns = {}
         self.guild_cooldowns = {}
 
-    roles = {
-            'Director' : 1243181553522053191, # League Director
-            'AC Head' : 1292336761627873322, # Anti-Cheat Head Admin
-            '6s Head' : 1243184095878709249, # 6s Head Admin
-            'HL Head' : 1243184165072011368, # HL Head Admin
-            '6s Admin' : 1243183240471253134, # 6s Admin
-            'HL Admin' : 1243183285824126976, # HL Admin
-            'Trial Admin' : 1243197012443267113, # Trial Admin
-            'Developers' : 1243183754625814599, # Developers
-            'Approved Casters' : 1243192943548829726, # Approved Casting
-            'Unapproved Casters' : 1243193009768497334, # Unapproved Casting
-            'Captains Bot': 1248508402275975169, # Captains Bot
-            'Staff': 1243181493598031934 # Staff role for all staff members
-        }
+    def _get_role_ids(self, *keywords: str) -> List[int]:
+        """
+        Returns a list of IDs of roles based on keywords.
 
-    def director_only(self):
-        return discord.app_commands.checks.has_any_role(self.roles['Director'])
+        Parameters
+        -----------
+        *keywords : str
+            Keywords to search for in role names. Case-insensitive.
 
-    def heads_only(self):
-        return discord.app_commands.checks.has_any_role(self.roles['6s Head'], self.roles['HL Head'], self.roles['AC Head'], self.roles['Director'], self.roles['Developers'])
+        Returns
+        --------
+        List[int]
+            List of role IDs.
+        """
+        keywords = [word.upper() for word in keywords]
+        return [
+            int(id) for key, id in self.roles.items()
+            if all(word in key for word in keywords)
+        ]
 
-    def admin_only(self):
-        return discord.app_commands.checks.has_any_role(self.roles['6s Admin'], self.roles['HL Admin'], self.roles['6s Head'], self.roles['HL Head'], self.roles['AC Head'], self.roles['Director'], self.roles['Developers'])
+    def is_head(self):
+        """
+        Check if user has any Head Admin role.
+        """
+        return discord.app_commands.checks.has_any_role(*self._get_role_ids('Head'))
 
-    def trials_only(self):
-        return discord.app_commands.checks.has_any_role(self.roles['Trial Admin'], self.roles['6s Admin'], self.roles['HL Admin'], self.roles['6s Head'], self.roles['HL Head'], self.roles['AC Head'], self.roles['Director'],  self.roles['Developers'])
+    def is_admin(self):
+        """
+        Check if user has any Admin role.
+        """
+        return discord.app_commands.checks.has_any_role(*self._get_role_ids('Admin'))
 
-    def dev_only(self):
-        return discord.app_commands.checks.has_any_role(self.roles['Developers'], self.roles['Director'])
+    def is_trial(self):
+        """
+        Check if user has any Trial Admin role.
+        """
+        return discord.app_commands.checks.has_any_role(*self._get_role_ids('Trial'))
 
-    def casters_only(self):
-        return discord.app_commands.checks.has_any_role(self.roles['Approved Casters'], self.roles['Unapproved Casters'], self.roles['Director'],  self.roles['Developers'], self.roles['Staff'])
+    def is_developer(self):
+        """
+        Check if user has any Developer role.
+        """
+        return discord.app_commands.checks.has_any_role(*self._get_role_ids('Developer'))
 
-    def staff_only(self):
-        return discord.app_commands.checks.has_any_role(self.roles['Staff'], self.roles['Director'], self.roles['Developers'])
+    def is_caster(self):
+        """
+        Check if user has any Caster role.
+        """
+        return discord.app_commands.checks.has_any_role(*self._get_role_ids('Caster'))
+
+    def is_staff(self):
+        """
+        Check if user has any Staff role.
+        """
+        return discord.app_commands.checks.has_any_role(*self._get_role_ids('Staff'))
+
+    def is_director(self):
+        """
+        Check if user has Director role.
+        """
+        return discord.app_commands.checks.has_any_role(*self._get_role_ids('Director'))
+
+    def is_approved_caster(self):
+        """
+        Check if user has Approved Caster role.
+        """
+        return discord.app_commands.checks.has_any_role(*self._get_role_ids('Approved', 'Caster'))
+
+    def is_unapproved_caster(self):
+        """
+        Check if user has Unapproved Caster role.
+        """
+        return discord.app_commands.checks.has_any_role(*self._get_role_ids('Unapproved', 'Caster'))
+
+    def is_bot(self):
+        """
+        Check if user has Bot role.
+        """
+        return discord.app_commands.checks.has_any_role(*self._get_role_ids('Bot'))
 
     def user_cooldown(self, timeout: int | float):
         async def predicate(ctx: discord.Interaction):
@@ -89,5 +122,3 @@ class Checks:
                 return True
         return discord_commands.check(predicate)
 
-
-#del discord, discord_commands, time
