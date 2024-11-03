@@ -7,7 +7,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: self-hosted
+    runs-on: drawbridge
 
     steps:
       - name: Pull latest changes in drawbridge/src
