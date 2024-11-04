@@ -17,7 +17,7 @@ __description__ = 'Commands for managing tournaments.'
 __version__ = '0.0.1'
 
 checks = Checks()
-@checks.is_head(Checks)
+@checks.is_head()
 @discord.app_commands.guild_only()
 class Tournament(discord_commands.GroupCog, group_name='tournament', name='tournamnet', group_description='Commands for managing tournaments. This is a new string',):
     def __init__(self, bot:discord_commands.Bot, db:database.Database, cit:citadel.Citadel, logger) -> None:
