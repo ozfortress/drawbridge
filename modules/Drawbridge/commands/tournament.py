@@ -16,8 +16,8 @@ __title__ = 'Tournament Commands'
 __description__ = 'Commands for managing tournaments.'
 __version__ = '0.0.1'
 
-
-@Checks.is_head(Checks)
+checks = Checks()
+@checks.is_head(Checks)
 @discord.app_commands.guild_only()
 class Tournament(discord_commands.GroupCog, group_name='tournament', name='tournamnet', group_description='Commands for managing tournaments. This is a new string',):
     def __init__(self, bot:discord_commands.Bot, db:database.Database, cit:citadel.Citadel, logger) -> None:
@@ -87,7 +87,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 interaction.guild.default_role: discord.PermissionOverwrite(view_channel=False)
             }
 
-            all_access = Checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'CASTER', 'BOT')
+            all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'CASTER', 'BOT')
             for role in all_access:
                 overrides[interaction.guild.get_role(role)] = discord.PermissionOverwrite(view_channel=True)
 
@@ -111,7 +111,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                         role: discord.PermissionOverwrite(view_channel=True)
                     }
 
-                    all_access = Checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'BOT')
+                    all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'BOT')
                     for role in all_access:
                         overrides[interaction.guild.get_role(role)] = discord.PermissionOverwrite(view_channel=True)
                     channel_name = f'🛡️{roster['name']} ({league_shortcode})'
@@ -277,7 +277,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     interaction.guild.get_role(team_home[2]): discord.PermissionOverwrite(view_channel=True),
                     interaction.guild.get_role(team_away[2]): discord.PermissionOverwrite(view_channel=True),
                 }
-                all_access = Checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'CASTER', 'BOT')
+                all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'CASTER', 'BOT')
                 for role in all_access:
                     overrides[interaction.guild.get_role(role)] = discord.PermissionOverwrite(view_channel=True)
 
