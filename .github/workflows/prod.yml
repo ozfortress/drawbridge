@@ -69,7 +69,7 @@ jobs:
           docker run -d \
             --name ${CONTAINER_NAME} \
             --env-file ${{ env.ENV_FILE_PATH }} \
-            ghcr.io/ozfortress/drawbridge:dev
+            ghcr.io/ozfortress/drawbridge:main
 
       - name: Verify deployment
         run: |
