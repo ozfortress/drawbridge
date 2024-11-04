@@ -1,0 +1,53 @@
+name: Deploy to Development
+
+on:
+  push:
+    branches:
+      - dev
+
+jobs:
+  build:
+    runs-on: drawbridge
+
+    steps:
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          push: false # Do not push the image to Docker Hub
+          tags: drawbridge:latest, drawbridge:${{ github.sha }}
+          context: .
+
+  deploy:
+    runs-on: drawbridge
+    needs: build
+
+    env:
+      DOCKER_BUILDKIT: 1
+      VERIFY_STRING: "Bot has been started"
+      WAIT_TIME: 30
+      CONTAINER_NAME: "drawbridge_prod"
+      ENV_FILE_PATH: "/opt/ozf-projects/drawbridge/prod.env"
+
+    steps:
+      - name: Deploy Docker Container
+        run: |
+          if [ "$(docker ps -a -q -f name=${CONTAINER_NAME})" ]; then
+            docker rm -f ${CONTAINER_NAME}
+          fi
+          docker run -d \
+            --name ${CONTAINER_NAME} \
+            --env-file ${{ env.ENV_FILE_PATH }} \
+            drawbridge:latest
+
+      - name: Verify deployment
+        run: |
+          sleep $WAIT_TIME
+          if [ "$(docker logs ${CONTAINER_NAME} | grep -c "${VERIFY_STRING}")" -eq 0 ]; then
+            echo "Deployment failed"
+            exit 1
+          else
+            echo "Deployment successful"
+          fi
