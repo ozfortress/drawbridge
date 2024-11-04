@@ -54,7 +54,7 @@ async def on_ready():
     # await Drawbridge.load_all_commands(
     await Drawbridge.initialize(client, db, cit, logger)
 
-    botmisc= client.get_channel(os.getenv('ANNOUNCE_CHANNEL'))
+    botmisc= client.get_channel(int(os.getenv('ANNOUNCE_CHANNEL')))
     def get_latest_commit():
         try:
             latest_commit = subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode().strip()
