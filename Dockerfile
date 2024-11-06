@@ -1,4 +1,5 @@
 FROM python:3.12.4-bookworm AS build
+LABEL org.opencontainers.image.source https://github.com/ozfortress/drawbridge
 
 WORKDIR /usr/src/app
 
