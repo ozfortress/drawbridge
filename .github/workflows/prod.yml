@@ -49,7 +49,6 @@ jobs:
 
     env:
       DOCKER_BUILDKIT: 1
-      VERIFY_STRING: "Bot has been started"
       WAIT_TIME: 30
       CONTAINER_NAME: "drawbridge_prod"
       ENV_FILE_PATH: "/opt/ozf-projects/drawbridge/prod.env"
@@ -72,12 +71,14 @@ jobs:
             --env-file ${{ env.ENV_FILE_PATH }} \
             ghcr.io/ozfortress/drawbridge:main
 
-      - name: Verify deployment
+      - name: Verify deployment via Docker Healthcheck
         run: |
-          sleep $WAIT_TIME
-          if [ "$(docker logs ${CONTAINER_NAME} | grep -c "${VERIFY_STRING}")" -eq 0 ]; then
-            echo "Deployment failed"
-            exit 1
-          else
-            echo "Deployment successful"
-          fi
+          for i in {1..${WAIT_TIME}}; do
+            if [ "$(docker inspect -f '{{.State.Health.Status}}' ${CONTAINER_NAME})" == "healthy" ]; then
+              echo "Container is healthy"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Container failed to start"
+          exit 1
