@@ -36,7 +36,8 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          push: false # Do not push the image to Docker Hub
+          push: true
+          context: .
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
