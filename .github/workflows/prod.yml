@@ -66,6 +66,7 @@ jobs:
           if [ "$(docker ps -a -q -f name=${CONTAINER_NAME})" ]; then
             docker rm -f ${CONTAINER_NAME}
           fi
+          docker pull ghcr.io/ozfortress/drawbridge:main
           docker run -d \
             --name ${CONTAINER_NAME} \
             --env-file ${{ env.ENV_FILE_PATH }} \
