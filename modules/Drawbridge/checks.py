@@ -12,7 +12,7 @@ class Checks:
         self.user_cooldowns = {}
         self.guild_cooldowns = {}
 
-    def _get_role_ids(self, *keywords: str) -> List[int]:
+    def _get_role_ids3(self, *keywords: str) -> List[int]:
         """
         Returns a list of IDs of roles based on keywords.
 
@@ -27,9 +27,14 @@ class Checks:
             List of role IDs.
         """
         keywords = [word.upper() for word in keywords]
+        antikeywords = []
+        for word in keywords:
+            if word.startswith('!'):
+                antikeywords.append(word[1:])
+                keywords.remove(word)
         return [
             int(id) for key, id in self.roles.items()
-            if any(word in key for word in keywords)
+            if any(word in key for word in keywords if word) and not any(word in key for word in antikeywords)
         ]
 
     def is_head(self):

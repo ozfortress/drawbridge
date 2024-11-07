@@ -87,7 +87,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 interaction.guild.default_role: discord.PermissionOverwrite(view_channel=False)
             }
 
-            all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'CASTER', 'BOT')
+            all_access = checks._get_role_ids('HEAD', 'ADMIN', '!AC', 'TRIAL', 'DEVELOPER', 'CASTER', 'BOT')
             for role in all_access:
                 overrides[interaction.guild.get_role(role)] = discord.PermissionOverwrite(view_channel=True)
 
