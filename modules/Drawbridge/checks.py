@@ -29,7 +29,7 @@ class Checks:
         keywords = [word.upper() for word in keywords]
         return [
             int(id) for key, id in self.roles.items()
-            if all(word in key for word in keywords)
+            if any(word in key for word in keywords)
         ]
 
     def is_head(self):
