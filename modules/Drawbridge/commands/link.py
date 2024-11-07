@@ -58,7 +58,7 @@ class Link(discord_commands.Cog):
         if channel is not None:
             await channel.send(f'Welcome {member.mention}! Please link your Citadel account with the command `/link`.')
 
-    @app_commands.command(name='link', help='Link your Citadel account with your Discord account.')
+    @app_commands.command(name='link', description='Link your Citadel account with your Discord account.')
     async def link(self, interaction : discord.Interaction):
         await interaction.response.send_modal(LinkModal)
 
