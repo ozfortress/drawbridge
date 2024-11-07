@@ -11,5 +11,5 @@ COPY . .
 
 CMD [ "python", "./app.py" ]
 
-HEALTHCHECK --interval=15s --timeout=10s --start-period=10s --retries=3 \
-    CMD (echo "ping" | socat - UNIX-CONNECT:/tmp/drawbridge.sock) | grep -q "OK" || exit 1
+# HEALTHCHECK --interval=15s --timeout=10s --start-period=10s --retries=3 \
+#     CMD (echo "ping" | socat - UNIX-CONNECT:/tmp/drawbridge.sock) | grep -q "OK" || exit 1

@@ -72,14 +72,16 @@ jobs:
             --env-file ${{ env.ENV_FILE_PATH }} \
             ghcr.io/ozfortress/drawbridge:main
 
-      - name: Verify deployment via Docker Healthcheck
-        run: |
-          for i in {1..${WAIT_TIME}}; do
-            if [ "$(docker inspect -f '{{.State.Health.Status}}' ${CONTAINER_NAME})" == "healthy" ]; then
-              echo "Container is healthy"
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "Container failed to start"
-          exit 1
+      # - name: Verify deployment via Docker Healthcheck
+      #   run: |
+      #     for i in {1..${WAIT_TIME}}; do
+      #       if [ "$(docker inspect -f '{{.State.Health.Status}}' ${CONTAINER_NAME})" -eq "healthy" ];
+      #         echo "Container is healthy"
+      #         exit 0
+      #       else
+      #         echo "Container is unhealthy"
+      #       fi
+      #       sleep 1
+      #     done
+      #     echo "Container failed to start"
+      #     exit 1

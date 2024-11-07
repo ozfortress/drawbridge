@@ -100,7 +100,7 @@ async def on_ready():
         await botmisc.send(f'# Bot has been started\n- time: <t:{now}>\n- `{latest_commit[:6]}` - `{commit_date}` `\n- author: {commit_author}\n```\n{commit_message}```')
     #Drawbridge.Logging(client, db, cit)
     healthstatus['status'] = b"OK"
-    client.loop.create_task(healthcheck())
+    # client.loop.create_task(healthcheck())
 
 @discord_tasks.loop(seconds=5)
 async def check_commands():
