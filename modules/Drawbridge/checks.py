@@ -12,7 +12,7 @@ class Checks:
         self.user_cooldowns = {}
         self.guild_cooldowns = {}
 
-    def _get_role_ids3(self, *keywords: str) -> List[int]:
+    def _get_role_ids(self, *keywords: str) -> List[int]:
         """
         Returns a list of IDs of roles based on keywords.
 
