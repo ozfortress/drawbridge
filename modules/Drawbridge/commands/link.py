@@ -30,7 +30,7 @@ class LinkModal(discord.ui.Modal, title='Link Account'):
     #         discord.SelectOption(label='Open', value='open'),
     #     ]
     # )
-    div = discord.ui.Select(label='Please select your division', max_values=1, min_values=1)
+    div = discord.ui.Select(placeholder='Please select your division', max_values=1, min_values=1)
     div.add_option(label='Premier', value='premier')
     div.add_option(label='High', value='high')
     div.add_option(label='Intermediate', value='intermediate')
