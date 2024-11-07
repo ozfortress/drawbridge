@@ -60,7 +60,8 @@ class Link(discord_commands.Cog):
 
     @app_commands.command(name='link', description='Link your Citadel account with your Discord account.')
     async def link(self, interaction : discord.Interaction):
-        await interaction.response.send_modal(LinkModal)
+        modal = LinkModal()
+        await interaction.response.send_modal(modal)
 
 async def initialize(bot: discord_commands.Bot, db, cit, logger):
     await bot.add_cog(Link(bot, db, cit, logger), guilds=[bot.get_guild(int(os.getenv('DISCORD_GUILD_ID')))])
