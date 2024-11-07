@@ -20,7 +20,7 @@ checks = Checks()
 
 class LinkModal(discord.ui.Modal, title='Link Account'):
     profile = discord.ui.TextInput(style='short',label='Please link your Ozfortress Profile', placeholder='https://ozfortress.com/users/...')
-    div = discord.ui.Select(type='select', placeholder='Please select your division', max_values=1, min_values=1, options=[discord.SelectOption(label='Premier', value='premier'),discord.SelectOption(label='High', value='high'),discord.SelectOption(label='Intermediate', value='intermediate'),discord.SelectOption(label='Main', value='main'),discord.SelectOption(label='Open', value='open')])
+    div = discord.ui.Select(placeholder='Please select your division', max_values=1, min_values=1, options=[discord.SelectOption(label='Premier', value='premier'),discord.SelectOption(label='High', value='high'),discord.SelectOption(label='Intermediate', value='intermediate'),discord.SelectOption(label='Main', value='main'),discord.SelectOption(label='Open', value='open')])
     team = discord.ui.TextInput(style='short',label='Please link your Team', placeholder='https://ozfortress.com/team/...')
 
     async def on_submit(self, interaction: discord.Interaction):
