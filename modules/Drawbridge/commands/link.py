@@ -19,24 +19,9 @@ __version__ = "1.0.0"
 checks = Checks()
 
 class LinkModal(discord.ui.Modal, title='Link Account'):
-    profile = discord.ui.TextInput(label='Please link your Ozfortress Profile', placeholder='https://ozfortress.com/users/...')
-    # div = discord.ui.select(
-    #     label='Please select your division',
-    #     options=[
-    #         discord.SelectOption(label='Premier', value='premier'),
-    #         discord.SelectOption(label='High', value='high'),
-    #         discord.SelectOption(label='Intermediate', value='intermediate'),
-    #         discord.SelectOption(label='Main', value='main'),
-    #         discord.SelectOption(label='Open', value='open'),
-    #     ]
-    # )
-    div = discord.ui.Select(placeholder='Please select your division', max_values=1, min_values=1)
-    div.add_option(label='Premier', value='premier')
-    div.add_option(label='High', value='high')
-    div.add_option(label='Intermediate', value='intermediate')
-    div.add_option(label='Main', value='main')
-    div.add_option(label='Open', value='open')
-    team = discord.ui.TextInput(label='Please link your Team', placeholder='https://ozfortress.com/team/...')
+    profile = discord.ui.TextInput(style='short',label='Please link your Ozfortress Profile', placeholder='https://ozfortress.com/users/...')
+    div = discord.ui.Select(type='select', placeholder='Please select your division', max_values=1, min_values=1, options=[discord.SelectOption(label='Premier', value='premier'),discord.SelectOption(label='High', value='high'),discord.SelectOption(label='Intermediate', value='intermediate'),discord.SelectOption(label='Main', value='main'),discord.SelectOption(label='Open', value='open')])
+    team = discord.ui.TextInput(style='short',label='Please link your Team', placeholder='https://ozfortress.com/team/...')
 
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.send_message(f'Debug, response: {self.profile} - {self.div} - {self.team}', ephemeral=True)
