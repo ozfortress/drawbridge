@@ -19,12 +19,36 @@ __version__ = "1.0.0"
 checks = Checks()
 
 class LinkModal(discord.ui.Modal, title='Link Account'):
-    profile = discord.ui.TextInput(style='short',label='Please link your Ozfortress Profile', placeholder='https://ozfortress.com/users/...')
-    div = discord.ui.Select(placeholder='Please select your division', max_values=1, min_values=1, options=[discord.SelectOption(label='Premier', value='premier'),discord.SelectOption(label='High', value='high'),discord.SelectOption(label='Intermediate', value='intermediate'),discord.SelectOption(label='Main', value='main'),discord.SelectOption(label='Open', value='open')])
-    team = discord.ui.TextInput(style='short',label='Please link your Team', placeholder='https://ozfortress.com/team/...')
+
+    profile = discord.ui.TextInput(
+        placeholder='https://ozfortress.com/users/...',
+        label='Ozfortress Profile',
+    )
+
+    division = discord.ui.Select(
+        placeholder='Select Division',
+        options=[
+            discord.SelectOption(label='Open', value='Open'),
+            discord.SelectOption(label='Main', value='Main'),
+            discord.SelectOption(label='Intermediate', value='Intermediate'),
+            discord.SelectOption(label='High', value='High'),
+            discord.SelectOption(label='Premier', value='Premier'),
+        ],
+        min_values=1,
+        max_values=1,
+        label='Ozfortress Division',
+    )
+
+    team = discord.ui.TextInput(
+        placeholder='https://ozfortress.com/teams/...',
+        label='Ozfortress Team',
+    )
 
     async def on_submit(self, interaction: discord.Interaction):
-        await interaction.response.send_message(f'Debug, response: {self.profile} - {self.div} - {self.team}', ephemeral=True)
+        await interaction.response.send_message(f'Profile: {self.profile.value}\nDivision: {self.division.values[0]}\nTeam: {self.team.value}', ephemeral=True)
+
+    async def on_error(self, interaction: discord.Interaction, error: Exception):
+        await interaction.response.send_message(f'An error occurred: \n```\n{error}\n```', ephemeral=True)
 
 
 @discord.app_commands.guild_only()
@@ -45,8 +69,7 @@ class Link(discord_commands.Cog):
 
     @app_commands.command(name='link', description='Link your Citadel account with your Discord account.')
     async def link(self, interaction : discord.Interaction):
-        modal = LinkModal()
-        await interaction.response.send_modal(modal)
+        await interaction.response.send_modal(LinkModal())
 
 async def initialize(bot: discord_commands.Bot, db, cit, logger):
     await bot.add_cog(Link(bot, db, cit, logger), guilds=[bot.get_guild(int(os.getenv('DISCORD_GUILD_ID')))])
