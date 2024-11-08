@@ -35,8 +35,7 @@ class LinkModal(discord.ui.Modal, title='Link Account'):
             discord.SelectOption(label='Premier', value='Premier'),
         ],
         min_values=1,
-        max_values=1,
-        label='Ozfortress Division',
+        max_values=1
     )
 
     team = discord.ui.TextInput(
