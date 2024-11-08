@@ -25,18 +25,18 @@ class LinkModal(discord.ui.Modal, title='Link Account'):
         label='Ozfortress Profile',
     )
 
-    division = discord.ui.Select(
-        placeholder='Select Division',
-        options=[
-            discord.SelectOption(label='Open', value='Open'),
-            discord.SelectOption(label='Main', value='Main'),
-            discord.SelectOption(label='Intermediate', value='Intermediate'),
-            discord.SelectOption(label='High', value='High'),
-            discord.SelectOption(label='Premier', value='Premier'),
-        ],
-        min_values=1,
-        max_values=1
-    )
+    # division = discord.ui.Select(
+    #     placeholder='Select Division',
+    #     options=[
+    #         discord.SelectOption(label='Open', value='Open'),
+    #         discord.SelectOption(label='Main', value='Main'),
+    #         discord.SelectOption(label='Intermediate', value='Intermediate'),
+    #         discord.SelectOption(label='High', value='High'),
+    #         discord.SelectOption(label='Premier', value='Premier'),
+    #     ],
+    #     min_values=1,
+    #     max_values=1
+    # )
 
     team = discord.ui.TextInput(
         placeholder='https://ozfortress.com/teams/...',
@@ -44,7 +44,7 @@ class LinkModal(discord.ui.Modal, title='Link Account'):
     )
 
     async def on_submit(self, interaction: discord.Interaction):
-        await interaction.response.send_message(f'Profile: {self.profile.value}\nDivision: {self.division.values[0]}\nTeam: {self.team.value}', ephemeral=True)
+        await interaction.response.send_message(f'Profile: {self.profile.value}\nTeam: {self.team.value}', ephemeral=True)
 
     async def on_error(self, interaction: discord.Interaction, error: Exception):
         await interaction.response.send_message(f'An error occurred: \n```\n{error}\n```', ephemeral=True)
