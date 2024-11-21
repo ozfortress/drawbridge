@@ -377,6 +377,41 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         self.db.archive_match(match_id)
 
         await interaction.edit_original_response(content='Round ended. All channels have been archived.')
+
+    @app_commands.command(
+            name='randomdemocheck',
+            description='Still WIP.'
+    )
+    async def randomdemocheck(self, interaction : discord.Interaction, league_id : int):
+        """Conduct a random demo check.
+        Parameters
+        -----------
+        league_id: int
+            league to demo check
+        """
+        await interaction.response.send_message('Democheck is in progress ...', ephemeral=True)
+        try:
+            league = self.cit.getLeague(league_id)
+            if league is None:
+                await interaction.edit_original_response(content='League not found. Aborting.', ephemeral=True)
+                return
+            if self.db.get_divs_by_league(league_id) is None:
+                await interaction.edit_original_response(content='League not being monitored. Aborting.', ephemeral=True)
+                return
+            
+            teams = self.db.get_teams_by_league(league_id)
+            team = teams[random.randint(0, len(teams)-1)]
+
+            messageraw = ''
+            with open('embeds/democheck.json', 'r') as file:
+                messageraw = file.read()
+
+            
+
+            await interaction.edit_original_response(content='Random demo check announced.')
+        except Exception as e:
+            self.logger.error(f'Error conducting demo check: {e}', exc_info=True)
+            await interaction.edit_original_response(content='An error occurred while announcing the random demo check.')
     # @app_commands.command(
     #         name='randomdemocheck',
     #         description='Announces a truly random demo check, given a League ID. Automatically picks a team in the league, and a match to check'

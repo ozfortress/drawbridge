@@ -1,0 +1,11 @@
+{
+  "content": "### {TEAM_NAME} Demo Check",
+  "embeds": [
+    {
+      "title": "> View the Round that Requires a Demo Check",
+      "description": "### Random Demo Check\nWe are randomly demo checking players under rule",
+      "url": "https://ozfortress.com/matches/{MATCH_ID}",
+      "color": 43962
+    }
+  ]
+}
