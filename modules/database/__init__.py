@@ -19,6 +19,7 @@ if __name__ == '__main__':
 import mariadb
 import re
 import logging
+import os
 
 class Database:
     """
@@ -216,7 +217,7 @@ class Database:
         conn_params['pool_name'] = 'drawbridge'
         self.pool = mariadb.ConnectionPool(**conn_params)
         self.logger = logging.getLogger('drawbridge.database')
-        # self._create_db_if_not_exists() # TODO: TEST THIS
+        # self._run_migrations() # TODO: WIP
 
     def __del__(self):
         self._close()
@@ -261,6 +262,54 @@ class Database:
 
     def _close(self):
         self.pool.close()
+
+    def _run_migrations(self):
+        # Check state of database
+        with self.pool.get_connection() as conn:
+            version = 0
+            # Check if the database is empty
+            cursor = conn.cursor()
+            cursor.execute("SHOW TABLES")
+            if cursor.rowcount == 0:
+                # Empty database, assume verison 0
+                version = 0
+            else:
+                # Check if the migrations table exists
+                cursor.execute("SHOW TABLES LIKE 'schema_migrations'")
+                if cursor.rowcount == 0:
+                    # No migrations table, assume version 0
+                    version = 0
+                else:
+                    # Migrations table exists, get the version
+                    cursor.execute("SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 1")
+                    # The highest version in the table is the current version
+                    version = cursor.fetchone()
+                    if version is None:
+                        version = 0
+
+            # The migrations folder will have sql files named like 1.migration_name.sql
+            # We will run all migrations from the current version to the latest version
+            # We will also log the migration in the schema_migrations table
+
+            # Get the list of migration files
+            migrations = []
+            # get all .sql files in migrations
+            for file in os.listdir('migrations'):
+                if file.endswith('.sql'):
+                    migrations.append(file)
+
+            # Sort the migrations by the version number
+            migrations.sort()
+
+            # Run the migrations
+            for migration in migrations:
+                if int(migration.split('.')[0]) > version:
+                    # Run the migration
+                    with open(f'migrations/{migration}') as file:
+                        query = file.read()
+                        cursor.execute(query)
+                    # Log the migration
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (?)", (int(migration.split('.')[0]),))
 
     def get_match_details(self,id):
         with self.pool.get_connection() as conn:
