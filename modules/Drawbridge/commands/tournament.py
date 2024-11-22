@@ -403,30 +403,33 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             if teams is None:
                 await interaction.edit_original_response(content='No teams were found. Aborting.', ephemeral=True)
                 return
-            
+            await interaction.edit_original_response(content='Getting team...')
             #Check to see if the team has a valid match to review. Loop to ensure safe guard to avoid infinite
-            '''
-            i = 0
-            while len(teams) > 0 or i < 20:
-                n = random.randint(0, len(teams)-1)
-                team = teams[n]
-                rosterobj = self.cit.getRoster(team[1])
-
-                match_id = rosterobj.matches[len(rosterobj.matches)-1]['id']
-                match_iq = self.cit.getMatch(match_id)         
-                if match_iq.away_team is not None and match_iq.forfeit_by is str['no_forfeit']:
-                    break
-                else:
-                    teams.pop(n)
-                    team = None
-                i +=1
-                if i < 20:
-                    team = None
-                    break
-                '''
+            
+#            i = 0
+#            while len(teams) > 0 or i < 20:
+#                n = random.randint(0, len(teams)-1)
+#                team = teams[n]
+#                rosterobj = self.cit.getRoster(team[1])
+#
+#                match_id = rosterobj.matches[len(rosterobj.matches)-1]['id']
+#                match_iq = self.cit.getMatch(match_id)         
+#                if match_iq.away_team is not None and match_iq.forfeit_by is str['no_forfeit']:
+#                    break
+#                else:
+#                    teams.pop(n)
+#                    team = None
+#                i +=1
+#                if i < 20:
+#                    team = None
+#                    break
+                
+            
             n = random.randint(0, len(teams)-1)
             team = teams[n]
+            await interaction.edit_original_response(content=f'Team found:{team[6]}. Retreaving roster...')
             rosterobj = self.cit.getRoster(team[1])
+            await interaction.edit_original_response(content=f'roster found:{str(rosterobj)}. Retreaving match...')
             match_id = rosterobj.matches[len(rosterobj.matches)-1]['id']
             match_iq = self.cit.getMatch(match_id) 
 
