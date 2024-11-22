@@ -432,7 +432,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             await interaction.edit_original_response(content=f'Random demo check announced. Player chosen is: {target_player.name} from {team[6]}')
         except Exception as e:
             self.logger.error(f'Error conducting demo check: {e}', exc_info=True)
-            await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}')
+            await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}. Line {e.__traceback__.tb_lineno}')
     # @app_commands.command(
     #         name='randomdemocheck',
     #         description='Announces a truly random demo check, given a League ID. Automatically picks a team in the league, and a match to check'
