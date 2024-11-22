@@ -424,27 +424,12 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 #                    team = None
 #                    break
             team = teams[random.randint(0, len(teams)-1)]
-            await interaction.edit_original_response(content=f'Team found:{team[6]}. Retreaving roster...')
-            rosterobj = self.cit.getRoster(team[1])
-            await interaction.edit_original_response(content=f'roster found:{str(rosterobj)}. Retreaving match...')
-            match_id = rosterobj.matches[len(rosterobj.matches)-1]['id']
-            match_iq = self.cit.getMatch(match_id) 
-
-            if team is not None:
-                msg = str(match_iq.away_team)
-                msg = msg + ' ' + str(team)
-                await interaction.edit_original_response(content=f'Warning: something went wrong. {msg}', ephemeral=True)
-                return
-
-            if team is None:
-                await interaction.edit_original_response(content='Warning: No team in league has any valid matches', ephemeral=True)
-                return
-                
             team_role = interaction.guild.get_role(team[3])
             team_channel = self.bot.get_channel(team[4])
             #team_role = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID'))).get_role(team[2])
 
             # below is functionality for getting a player
+            rosterobj = self.cit.getRoster(team[1])
             target_player = rosterobj.players[random.randint(0, len(rosterobj.players)-1)]
 
             messageraw = ''
@@ -458,8 +443,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 '{TEAM_NAME}'   : f'<@&{team_role}>',
                 '{TARGET_NAME}' : f'{target_player['name']}',
                 '{TARGET_ID}'   : f'{target_player['id']}',
-                '{MATCH_PAGE}'  : f'{match_iq.round_name}',
-                '{MATCH_ID}'    : f'{match_iq.id}'
+                '{MATCH_PAGE}'  : f'tbd',
+                '{MATCH_ID}'    : f'tbd'
             }))
 
             demochkmsg['embed'] = discord.Embed(**demochkmsg['embeds'][0])
