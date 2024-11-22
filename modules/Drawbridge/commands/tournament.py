@@ -406,9 +406,10 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
             team = teams[random.randint(0, len(teams)-1)]
             team_channel = self.bot.get_channel(team[4])
+            #team_role = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID'))).get_role(team[2])
 
             # below is functionality for getting a player
-            rosterobj = self.cit.getRoster(team[0])
+            rosterobj = self.cit.getTeam(team[0])
             target_player = rosterobj.players[random.randint(0, len(rosterobj.players)-1)]
 
             messageraw = ''
