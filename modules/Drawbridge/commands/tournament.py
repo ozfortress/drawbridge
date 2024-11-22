@@ -380,7 +380,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
     @app_commands.command(
             name='randomdemocheck',
-            description='Still WIP.'
+            description='Still WIP. Currently chooses a random team in any div'
     )
     async def randomdemocheck(self, interaction : discord.Interaction, league_id : int):
         """Conduct a random demo check.
@@ -398,20 +398,33 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             if self.db.get_divs_by_league(league_id) is None:
                 await interaction.edit_original_response(content='League not being monitored. Aborting.', ephemeral=True)
                 return
-
+            
             teams = self.db.get_teams_by_league(league_id)
+            if teams is None:
+                await interaction.edit_original_response(content='No teams were found. Aborting.', ephemeral=True)
+                return
             team = teams[random.randint(0, len(teams)-1)]
+            team_channel = self.bot.get_channel(team[4])
+            team_role = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID'))).get_role(team[2])
 
             messageraw = ''
             with open('embeds/democheck.json', 'r') as file:
                 messageraw = file.read()
-
-
-
+            tempmsg = str(messageraw)
+            demochkmsg = json.loads(self.functions.substitute_strings_in_embed(tempmsg, {
+                '{TEAM_NAME}'   : f'<@&{team[2]}>',
+                '{TARGET_NAME}' : f'tbd',
+                '{MATCH_PAGE}'  : f'tbd',
+                '{MATCH_ID}'    : f'tbd'
+            }))
+            demochkmsg['embed'] = discord.Embed(**demochkmsg['embeds'][0])
+            del demochkmsg['embeds']
+            await demochkmsg.send(**demochkmsg)
+            
             await interaction.edit_original_response(content='Random demo check announced.')
         except Exception as e:
             self.logger.error(f'Error conducting demo check: {e}', exc_info=True)
-            await interaction.edit_original_response(content='An error occurred while announcing the random demo check.')
+            await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}')
     # @app_commands.command(
     #         name='randomdemocheck',
     #         description='Announces a truly random demo check, given a League ID. Automatically picks a team in the league, and a match to check'
