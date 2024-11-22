@@ -11,8 +11,7 @@ env:
 
 jobs:
   build:
-    runs-on: [self-hosted,drawbridge]
-
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -71,17 +70,3 @@ jobs:
             --name ${CONTAINER_NAME} \
             --env-file ${{ env.ENV_FILE_PATH }} \
             ghcr.io/ozfortress/drawbridge:dev
-
-      # - name: Verify deployment via Docker Healthcheck
-      #   run: |
-      #     for i in {1..${WAIT_TIME}}; do
-      #       if [ "$(docker inspect -f '{{.State.Health.Status}}' ${CONTAINER_NAME})" -eq "healthy" ];
-      #         echo "Container is healthy"
-      #         exit 0
-      #       else
-      #         echo "Container is unhealthy"
-      #       fi
-      #       sleep 1
-      #     done
-      #     echo "Container failed to start"
-      #     exit 1
