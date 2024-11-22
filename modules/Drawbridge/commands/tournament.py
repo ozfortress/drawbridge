@@ -405,12 +405,10 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 return
 
             team = teams[random.randint(0, len(teams)-1)]
-            team_role = interaction.guild.get_role(team[3])
             team_channel = self.bot.get_channel(team[4])
-            #team_role = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID'))).get_role(team[2])
 
             # below is functionality for getting a player
-            rosterobj = self.cit.getRoster(team[1])
+            rosterobj = self.cit.getRoster(team[0])
             target_player = rosterobj.players[random.randint(0, len(rosterobj.players)-1)]
 
             messageraw = ''
@@ -421,7 +419,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             self.logger.debug(f'Random demo check announced. Player chosen is: {target_player}')
 
             demochkmsg = json.loads(self.functions.substitute_strings_in_embed(tempmsg, {
-                '{TEAM_NAME}'   : f'<@&{team_role}> Team {team[5]} id: {team[0]}. {team[1]}, {team[2]},{team[3]},{team[4]} len: {len(team)}',
+                '{TEAM_NAME}'   : f'<@&{team[2]}>',
                 '{TARGET_NAME}' : f'{target_player['name']}',
                 '{TARGET_ID}'   : f'{target_player['id']}',
                 '{MATCH_PAGE}'  : f'tbd',
