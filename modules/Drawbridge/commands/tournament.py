@@ -413,7 +413,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
                 match_iq = rosterobj.matches[len(rosterobj.matches)-1]
                                
-                if match_iq['away_team'] is not None and match_iq['forfeit_by'] is str['no_forfeit']:
+                if match_iq.away_team is not None and match_iq.forfeit_by is str['no_forfeit']:
                     break
                 else:
                     teams.pop(n)
