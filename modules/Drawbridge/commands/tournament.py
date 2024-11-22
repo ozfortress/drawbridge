@@ -403,26 +403,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             if teams is None:
                 await interaction.edit_original_response(content='No teams were found. Aborting.', ephemeral=True)
                 return
-            await interaction.edit_original_response(content='Getting team...')
-            #Check to see if the team has a valid match to review. Loop to ensure safe guard to avoid infinite
-            
-#            i = 0
-#            while len(teams) > 0 or i < 20:
-#                n = random.randint(0, len(teams)-1)
-#                team = teams[n]
-#                rosterobj = self.cit.getRoster(team[1])
-#
-#                match_id = rosterobj.matches[len(rosterobj.matches)-1]['id']
-#                match_iq = self.cit.getMatch(match_id)         
-#                if match_iq.away_team is not None and match_iq.forfeit_by is str['no_forfeit']:
-#                    break
-#                else:
-#                    teams.pop(n)
-#                    team = None
-#                i +=1
-#                if i < 20:
-#                    team = None
-#                    break
+
             team = teams[random.randint(0, len(teams)-1)]
             team_role = interaction.guild.get_role(team[3])
             team_channel = self.bot.get_channel(team[4])
@@ -440,7 +421,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             self.logger.debug(f'Random demo check announced. Player chosen is: {target_player}')
 
             demochkmsg = json.loads(self.functions.substitute_strings_in_embed(tempmsg, {
-                '{TEAM_NAME}'   : f'<@&{team_role}>',
+                '{TEAM_NAME}'   : f'<@&{team_role}> Team {team[6]} id: {team[1]}',
                 '{TARGET_NAME}' : f'{target_player['name']}',
                 '{TARGET_ID}'   : f'{target_player['id']}',
                 '{MATCH_PAGE}'  : f'tbd',
@@ -450,14 +431,16 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             demochkmsg['embed'] = discord.Embed(**demochkmsg['embeds'][0])
             del demochkmsg['embeds']
             await team_channel.send(**demochkmsg)
-
+            
+            bug = ""
+            n = 0
+            while n < 20:
+                bug = bug + " " + rosterobj.players[n]['name']
+            await team_channel.send(bug)
             await interaction.edit_original_response(content=f'Random demo check announced. Player chosen is: {target_player['name']} from {team[6]}')
         except Exception as e:
             self.logger.error(f'Error conducting demo check: {e}', exc_info=True)
-            killme = ''
-            for x in match_iq:
-                killme = killme + ' ' + str(x)
-            await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}. Line {e.__traceback__.tb_lineno}. match_iq={killme}')
+            await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}. Line {e.__traceback__.tb_lineno}.')
     # @app_commands.command(
     #         name='randomdemocheck',
     #         description='Announces a truly random demo check, given a League ID. Automatically picks a team in the league, and a match to check'
