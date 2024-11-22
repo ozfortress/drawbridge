@@ -430,14 +430,14 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             match_id = rosterobj.matches[len(rosterobj.matches)-1]['id']
             match_iq = self.cit.getMatch(match_id) 
 
-            if match_iq.away_team is not None and match_iq.forfeit_by is str['no_forfeit']:
+            if team is not None:
                 msg = str(match_iq.away_team)
                 msg = msg + ' ' + str(team)
-                await interaction.edit_original_response(content=f'**Warning**: something went wrong. {msg}', ephemeral=True)
+                await interaction.edit_original_response(content=f'Warning: something went wrong. {msg}', ephemeral=True)
                 return
 
             if team is None:
-                await interaction.edit_original_response(content='**Warning**: No team in league has any valid matches', ephemeral=True)
+                await interaction.edit_original_response(content='Warning: No team in league has any valid matches', ephemeral=True)
                 return
                 
             team_role = interaction.guild.get_role(team[3])
