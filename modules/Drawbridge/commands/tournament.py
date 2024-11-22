@@ -423,10 +423,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 #                if i < 20:
 #                    team = None
 #                    break
-                
-            
-            n = random.randint(0, len(teams)-1)
-            team = teams[n]
+            team = teams[random.randint(0, len(teams)-1)]
             await interaction.edit_original_response(content=f'Team found:{team[6]}. Retreaving roster...')
             rosterobj = self.cit.getRoster(team[1])
             await interaction.edit_original_response(content=f'roster found:{str(rosterobj)}. Retreaving match...')
