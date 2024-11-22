@@ -105,6 +105,112 @@ class Database:
                     self.logger.error(f"Error committing with query `{query}` and params `{params}`: {e}", exc_info=True)
                     return None
 
+    class Teams(_BaseDatabaseTable):
+        def __init__(self, pool):
+            super().__init__(pool)
+            self.table = 'teams'
+
+        def get(self, id):
+            """
+            Get a team by its ID.
+
+            Args:
+                id (int): The ID of the team. Not to be confused with Roster
+            """
+            query = f"SELECT * FROM {self.table} WHERE team_id=?"
+            return self._query_one(query, (id,))
+
+        def get_by_channel_id(self, channel_id):
+            """
+            Get a team by its Discord channel ID.
+
+            Args:
+                channel_id (int): The ID of the Discord channel.
+            """
+            query = f"SELECT * FROM {self.table} WHERE team_channel=?"
+            return self._query_one(query, (channel_id,))
+
+        def get_by_league(self, league_id):
+            """
+            Get all teams in a league.
+
+            Args:
+                league_id (int): The ID of the league.
+            """
+            query = f"SELECT * FROM {self.table} WHERE league_id=?"
+            return self._query_all(query, (league_id,))
+
+        def get_all(self):
+            """
+            Get all teams.
+            """
+            query = f"SELECT * FROM {self.table}"
+            return self._query_all(query, ())
+
+        def insert(self, team) -> int:
+            """
+            Insert a team into the database.
+
+            Args:
+                team (dict): The team to insert.
+            """
+            query = f"INSERT INTO {self.table} (team_id, league_id, role_id, team_channel, division, team_name) VALUES (?, ?, ?, ?, ?, ?)"
+            return self._execute(query, (team['team_id'], team['league_id'], team['role_id'], team['team_channel'], team['division'], team['team_name']))
+
+        def delete(self, team_id):
+            """
+            Delete a team by its ID.
+
+            Args:
+                team_id (int): The ID of the team.
+            """
+            query = f"DELETE FROM {self.table} WHERE team_id=?"
+            return self._execute(query, (team_id,))
+
+        def delete_by_league(self, league_id):
+            """
+            Delete all teams in a league.
+
+            Args:
+                league_id (int): The ID of the league.
+            """
+            query = f"DELETE FROM {self.table} WHERE league_id=?"
+            return self._execute(query, (league_id,))
+
+        def update(self, team):
+            """
+            Update a team.
+
+            Args:
+                team (dict): The team to update.
+
+            Raises:
+                KeyError: If team_id is not passed in.
+                ValueError: If team_id is not found in the database.
+            """
+            # this is a strange one, we need to only update the fields that are passed in
+            # raise an error if team_id is not passed in
+            if 'team_id' not in team:
+                raise KeyError('team_id not passed in')
+            query = f"SELECT * FROM {self.table} WHERE team_id=?"
+            old_team = self._query_one(query, (team['team_id'],))
+            if old_team is None:
+                raise ValueError('team_id not found in database')
+
+            query = f"UPDATE {self.table} SET league_id=?, role_id=?, team_channel=?, division=?, team_name=? WHERE team_id=?"
+            # Merge the two dicts together
+            for key, value in old_team.items():
+                if key not in team:
+                    team[key] = value
+            return self._execute(query, (team['league_id'], team['role_id'], team['team_channel'], team['division'], team['team_name'], team['team_id']))
+
+        def count(self):
+            """
+            Get the number of teams in the database.
+            """
+            query = f"SELECT COUNT(*) FROM {self.table}"
+            return self._query_one(query, ())
+
     def __init__(self, conn_params):
         self._throw_if_bad_config(conn_params)
         conn_params['pool_name'] = 'drawbridge'
