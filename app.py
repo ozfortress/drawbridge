@@ -102,6 +102,19 @@ async def on_ready():
     healthstatus['status'] = b"OK"
     # client.loop.create_task(healthcheck())
 
+
+# Catch any error that occurs during the on_ready event
+@client.event
+async def on_error(event, *args, **kwargs):
+    logger.error(f'Error in event {event}: {args} {kwargs}', exc_info=True)
+    # None of the next code may work, so we need to catch any error that occurs here
+    # and log it to the console
+    try:
+        botmisc= client.get_channel(int(os.getenv('ANNOUNCE_CHANNEL')))
+        await botmisc.send(f'# Unhandled Error\n in event {event}: \n args: {args} \n kwargs: {kwargs}')
+    except Exception as e:
+        logger.error(f'Error in on_error: {e}', exc_info=True)
+
 @discord_tasks.loop(seconds=5)
 async def check_commands():
     logger.info('DEBUG - Checking commands')
