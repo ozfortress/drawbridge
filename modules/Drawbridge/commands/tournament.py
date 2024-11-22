@@ -421,8 +421,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
             demochkmsg = json.loads(self.functions.substitute_strings_in_embed(tempmsg, {
                 '{TEAM_NAME}'   : f'<@&{team_role}>',
-                '{TARGET_NAME}' : f'{target_player.name}',
-                '{TARGET_ID}'   : f'{target_player.id}',
+                '{TARGET_NAME}' : f'{target_player['name']}',
+                '{TARGET_ID}'   : f'{target_player['id']}',
                 '{MATCH_PAGE}'  : f'tbd',
                 '{MATCH_ID}'    : f'tbd'
             }))
