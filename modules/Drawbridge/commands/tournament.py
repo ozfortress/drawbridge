@@ -421,7 +421,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             self.logger.debug(f'Random demo check announced. Player chosen is: {target_player}')
 
             demochkmsg = json.loads(self.functions.substitute_strings_in_embed(tempmsg, {
-                '{TEAM_NAME}'   : f'<@&{team_role}> Team {team[6]} id: {team[1]}',
+                '{TEAM_NAME}'   : f'<@&{team_role.id}> Team {team[5]} id: {team[0]}',
                 '{TARGET_NAME}' : f'{target_player['name']}',
                 '{TARGET_ID}'   : f'{target_player['id']}',
                 '{MATCH_PAGE}'  : f'tbd',
