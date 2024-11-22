@@ -1,3 +1,21 @@
+"""
+Database Module for Drawbridge
+~~~~~~~~~~~~~~~~~~~~~~~
+
+:copyright: (c) 2024-present ozfortress"""
+
+__title__ = 'drawbridge database'
+__author__ = 'ozfortress'
+__license__ = 'None'
+__verison__ = '0.1.0'
+__copyright__ = 'Copyright 2024-present ozfortress'
+
+__path__ = __import__('pkgutil').extend_path(__path__, __name__)
+
+if __name__ == '__main__':
+    print('This is not a standalone module.')
+    raise SystemExit
+
 import mariadb
 import re
 
@@ -13,9 +31,9 @@ class Database:
         # self._create_db_if_not_exists() # TODO: TEST THIS
 
     def __del__(self):
-        self.close()
+        self._close()
 
-    def health_check(self):
+    def _health_check(self):
         with self.pool.get_connection() as conn:
             try:
                 cursor = conn.cursor()
@@ -87,7 +105,8 @@ class Database:
                 print(f"Error: {e}")
                 return None
 
-    def close(self):
+    def _close(self):
+
         self.pool.close()
 
     def get_match_details(self,id):
