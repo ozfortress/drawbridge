@@ -419,7 +419,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             }))
             demochkmsg['embed'] = discord.Embed(**demochkmsg['embeds'][0])
             del demochkmsg['embeds']
-            await demochkmsg.send(**demochkmsg)
+            await team_channel.send(**demochkmsg)
             
             await interaction.edit_original_response(content='Random demo check announced.')
         except Exception as e:
