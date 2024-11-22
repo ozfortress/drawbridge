@@ -53,6 +53,40 @@ class Database:
             except mariadb.Error as e:
                 print(f"Error: {e}")
 
+    def _query_one(self, query, params):
+        # Should be used for SELECT, LIMIT 1
+        with self.pool.get_connection() as conn:
+            try:
+                cursor = conn.cursor()
+                cursor.execute(query, params)
+                return cursor.fetchone()
+            except mariadb.Error as e:
+                print(f"Error: {e}")
+                return None
+
+    def _query_all(self, query, params):
+        # Should be used for SELECT, SELECT COUNT, etc.
+        with self.pool.get_connection() as conn:
+            try:
+                cursor = conn.cursor()
+                cursor.execute(query, params)
+                return cursor.fetchall()
+            except mariadb.Error as e:
+                print(f"Error: {e}")
+                return None
+
+    def _execute(self, query, params):
+        # Should be used for INSERT, UPDATE, DELETE
+        with self.pool.get_connection() as conn:
+            try:
+                cursor = conn.cursor()
+                cursor.execute(query, params)
+                conn.commit()
+                return cursor.lastrowid
+            except mariadb.Error as e:
+                print(f"Error: {e}")
+                return None
+
     def close(self):
         self.pool.close()
 
