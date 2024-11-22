@@ -112,8 +112,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     }
 
                     all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'BOT')
-                    for role in all_access:
-                        overrides[interaction.guild.get_role(role)] = discord.PermissionOverwrite(view_channel=True)
+                    for permrole in all_access:
+                        overrides[interaction.guild.get_role(permrole)] = discord.PermissionOverwrite(view_channel=True)
                     channel_name = f'🛡️{roster['name']} ({league_shortcode})'
                     if len(channel_name) > 45:
                         channel_name = f'🛡️{roster['name'][:20]} ({league_shortcode})'
@@ -398,7 +398,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             if self.db.get_divs_by_league(league_id) is None:
                 await interaction.edit_original_response(content='League not being monitored. Aborting.', ephemeral=True)
                 return
-            
+
             teams = self.db.get_teams_by_league(league_id)
             team = teams[random.randint(0, len(teams)-1)]
 
@@ -406,7 +406,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             with open('embeds/democheck.json', 'r') as file:
                 messageraw = file.read()
 
-            
+
 
             await interaction.edit_original_response(content='Random demo check announced.')
         except Exception as e:
