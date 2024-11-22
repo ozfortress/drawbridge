@@ -410,7 +410,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
             # below is functionality for getting a player
             rosterobj = self.cit.getRoster(team[1])
-            target_player = rosterobj.players[random.randint(0, len(rosterobj)-1)]
+            target_player = rosterobj.players[random.randint(0, len(rosterobj.players)-1)]
 
             messageraw = ''
             with open('embeds/democheck.json', 'r') as file:
