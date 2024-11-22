@@ -421,7 +421,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             self.logger.debug(f'Random demo check announced. Player chosen is: {target_player}')
 
             demochkmsg = json.loads(self.functions.substitute_strings_in_embed(tempmsg, {
-                '{TEAM_NAME}'   : f'<@&{team_role}> Team {team[5]} id: {team[0]}',
+                '{TEAM_NAME}'   : f'<@&{team_role}> Team {team[5]} id: {team[0]}. {team[1]}, {team[2]},{team[3]},{team[4]} len: {len(team)}',
                 '{TARGET_NAME}' : f'{target_player['name']}',
                 '{TARGET_ID}'   : f'{target_player['id']}',
                 '{MATCH_PAGE}'  : f'tbd',
@@ -436,7 +436,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             n = 0
             while n < 20:
                 bug = bug + " " + rosterobj.players[n]['name']
-            await team_channel.send(bug)
+            await team_channel.send(**bug)
             await interaction.edit_original_response(content=f'Random demo check announced. Player chosen is: {target_player['name']} from {team[6]}')
         except Exception as e:
             self.logger.error(f'Error conducting demo check: {e}', exc_info=True)
