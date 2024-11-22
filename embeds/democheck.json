@@ -3,7 +3,7 @@
   "embeds": [
     {
       "title": "> View the Round that Requires a Demo Check",
-      "description": "### Random Demo Check\nWe are randomly demo checking players under rule. Player being checked [{TARGET_NAME}][https://ozfortress.com/users/{TARGET_ID}]. Match being checked {MATCH_PAGE}",
+      "description": "### Random Demo Check\nWe are randomly demo checking players under rule. Player being checked [{TARGET_NAME}](https://ozfortress.com/users/{TARGET_ID}). Match being checked {MATCH_PAGE}",
       "url": "https://ozfortress.com/matches/{MATCH_ID}",
       "color": 43962
     }
