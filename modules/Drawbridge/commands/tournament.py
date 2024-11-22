@@ -405,6 +405,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 return
             
             #Check to see if the team has a valid match to review. Loop to ensure safe guard to avoid infinite
+            '''
             i = 0
             while len(teams) > 0 or i < 20:
                 n = random.randint(0, len(teams)-1)
@@ -419,6 +420,21 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     teams.pop(n)
                     team = None
                 i +=1
+                if i < 20:
+                    team = None
+                    break
+                '''
+            n = random.randint(0, len(teams)-1)
+            team = teams[n]
+            rosterobj = self.cit.getRoster(team[1])
+            match_id = rosterobj.matches[len(rosterobj.matches)-1]['id']
+            match_iq = self.cit.getMatch(match_id) 
+
+            if match_iq.away_team is not None and match_iq.forfeit_by is str['no_forfeit']:
+                msg = str(match_iq.away_team)
+                msg = msg + ' ' + str(team)
+                await interaction.edit_original_response(content=f'**Warning**: something went wrong. {msg}', ephemeral=True)
+                return
 
             if team is None:
                 await interaction.edit_original_response(content='**Warning**: No team in league has any valid matches', ephemeral=True)
@@ -442,8 +458,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 '{TEAM_NAME}'   : f'<@&{team_role}>',
                 '{TARGET_NAME}' : f'{target_player['name']}',
                 '{TARGET_ID}'   : f'{target_player['id']}',
-                '{MATCH_PAGE}'  : f'{match_iq['round_name']}',
-                '{MATCH_ID}'    : f'{match_iq['id']}'
+                '{MATCH_PAGE}'  : f'{match_iq.round_name}',
+                '{MATCH_ID}'    : f'{match_iq.id}'
             }))
 
             demochkmsg['embed'] = discord.Embed(**demochkmsg['embeds'][0])
