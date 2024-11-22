@@ -398,12 +398,12 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             if self.db.get_divs_by_league(league_id) is None:
                 await interaction.edit_original_response(content='League not being monitored. Aborting.', ephemeral=True)
                 return
-            
+
             teams = self.db.get_teams_by_league(league_id)
             if teams is None:
                 await interaction.edit_original_response(content='No teams were found. Aborting.', ephemeral=True)
                 return
-            
+
             team = teams[random.randint(0, len(teams)-1)]
             team_channel = self.bot.get_channel(team[4])
             team_role = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID'))).get_role(team[2])
@@ -417,6 +417,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 messageraw = file.read()
             tempmsg = str(messageraw)
 
+            self.logger.debug(f'Random demo check announced. Player chosen is: {target_player} from {team[6]}')
+
             demochkmsg = json.loads(self.functions.substitute_strings_in_embed(tempmsg, {
                 '{TEAM_NAME}'   : f'<@&{team_role}>',
                 '{TARGET_NAME}' : f'{target_player.name}',
@@ -428,7 +430,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             demochkmsg['embed'] = discord.Embed(**demochkmsg['embeds'][0])
             del demochkmsg['embeds']
             await team_channel.send(**demochkmsg)
-            
+
             await interaction.edit_original_response(content=f'Random demo check announced. Player chosen is: {target_player.name} from {team[6]}')
         except Exception as e:
             self.logger.error(f'Error conducting demo check: {e}', exc_info=True)
