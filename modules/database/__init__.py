@@ -22,7 +22,86 @@ import re
 class Database:
     """
     An interface for the Drawbridge Database.
+
+    This class when instantiated will create a connection pool to the database, and provide methods to interact with the database.
+
+    Args:
+        conn_params (dict): A dictionary containing the connection parameters for the database. For examples, see mariadb.ConnectionPool documentation.
+
+    Raises:
+        KeyError: The connection parameters are missing a required key.
+
     """
+
+    class _BaseDatabaseTable:
+        """
+        A base class for database tables.
+
+        This class should be inherited by other classes that represent database tables.
+        """
+        def __init__(self, pool):
+            self.pool = pool
+
+        def _query_one(self, query, params):
+            """
+            Execute a query that returns one result.
+
+            Args:
+                query (str): The query to execute.
+                params (tuple): The parameters to pass to the query.
+            """
+            # Should be used for SELECT, LIMIT 1
+            with self.pool.get_connection() as conn:
+                try:
+                    cursor = conn.cursor()
+                    cursor.execute(query, params)
+                    return cursor.fetchone()
+                except mariadb.Error as e:
+                    print(f"Error: {e}")
+                    return None
+
+        def _query_all(self, query, params):
+            """
+            Execute a query that returns many results.
+
+            Args:
+                query (str): The query to execute.
+                params (tuple): The parameters to pass to the query.
+
+            Returns:
+                list: A list of the results of the query.
+            """
+            # Should be used for SELECT, SELECT COUNT, etc.
+            with self.pool.get_connection() as conn:
+                try:
+                    cursor = conn.cursor()
+                    cursor.execute(query, params)
+                    return cursor.fetchall()
+                except mariadb.Error as e:
+                    print(f"Error: {e}")
+                    return None
+
+        def _execute(self, query, params):
+            """
+            Execute a query that does not return a result.
+
+            Args:
+                query (str): The query to execute.
+                params (tuple): The parameters to pass to the query.
+
+            Returns:
+                int: The last row id of the query.
+            """
+            # Should be used for INSERT, UPDATE, DELETE
+            with self.pool.get_connection() as conn:
+                try:
+                    cursor = conn.cursor()
+                    cursor.execute(query, params)
+                    conn.commit()
+                    return cursor.lastrowid
+                except mariadb.Error as e:
+                    print(f"Error: {e}")
+                    return None
 
     def __init__(self, conn_params):
         self._throw_if_bad_config(conn_params)
@@ -71,42 +150,7 @@ class Database:
             except mariadb.Error as e:
                 print(f"Error: {e}")
 
-    def _query_one(self, query, params):
-        # Should be used for SELECT, LIMIT 1
-        with self.pool.get_connection() as conn:
-            try:
-                cursor = conn.cursor()
-                cursor.execute(query, params)
-                return cursor.fetchone()
-            except mariadb.Error as e:
-                print(f"Error: {e}")
-                return None
-
-    def _query_all(self, query, params):
-        # Should be used for SELECT, SELECT COUNT, etc.
-        with self.pool.get_connection() as conn:
-            try:
-                cursor = conn.cursor()
-                cursor.execute(query, params)
-                return cursor.fetchall()
-            except mariadb.Error as e:
-                print(f"Error: {e}")
-                return None
-
-    def _execute(self, query, params):
-        # Should be used for INSERT, UPDATE, DELETE
-        with self.pool.get_connection() as conn:
-            try:
-                cursor = conn.cursor()
-                cursor.execute(query, params)
-                conn.commit()
-                return cursor.lastrowid
-            except mariadb.Error as e:
-                print(f"Error: {e}")
-                return None
-
     def _close(self):
-
         self.pool.close()
 
     def get_match_details(self,id):
