@@ -18,6 +18,7 @@ if __name__ == '__main__':
 
 import mariadb
 import re
+import logging
 
 class Database:
     """
@@ -41,6 +42,7 @@ class Database:
         """
         def __init__(self, pool):
             self.pool = pool
+            self.logger = logging.getLogger('drawbridge.database')
 
         def _query_one(self, query, params):
             """
@@ -57,7 +59,7 @@ class Database:
                     cursor.execute(query, params)
                     return cursor.fetchone()
                 except mariadb.Error as e:
-                    print(f"Error: {e}")
+                    self.logger.error(f"Error fetching one with query `{query}` and params `{params}`: {e}", exc_info=True)
                     return None
 
         def _query_all(self, query, params):
@@ -78,7 +80,7 @@ class Database:
                     cursor.execute(query, params)
                     return cursor.fetchall()
                 except mariadb.Error as e:
-                    print(f"Error: {e}")
+                    self.logger.error(f"Error fetching all with query `{query}` and params `{params}`: {e}", exc_info=True)
                     return None
 
         def _execute(self, query, params):
@@ -100,13 +102,14 @@ class Database:
                     conn.commit()
                     return cursor.lastrowid
                 except mariadb.Error as e:
-                    print(f"Error: {e}")
+                    self.logger.error(f"Error committing with query `{query}` and params `{params}`: {e}", exc_info=True)
                     return None
 
     def __init__(self, conn_params):
         self._throw_if_bad_config(conn_params)
         conn_params['pool_name'] = 'drawbridge'
         self.pool = mariadb.ConnectionPool(**conn_params)
+        self.logger = logging.getLogger('drawbridge.database')
         # self._create_db_if_not_exists() # TODO: TEST THIS
 
     def __del__(self):
