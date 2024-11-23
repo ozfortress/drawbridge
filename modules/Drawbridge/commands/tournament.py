@@ -422,7 +422,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             #Get log of match here
             log = requests.get('https://logs.tf/api/v1/log/3757893').json() #WILL ONLY TEST FOR THIS LOG ATM
 
-            r_players = [p for r in league.rosters for p in r.players]
+            r_players = [p for r in league.rosters for p in r['players']]
             if (len(r_players) == 0):
                 await interaction.edit_original_response(content=f'No players were found. Aborting.', ephemeral=True)
                 return
