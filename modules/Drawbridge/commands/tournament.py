@@ -432,7 +432,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 return
 
             for player in r_players:
-                if player['steam_32'] not in log['name']: #logs.tf uses the 32 bit steam ID for who played
+                if player['steam_32'] not in log['names']: #logs.tf uses the 32 bit steam ID for who played
                     r_players.remove(player)
 
             chosen_player = r_players[random.randint(0, len(r_players)-1)]
