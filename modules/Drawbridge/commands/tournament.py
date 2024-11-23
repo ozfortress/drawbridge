@@ -409,8 +409,9 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             matches = [] #list of matches
 
             for m in league.matches:
-                if m.round_number == round_no and m.forfeit_by == str['no_forfeit'] and m.away_team is not None:
+                if m['round_number'] == round_no and m['forfeit_by'] == str['no_forfeit'] and m['away_team'] is not None:
                     matches.append(m)
+                    
             if len(matches) == 0:
                 await interaction.edit_original_response(content=f'No matches were found for round {round_no}. Aborting.', ephemeral=True)
                 return
