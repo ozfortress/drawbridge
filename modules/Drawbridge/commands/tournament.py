@@ -409,7 +409,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             matches = [] #list of matches
 
             for m in league.matches:
-                if m['round_number'] == round_no and m['forfeit_by'] == 'no_forfeit' and m['away_team'] is not None:
+                if m['round_number'] == round_no and m['forfeit_by'] == 'no_forfeit': #and m['away_team'] is not None
                     matches.append(m)
 
             if len(matches) == 0:
@@ -460,7 +460,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
         except Exception as e:
             self.logger.error(f'Error conducting demo check: {e}', exc_info=True)
-            await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}. Line {e.__traceback__.tb_lineno}. {league.matches}')
+            await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}. Line {e.__traceback__.tb_lineno}.')
 
     # @app_commands.command(
     #         name='randomdemocheck',
