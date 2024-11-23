@@ -641,7 +641,7 @@ class Database:
         self.divisions = self.Divisions(self.pool)
         self.matches = self.Matches(self.pool)
         self.logs = self.Logs(self.pool)
-
+        self.leagues = self.Leagues(self.pool)
 
     def __del__(self):
         self._close()
