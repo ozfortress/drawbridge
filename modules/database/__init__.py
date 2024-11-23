@@ -321,7 +321,6 @@ class Database:
             query = f"SELECT COUNT(*) FROM {self.table} WHERE league_id=?"
             return self._query_one(query, (league_id,))
 
-
     class Matches(_BaseDatabaseTable):
         def __init__(self, pool):
             super().__init__(pool)
@@ -457,6 +456,40 @@ class Database:
             """
             query = f"SELECT COUNT(*) FROM {self.table} WHERE division=?"
             return self._query_one(query, (division,))
+
+    class Leagues(_BaseDatabaseTable):
+        def __init__(self, pool):
+            super().__init__(pool)
+            self.table = 'leagues'
+
+        def get(self, id):
+            query = f"SELECT * FROM {self.table} WHERE league_id=?"
+            return self._query_one(query, (id,))
+
+        def get_all(self):
+            query = f"SELECT * FROM {self.table}"
+            return self._query_all(query, ())
+
+        def insert(self, league) -> int:
+            query = f"INSERT INTO {self.table} (league_id, league_name, league_short, league_description, league_icon) VALUES (?, ?, ?, ?, ?)"
+            return self._execute(query, (league['league_id'], league['league_name'], league['league_short'], league['league_description'], league['league_icon']))
+
+        def delete(self, id):
+            query = f"DELETE FROM {self.table} WHERE league_id=?"
+            return self._execute(query, (id,))
+
+        def update(self, league):
+            if 'league_id' not in league:
+                raise KeyError('league_id not passed in')
+            query = f"SELECT * FROM {self.table} WHERE league_id=?"
+            old_league = self._query_one(query, (league['league_id'],))
+            if old_league is None:
+                raise ValueError('league_id not found in database')
+            query = f"UPDATE {self.table} SET league_name=?, league_short=?, league_description=?, league_icon=? WHERE league_id=?"
+            for key, value in old_league.items():
+                if key not in league:
+                    league[key] = value
+            return self._execute(query, (league['league_name'], league['league_short'], league['league_description'], league['league_icon'], league['league_id']))
 
     class Teams(_BaseDatabaseTable):
         def __init__(self, pool):
@@ -602,6 +635,13 @@ class Database:
         self.pool = mariadb.ConnectionPool(**conn_params)
         self.logger = logging.getLogger('drawbridge.database')
         # self._run_migrations() # TODO: WIP
+
+        # instantiate the tables
+        self.teams = self.Teams(self.pool)
+        self.divisions = self.Divisions(self.pool)
+        self.matches = self.Matches(self.pool)
+        self.logs = self.Logs(self.pool)
+
 
     def __del__(self):
         self._close()
