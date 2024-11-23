@@ -41,17 +41,20 @@ class Database:
 
         This class should be inherited by other classes that represent database tables.
         """
-        def __init__(self, pool):
+        def __init__(self, pool: mariadb.ConnectionPool):
             self.pool = pool
             self.logger = logging.getLogger('drawbridge.database')
 
-        def _query_one(self, query, params):
+        def _query_one(self, query: str, params: tuple) -> dict | None:
             """
             Execute a query that returns one result.
 
             Args:
                 query (str): The query to execute.
                 params (tuple): The parameters to pass to the query.
+
+            Returns:
+                dict: The result of the query.
             """
             # Should be used for SELECT, LIMIT 1
             with self.pool.get_connection() as conn:
@@ -63,7 +66,7 @@ class Database:
                     self.logger.error(f"Error fetching one with query `{query}` and params `{params}`: {e}", exc_info=True)
                     return None
 
-        def _query_all(self, query, params):
+        def _query_all(self, query: str, params: tuple) -> list[dict] | None:
             """
             Execute a query that returns many results.
 
@@ -84,7 +87,7 @@ class Database:
                     self.logger.error(f"Error fetching all with query `{query}` and params `{params}`: {e}", exc_info=True)
                     return None
 
-        def _execute(self, query, params):
+        def _execute(self, query: str, params: tuple) -> int | None:
             """
             Execute a query that does not return a result.
 
@@ -212,12 +215,433 @@ class Database:
             query = f"SELECT COUNT(*) FROM {self.table}"
             return self._query_one(query, ())
 
+    class Divisions(_BaseDatabaseTable):
+        def __init__(self, pool):
+            super().__init__(pool)
+            self.table = 'divisions'
+
+        def get(self, id):
+            """
+            Get a division by its ID.
+
+            Args:
+                id (int): The ID of the division.
+            """
+            query = f"SELECT * FROM {self.table} WHERE id=?"
+            return self._query_one(query, (id,))
+
+        def get_all(self):
+            """
+            Get all divisions.
+            """
+            query = f"SELECT * FROM {self.table}"
+            return self._query_all(query, ())
+
+        def get_by_league(self, league_id):
+            """
+            Get all divisions in a league.
+
+            Args:
+                league_id (int): The ID of the league.
+            """
+            query = f"SELECT * FROM {self.table} WHERE league_id=?"
+            return self._query_all(query, (league_id,))
+
+        def insert(self, div) -> int:
+            """
+            Insert a division into the database.
+
+            Args:
+                div (dict): The division to insert.
+            """
+            query = f"INSERT INTO {self.table} (league_id, division_name, role_id, category_id) VALUES (?, ?, ?, ?)"
+            return self._execute(query, (div['league_id'], div['division_name'], div['role_id'], div['category_id']))
+
+        def delete(self, id):
+            """
+            Delete a division by its ID.
+
+            Args:
+                id (int): The ID of the division.
+            """
+            query = f"DELETE FROM {self.table} WHERE id=?"
+            return self._execute(query, (id,))
+
+        def delete_by_league(self, league_id):
+            """
+            Delete all divisions in a league.
+
+            Args:
+                league_id (int): The ID of the league.
+            """
+            query = f"DELETE FROM {self.table} WHERE league_id=?"
+            return self._execute(query, (league_id,))
+
+        def update(self, div):
+            """
+            Update a division.
+
+            Args:
+                div (dict): The division to update.
+
+            Raises:
+                KeyError: If id is not passed in.
+                ValueError: If id is not found in the database.
+            """
+            # this is a strange one, we need to only update the fields that are passed in
+            # raise an error if id is not passed in
+            if 'id' not in div:
+                raise KeyError('id not passed in')
+            query = f"SELECT * FROM {self.table} WHERE id=?"
+            old_div = self._query_one(query, (div['id'],))
+            if old_div is None:
+                raise ValueError('id not found in database')
+
+            query = f"UPDATE {self.table} SET league_id=?, division_name=?, role_id=?, category_id=? WHERE id=?"
+            # Merge the two dicts together
+            for key, value in old_div.items():
+                if key not in div:
+                    div[key] = value
+            return self._execute(query, (div['league_id'], div['division_name'], div['role_id'], div['category_id'], div['id']))
+
+        def count(self):
+            """
+            Get the number of divisions in the database.
+            """
+            query = f"SELECT COUNT(*) FROM {self.table}"
+            return self._query_one(query, ())
+
+        def count_by_league(self, league_id):
+            """
+            Get the number of divisions in a league.
+
+            Args:
+                league_id (int): The ID of the league.
+            """
+            query = f"SELECT COUNT(*) FROM {self.table} WHERE league_id=?"
+            return self._query_one(query, (league_id,))
+
+    class Matches(_BaseDatabaseTable):
+        def __init__(self, pool):
+            super().__init__(pool)
+            self.table = 'matches'
+
+        def get(self, id):
+            """
+            Get a match by its ID.
+
+            Args:
+                id (int): The ID of the match.
+            """
+            query = f"SELECT * FROM {self.table} WHERE match_id=?"
+            return self._query_one(query, (id,))
+
+        def get_all(self):
+            """
+            Get all matches.
+            """
+            query = f"SELECT * FROM {self.table}"
+            return self._query_all(query, ())
+
+        def get_by_league(self, league_id):
+            """
+            Get all matches in a league.
+
+            Args:
+                league_id (int): The ID of the league.
+            """
+            query = f"SELECT * FROM {self.table} WHERE league_id=?"
+            return self._query_all(query, (league_id,))
+
+        def get_by_division(self, division):
+            """
+            Get all matches in a division.
+
+            Args:
+                division (int): The ID of the division.
+            """
+            query = f"SELECT * FROM {self.table} WHERE division=?"
+            return self._query_all(query, (division,))
+
+        def get_by_channel_id(self, channel_id):
+            """
+            Get a match by its Discord channel ID.
+
+            Args:
+                channel_id (int): The ID of the Discord channel.
+            """
+            query = f"SELECT * FROM {self.table} WHERE channel_id=?"
+            return self._query_one(query, (channel_id,))
+
+        def insert(self, match) -> int:
+            """
+            Insert a match into the database.
+
+            Args:
+                match (dict): The match to insert.
+            """
+            query = f"INSERT INTO {self.table} (match_id, division, team_home, team_away, channel_id, archived, league_id) VALUES (?, ?, ?, ?, ?, ?, ?)"
+            return self._execute(query, (match['match_id'], match['division'], match['team_home'], match['team_away'], match['channel_id'], 0, match['league_id']))
+
+        def delete(self, id):
+            """
+            Delete a match by its ID.
+
+            Args:
+                id (int): The ID of the match.
+            """
+            query = f"DELETE FROM {self.table} WHERE match_id=?"
+            return self._execute(query, (id,))
+
+        def delete_by_league(self, league_id):
+            """
+            Delete all matches in a league.
+
+            Args:
+                league_id (int): The ID of the league.
+            """
+            query = f"DELETE FROM {self.table} WHERE league_id=?"
+            return self._execute
+
+        def update(self, match):
+            """
+            Update a match.
+
+            Args:
+                match (dict): The match to update.
+
+            Raises:
+                KeyError: If match_id is not passed in.
+                ValueError: If match_id is not found in the database.
+            """
+            # this is a strange one, we need to only update the fields that are passed in
+            # raise an error if match_id is not passed in
+            if 'match_id' not in match:
+                raise KeyError('match_id not passed in')
+            query = f"SELECT * FROM {self.table} WHERE match_id=?"
+            old_match = self._query_one(query, (match['match_id'],))
+            if old_match is None:
+                raise ValueError('match_id not found in database')
+
+            query = f"UPDATE {self.table} SET division=?, team_home=?, team_away=?, channel_id=?, archived=?, league_id=? WHERE match_id=?"
+            # Merge the two dicts together
+            for key, value in old_match.items():
+                if key not in match:
+                    match[key] = value
+            return self._execute(query, (match['division'], match['team_home'], match['team_away'], match['channel_id'], match['archived'], match['league_id'], match['match_id']))
+
+        def count(self):
+            """
+            Get the number of matches in the database.
+            """
+            query = f"SELECT COUNT(*) FROM {self.table}"
+            return self._query_one(query, ())
+
+        def count_by_league(self, league_id):
+            """
+            Get the number of matches in a league.
+
+            Args:
+                league_id (int): The ID of the league.
+            """
+            query = f"SELECT COUNT(*) FROM {self.table} WHERE league_id=?"
+            return self._query_one(query, (league_id,))
+
+        def count_by_division(self, division):
+            """
+            Get the number of matches in a division.
+
+            Args:
+                division (int): The ID of the division.
+            """
+            query = f"SELECT COUNT(*) FROM {self.table} WHERE division=?"
+            return self._query_one(query, (division,))
+
+    class Leagues(_BaseDatabaseTable):
+        def __init__(self, pool):
+            super().__init__(pool)
+            self.table = 'leagues'
+
+        def get(self, id):
+            query = f"SELECT * FROM {self.table} WHERE league_id=?"
+            return self._query_one(query, (id,))
+
+        def get_all(self):
+            query = f"SELECT * FROM {self.table}"
+            return self._query_all(query, ())
+
+        def insert(self, league) -> int:
+            query = f"INSERT INTO {self.table} (league_id, league_name, league_short, league_description, league_icon) VALUES (?, ?, ?, ?, ?)"
+            return self._execute(query, (league['league_id'], league['league_name'], league['league_short'], league['league_description'], league['league_icon']))
+
+        def delete(self, id):
+            query = f"DELETE FROM {self.table} WHERE league_id=?"
+            return self._execute(query, (id,))
+
+        def update(self, league):
+            if 'league_id' not in league:
+                raise KeyError('league_id not passed in')
+            query = f"SELECT * FROM {self.table} WHERE league_id=?"
+            old_league = self._query_one(query, (league['league_id'],))
+            if old_league is None:
+                raise ValueError('league_id not found in database')
+            query = f"UPDATE {self.table} SET league_name=?, league_short=?, league_description=?, league_icon=? WHERE league_id=?"
+            for key, value in old_league.items():
+                if key not in league:
+                    league[key] = value
+            return self._execute(query, (league['league_name'], league['league_short'], league['league_description'], league['league_icon'], league['league_id']))
+
+    class Teams(_BaseDatabaseTable):
+        def __init__(self, pool):
+            super().__init__(pool)
+            self.table = 'teams'
+
+        def get(self, id):
+            query = f"SELECT * FROM {self.table} WHERE team_id=?"
+            return self._query_one(query, (id,))
+
+        def get_by_team_id(self, team_id):
+            query = f"SELECT * FROM {self.table} WHERE team_id=?"
+            return self._query_all(query, (team_id,))
+
+        def get_by_league_id(self, league_id):
+            query = f"SELECT * FROM {self.table} WHERE league_id=?"
+            return self._query_all(query, (league_id,))
+
+        def get_by_channel_id(self, channel_id):
+            query = f"SELECT * FROM {self.table} WHERE team_channel=?"
+            return self._query_one(query, (channel_id,))
+
+        def get_by_role_id(self, role_id):
+            query = f"SELECT * FROM {self.table} WHERE role_id=?"
+            return self._query_one(query, (role_id,))
+
+        def get_by_division(self, division):
+            query = f"SELECT * FROM {self.table} WHERE division=?"
+            return self._query_all(query, (division,))
+
+        def get_all(self):
+            query = f"SELECT * FROM {self.table}"
+            return self._query_all(query, ())
+
+        def insert(self, team) -> int:
+            query = f"INSERT INTO {self.table} (team_id, league_id, role_id, team_channel, division, team_name) VALUES (?, ?, ?, ?, ?, ?)"
+            return self._execute(query, (team['team_id'], team['league_id'], team['role_id'], team['team_channel'], team['division'], team['team_name']))
+
+        def delete(self, team_id):
+            query = f"DELETE FROM {self.table} WHERE team_id=?"
+            return self._execute(query, (team_id,))
+
+        def delete_by_league(self, league_id):
+            query = f"DELETE FROM {self.table} WHERE league_id=?"
+            return self._execute(query, (league_id,))
+
+        def update(self, team):
+            if 'roster_id' not in team:
+                raise KeyError('roster_id not passed in')
+            if 'team_id' not in team:
+                raise KeyError('team_id not passed in')
+            query = f"SELECT * FROM {self.table} WHERE team_id=?"
+            old_team = self._query_one(query, (team['team_id'],))
+            if old_team is None:
+                raise ValueError('team_id not found in database')
+            query = f"UPDATE {self.table} SET league_id=?, role_id=?, team_channel=?, division=?, team_name=? WHERE team_id=?"
+            for key, value in old_team.items():
+                if key not in team:
+                    team[key] = value
+            return self._execute(query, (team['league_id'], team['role_id'], team['team_channel'], team['division'], team['team_name'], team['team_id']))
+
+
+        def count(self):
+            query = f"SELECT COUNT(*) FROM {self.table}"
+            return self._query_one(query, ())
+
+        def count_by_league(self, league_id):
+            query = f"SELECT COUNT(*) FROM {self.table} WHERE league_id=?"
+            return self._query_one(query, (league_id,))
+
+        def count_by_division(self, division):
+            query = f"SELECT COUNT(*) FROM {self.table} WHERE division=?"
+            return self._query_one
+
+    class Logs(_BaseDatabaseTable):
+        def __init__(self, pool):
+            super().__init__(pool)
+            self.table = 'logs'
+
+        def get(self, id):
+            query = f"SELECT * FROM {self.table} WHERE id=?"
+            return self._query_one(query, (id,))
+
+        def get_by_match_id(self, match_id):
+            query = f"SELECT * FROM {self.table} WHERE match_id=?"
+            return self._query_all(query, (match_id,))
+
+        def get_by_team_id(self, team_id):
+            query = f"SELECT * FROM {self.table} WHERE team_id=?"
+            return self._query_all(query, (team_id,))
+
+        def get_all(self):
+            query = f"SELECT * FROM {self.table}"
+            return self._query_all(query, ())
+
+        def insert(self, log) -> int:
+            query = f"INSERT INTO {self.table} (match_id, user_id, user_name, user_nick, user_avatar, team_id, message_id, message_content, message_additionals, log_type, log_timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            return self._execute(query, (log['match_id'], log['user_id'], log['user_name'], log['user_nick'], log['user_avatar'], log['team_id'], log['message_id'], log['message_content'], log['message_additionals'], log['log_type'], log['log_timestamp']))
+
+        def delete(self, id):
+            query = f"DELETE FROM {self.table} WHERE id=?"
+            return self._execute(query, (id,))
+
+        def delete_by_match_id(self, match_id):
+            if 'match_id' == 0:
+                raise ValueError('match_id cannot be 0')
+            query = f"DELETE FROM {self.table} WHERE match_id=?"
+            return self._execute(query, (match_id,))
+
+        def delete_by_team_id(self, team_id):
+            if 'team_id' == 0:
+                raise ValueError('team_id cannot be 0')
+            query = f"DELETE FROM {self.table} WHERE team_id=?"
+            return self._execute(query, (team_id,))
+
+        def update(self, log):
+            raise NotImplementedError('Update not implemented for logs - logs are designed to be immutable')
+
+        def count(self):
+            query = f"SELECT COUNT(*) FROM {self.table}"
+            return self._query_one(query, ())
+
+        def count_by_match_id(self, match_id):
+            query = f"SELECT COUNT(*) FROM {self.table} WHERE match_id=?"
+            return self._query_one(query, (match_id,))
+
+        def count_by_team_id(self, team_id):
+            query = f"SELECT COUNT(*) FROM {self.table} WHERE team_id=?"
+            return self._query_one(query, (team_id,))
+
+        def delete(self, id):
+            raise NotImplementedError('Delete not implemented for logs - logs are designed to be kept indefinitely')
+
+        def delete_by_match_id(self, match_id):
+            raise NotImplementedError('Delete not implemented for logs - logs are designed to be kept indefinitely')
+
+        def delete_by_team_id(self, team_id):
+            raise NotImplementedError('Delete not implemented for logs - logs are designed to be kept indefinitely')
+
     def __init__(self, conn_params):
         self._throw_if_bad_config(conn_params)
         conn_params['pool_name'] = 'drawbridge'
         self.pool = mariadb.ConnectionPool(**conn_params)
         self.logger = logging.getLogger('drawbridge.database')
         # self._run_migrations() # TODO: WIP
+
+        # instantiate the tables
+        self.teams = self.Teams(self.pool)
+        self.divisions = self.Divisions(self.pool)
+        self.matches = self.Matches(self.pool)
+        self.logs = self.Logs(self.pool)
+        self.leagues = self.Leagues(self.pool)
 
     def __del__(self):
         self._close()

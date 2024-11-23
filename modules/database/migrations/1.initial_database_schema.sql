@@ -46,7 +46,7 @@ CREATE TABLE `teams` (
 
 CREATE TABLE `matches` (
   `match_id` int(11) NOT NULL,
-  `division` varchar(12) DEFAULT NULL,
+  `division` int(11) DEFAULT NULL,
   `team_home` int(11) DEFAULT NULL,
   `team_away` int(11) DEFAULT NULL,
   `channel_id` bigint(20) DEFAULT NULL,
