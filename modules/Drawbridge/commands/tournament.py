@@ -424,7 +424,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
             # morbid curiosity time - shig
 
-            r_id = [p for r in league.rosters for p in r['id']]
+            r_id = [r['id'] for r in league.rosters]
             r_players = [p['players'] for id in r_id for p in self.cit.getRoster(id)]
             if (len(r_players) == 0):
                 await interaction.edit_original_response(content=f'No players were found. Aborting.', ephemeral=True)
