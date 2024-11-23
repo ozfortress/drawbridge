@@ -460,7 +460,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
         except Exception as e:
             self.logger.error(f'Error conducting demo check: {e}', exc_info=True)
-            await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}. Line {e.__traceback__.tb_lineno}. {league.matches[0]}')
+            await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}. Line {e.__traceback__.tb_lineno}. {league.matches}')
 
     # @app_commands.command(
     #         name='randomdemocheck',
