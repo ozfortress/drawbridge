@@ -409,7 +409,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             
             matches = [m for m in league.matches]
             for m in matches:
-                if m.round_number != round_no and m.forfeit_by != 'no_forfeit': #and m['away_team'] is not None
+                if m['round_number'] != round_no and m['forfeit_by'] != 'no_forfeit': #and m['away_team'] is not None
                     matches.remove(m)
 
             if len(matches) == 0:
@@ -438,9 +438,9 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             chosen_player = r_players[random.randint(0, len(r_players)-1)]
 
             if chosen_player in match_chosen:
-                chosen_team = match_chosen.home_team.name
+                chosen_team = match_chosen.home_team
             else:
-                chosen_team = match_chosen.away_team.name
+                chosen_team = match_chosen.away_team
 
             t = self.db.get_team_by_id(chosen_team.id)
 
