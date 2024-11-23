@@ -406,11 +406,11 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             if self.db.get_divs_by_league(league_id) is None:
                 await interaction.edit_original_response(content='League not being monitored. Aborting.', ephemeral=True)
                 return
-            matches = [] #list of matches
-
-            for m in league.matches:
-                if m['round_number'] == round_no and m['forfeit_by'] == 'no_forfeit': #and m['away_team'] is not None
-                    matches.append(m)
+            
+            matches = [m for m in league.matches]
+            for m in matches:
+                if m.round_number != round_no and m.forfeit_by != 'no_forfeit': #and m['away_team'] is not None
+                    matches.remove(m)
 
             if len(matches) == 0:
                 await interaction.edit_original_response(content=f'No matches were found for round {round_no}. Aborting.', ephemeral=True)
@@ -432,11 +432,12 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 return
 
             for player in r_players:
-                if player.steam_32 not in log['name']: #logs.tf uses the 32 bit steam ID for who played
+                if player['steam_32'] not in log['name']: #logs.tf uses the 32 bit steam ID for who played
                     r_players.remove(player)
 
             chosen_player = r_players[random.randint(0, len(r_players)-1)]
-            if chosen_player in match_chosen.home_team:
+
+            if chosen_player in match_chosen:
                 chosen_team = match_chosen.home_team.name
             else:
                 chosen_team = match_chosen.away_team.name
