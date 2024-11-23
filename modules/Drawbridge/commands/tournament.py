@@ -5,6 +5,7 @@ import discord
 import os
 import json
 import random
+import requests
 from modules import database
 from modules import citadel
 
@@ -382,12 +383,19 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             name='randomdemocheck',
             description='Still WIP. Currently chooses a random team in any div'
     )
-    async def randomdemocheck(self, interaction : discord.Interaction, league_id : int):
+    async def randomdemocheck(self, interaction : discord.Interaction, league_id : int, round_no : int, spes_user: int = 0):
         """Conduct a random demo check.
+
         Parameters
         -----------
         league_id: int
             league to demo check
+
+        round_no:
+            the round that admins will check
+
+        spes_user:
+            does nothing atm but will be used to target a specific player
         """
         await interaction.response.send_message('Democheck is in progress ...', ephemeral=True)
         try:
@@ -398,48 +406,61 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             if self.db.get_divs_by_league(league_id) is None:
                 await interaction.edit_original_response(content='League not being monitored. Aborting.', ephemeral=True)
                 return
+            matches = [] #list of matches
 
-            teams = self.db.get_teams_by_league(league_id)
-            if teams is None:
-                await interaction.edit_original_response(content='No teams were found. Aborting.', ephemeral=True)
+            for m in league.matches:
+                if m.round_number == round_no and m.forfeit_by == str['no_forfeit'] and m.away_team is not None:
+                    matches.append(m)
+            if len(matches) == 0:
+                await interaction.edit_original_response(content=f'No matches were found for round {round_no}. Aborting.', ephemeral=True)
                 return
+            
+            random.shuffle(matches)
+            match_chosen = matches[random.randint(0, len(matches)-1)]
 
-            team = teams[random.randint(0, len(teams)-1)]
-            team_channel = self.bot.get_channel(team[4])
-            #team_role = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID'))).get_role(team[2])
+            #Get log of match here
+            log = requests.get('https://logs.tf/api/v1/log/3757893').json() #WILL ONLY TEST FOR THIS LOG ATM
 
-            # below is functionality for getting a player
-            rosterobj = self.cit.getTeam(team[0])
-            target_player = rosterobj.players[random.randint(0, len(rosterobj.players)-1)]
+            r_players = [p for r in league.rosters for p in r.players]
+            if (len(r_players) == 0):
+                await interaction.edit_original_response(content=f'No players were found. Aborting.', ephemeral=True)
+                return
+            
+            for player in r_players:
+                if player.steam_32 not in log['name']: #logs.tf uses the 32 bit steam ID for who played
+                    r_players.remove(player)
+            
+            chosen_player = r_players[random.randint(0, len(r_players)-1)]
+            if chosen_player in match_chosen.home_team:
+                chosen_team = match_chosen.home_team.name
+            else:
+                chosen_team = match_chosen.away_team.name
+            
+            t = self.db.get_team_by_id(chosen_team.id)
 
             messageraw = ''
             with open('embeds/democheck.json', 'r') as file:
                 messageraw = file.read()
             tempmsg = str(messageraw)
 
-            self.logger.debug(f'Random demo check announced. Player chosen is: {target_player}')
+            await interaction.edit_original_response(content=f'Random demo check announced. Player chosen is: {chosen_player.name}', ephemeral=True)
 
             demochkmsg = json.loads(self.functions.substitute_strings_in_embed(tempmsg, {
-                '{TEAM_NAME}'   : f'<@&{team[2]}>',
-                '{TARGET_NAME}' : f'{target_player['name']}',
-                '{TARGET_ID}'   : f'{target_player['id']}',
+                '{TEAM_NAME}'   : f'<@&{t['role_id']}>',
+                '{TARGET_NAME}' : f'{chosen_player.name}',
+                '{TARGET_ID}'   : f'{chosen_player.id}',
                 '{MATCH_PAGE}'  : f'tbd',
                 '{MATCH_ID}'    : f'tbd'
             }))
-
+            self.bot.get_channel(t['channel'])
             demochkmsg['embed'] = discord.Embed(**demochkmsg['embeds'][0])
             del demochkmsg['embeds']
-            await team_channel.send(**demochkmsg)
-            
-            bug = ""
-            n = 0
-            while n < 20:
-                bug = bug + " " + rosterobj.players[n]['name']
-            await team_channel.send(**bug)
-            await interaction.edit_original_response(content=f'Random demo check announced. Player chosen is: {target_player['name']} from {team[6]}')
+            await t['team'].send(**demochkmsg)
+
         except Exception as e:
             self.logger.error(f'Error conducting demo check: {e}', exc_info=True)
             await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}. Line {e.__traceback__.tb_lineno}.')
+
     # @app_commands.command(
     #         name='randomdemocheck',
     #         description='Announces a truly random demo check, given a League ID. Automatically picks a team in the league, and a match to check'

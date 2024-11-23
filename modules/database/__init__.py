@@ -493,6 +493,17 @@ class Database:
                 print(f'Error in get_teams_by_league: {e}')
                 return None
 
+    def get_matches_by_league(self, league_id):
+        with self.pool.get_connection() as conn:
+            try:
+                cursor = conn.cursor()
+                query = 'SELECT * FROM matches WHERE league_id=?'
+                cursor.execute(query, (league_id,))
+                return cursor.fetchall()
+            except mariadb.Error as e:
+                print(f'Error in get_matches_by_league: {e}')
+                return None
+            
     def get_team_channels(self):
         with self.pool.get_connection() as conn:
             try:
