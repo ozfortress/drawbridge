@@ -415,28 +415,30 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             if len(matches) == 0:
                 await interaction.edit_original_response(content=f'No matches were found for round {round_no}. Aborting.', ephemeral=True)
                 return
-            
+
             random.shuffle(matches)
             match_chosen = matches[random.randint(0, len(matches)-1)]
 
             #Get log of match here
             log = requests.get('https://logs.tf/api/v1/log/3757893').json() #WILL ONLY TEST FOR THIS LOG ATM
 
+            # morbid curiosity time - shig
+            self.logger.debug(league.rosters)
             r_players = [p for r in league.rosters for p in r['players']]
             if (len(r_players) == 0):
                 await interaction.edit_original_response(content=f'No players were found. Aborting.', ephemeral=True)
                 return
-            
+
             for player in r_players:
                 if player.steam_32 not in log['name']: #logs.tf uses the 32 bit steam ID for who played
                     r_players.remove(player)
-            
+
             chosen_player = r_players[random.randint(0, len(r_players)-1)]
             if chosen_player in match_chosen.home_team:
                 chosen_team = match_chosen.home_team.name
             else:
                 chosen_team = match_chosen.away_team.name
-            
+
             t = self.db.get_team_by_id(chosen_team.id)
 
             messageraw = ''
