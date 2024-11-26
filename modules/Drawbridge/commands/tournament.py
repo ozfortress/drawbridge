@@ -418,6 +418,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
             random.shuffle(matches)
             match_chosen = matches[random.randint(0, len(matches)-1)]
+            # request the full match details from citadel
+            match = self.cit.getMatch(match_chosen['id'])
 
             #Get log of match here
             log = requests.get('https://logs.tf/api/v1/log/3757893').json() #WILL ONLY TEST FOR THIS LOG ATM
@@ -436,12 +438,11 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     r_players.remove(player)
 
             chosen_player = r_players[random.randint(0, len(r_players)-1)]
-            self.logger.debug(match_chosen)
 
-            if  match_chosen['home_team'] in chosen_player['rosters']:
-                chosen_team = match_chosen.home_team
+            if  match['home_team'] in chosen_player['rosters']:
+                chosen_team = match.home_team
             else:
-                chosen_team = match_chosen.away_team
+                chosen_team = match.away_team
 
             t = self.db.get_team_by_id(chosen_team.id)
 
