@@ -155,13 +155,43 @@ class Citadel:
                 self.id: int = data['id'] # Integer
                 self.name: str = data['name'] # String
                 self.description: str = data['description'] # String
-                self.rosters: list[Citadel.Roster] | None = data['rosters'] # [Roster]
+                self.rosters: list[Citadel.PartialRoster] | None = data['rosters'] # [Roster]
                 self.matches: list[Citadel.PartialMatch] | None = data['matches'] # [Match]
             except KeyError as e:
                 raise ValueError(f'Missing required field: {e}')
-    class Roster(_BaseCitadelObject):
-        def __getitem__(self, key):
-            return self.__dict__[key]
+    class PartialRoster(_BaseCitadelObject):
+        """
+        Represents a roster in the Citadel module. This is only a partial roster, missing some fields as a consequence of being requested as a child of a league
+
+        Attributes
+        ----------
+        id: int
+            The roster's ID.
+        team_id: int
+            The team's ID.
+        name: str
+            The roster's name.
+        description: str
+            The roster's description.
+        division: str
+            The roster's division.
+        disbanded: bool
+            Whether the roster has been disbanded.
+        """
+        def __init__(self, data: dict) -> None:
+            # Throw an error if the data doesnt have the required fields
+            try:
+                self.id: int = data['id'] # Integer
+                self.team_id: int = data['team_id'] # Integer
+                self.name: str = data['name'] # String
+                self.description: str = data['description'] # String
+                self.division: str = data['division'] # String
+                self.disbanded: bool = data['disbanded'] # Boolean
+                #self.players: list[Citadel.User] | None = data['players'] # [User]
+                #self.matches: list[Citadel.PartialMatch] | None = data['matches'] # [Match]
+            except KeyError as e:
+                raise ValueError(f'Missing required field: {e}')
+    class Roster(PartialRoster):
         """
         Represents a roster in the Citadel module.
 
@@ -179,22 +209,16 @@ class Citadel:
             The roster's division.
         disbanded: bool
             Whether the roster has been disbanded.
-        players: list[Citadel.User] | None
-            The players in the roster (optional).
-        matches: list[Citadel.Match] | None
-            The matches in the roster (optional).
+        players: list[Citadel.User]
+            The players in the roster.
+        matches: list[Citadel.Match]
+            The matches the roster is part of.
         """
         def __init__(self, data: dict) -> None:
-            # Throw an error if the data doesnt have the required fields
+            super().__init__(data)
             try:
-                self.id: int = data['id'] # Integer
-                self.team_id: int = data['team_id'] # Integer
-                self.name: str = data['name'] # String
-                self.description: str = data['description'] # String
-                self.division: str = data['division'] # String
-                self.disbanded: bool = data['disbanded'] # Boolean
-                self.players: list[Citadel.User] | None = data['players'] # [User]
-                self.matches: list[Citadel.PartialMatch] | None = data['matches'] # [Match]
+                self.players: list[Citadel.User] = data['players'] # [User]
+                self.matches: list[Citadel.Match] = data['matches'] # [Match]
             except KeyError as e:
                 raise ValueError(f'Missing required field: {e}')
 
