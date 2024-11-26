@@ -444,7 +444,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             else:
                 chosen_team = match.away_team
 
-            t = self.db.get_team_by_id(chosen_team.id)
+            t = self.db.get_team_by_id(chosen_team['id'])
 
             messageraw = ''
             with open('embeds/democheck.json', 'r') as file:
@@ -455,8 +455,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
             demochkmsg = json.loads(self.functions.substitute_strings_in_embed(tempmsg, {
                 '{TEAM_NAME}'   : f'<@&{t['role_id']}>',
-                '{TARGET_NAME}' : f'{chosen_player.name}',
-                '{TARGET_ID}'   : f'{chosen_player.id}',
+                '{TARGET_NAME}' : f'{player.name}',
+                '{TARGET_ID}'   : f'{player.id}',
                 '{MATCH_PAGE}'  : f'tbd',
                 '{MATCH_ID}'    : f'tbd'
             }))
