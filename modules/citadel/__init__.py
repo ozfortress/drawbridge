@@ -42,6 +42,8 @@ class Citadel:
 
 
     class _BaseCitadelObject:
+        def __getitem__(self, key):
+            return self.__dict__[key]
         def __init__(self, data: dict) -> None:
             pass
         def __str__(self) -> str:
@@ -153,11 +155,43 @@ class Citadel:
                 self.id: int = data['id'] # Integer
                 self.name: str = data['name'] # String
                 self.description: str = data['description'] # String
-                self.rosters: list[Citadel.Roster] | None = data['rosters'] # [Roster]
-                self.matches: list[Citadel.Match] | None = data['matches'] # [Match]
+                self.rosters: list[Citadel.PartialRoster] | None = data['rosters'] # [Roster]
+                self.matches: list[Citadel.PartialMatch] | None = data['matches'] # [Match]
             except KeyError as e:
                 raise ValueError(f'Missing required field: {e}')
-    class Roster(_BaseCitadelObject):
+    class PartialRoster(_BaseCitadelObject):
+        """
+        Represents a roster in the Citadel module. This is only a partial roster, missing some fields as a consequence of being requested as a child of a league
+
+        Attributes
+        ----------
+        id: int
+            The roster's ID.
+        team_id: int
+            The team's ID.
+        name: str
+            The roster's name.
+        description: str
+            The roster's description.
+        division: str
+            The roster's division.
+        disbanded: bool
+            Whether the roster has been disbanded.
+        """
+        def __init__(self, data: dict) -> None:
+            # Throw an error if the data doesnt have the required fields
+            try:
+                self.id: int = data['id'] # Integer
+                self.team_id: int = data['team_id'] # Integer
+                self.name: str = data['name'] # String
+                self.description: str = data['description'] # String
+                self.division: str = data['division'] # String
+                self.disbanded: bool = data['disbanded'] # Boolean
+                #self.players: list[Citadel.User] | None = data['players'] # [User]
+                #self.matches: list[Citadel.PartialMatch] | None = data['matches'] # [Match]
+            except KeyError as e:
+                raise ValueError(f'Missing required field: {e}')
+    class Roster(PartialRoster):
         """
         Represents a roster in the Citadel module.
 
@@ -175,28 +209,22 @@ class Citadel:
             The roster's division.
         disbanded: bool
             Whether the roster has been disbanded.
-        players: list[Citadel.User] | None
-            The players in the roster (optional).
-        matches: list[Citadel.Match] | None
-            The matches in the roster (optional).
+        players: list[Citadel.User]
+            The players in the roster.
+        matches: list[Citadel.Match]
+            The matches the roster is part of.
         """
         def __init__(self, data: dict) -> None:
-            # Throw an error if the data doesnt have the required fields
+            super().__init__(data)
             try:
-                self.id: int = data['id'] # Integer
-                self.team_id: int = data['team_id'] # Integer
-                self.name: str = data['name'] # String
-                self.description: str = data['description'] # String
-                self.division: str = data['division'] # String
-                self.disbanded: bool = data['disbanded'] # Boolean
-                self.players: list[Citadel.User] | None = data['players'] # [User]
-                self.matches: list[Citadel.Match] | None = data['matches'] # [Match]
+                self.players: list[Citadel.User] = data['players'] # [User]
+                self.matches: list[Citadel.Match] = data['matches'] # [Match]
             except KeyError as e:
                 raise ValueError(f'Missing required field: {e}')
 
-    class Match(_BaseCitadelObject):
+    class PartialMatch(_BaseCitadelObject):
         """
-        Represents a match in the Citadel module.
+        Represents a partial match in the Citadel module. This minified version of the Match object is used as a child of Rosters and Leagues, and misses some fields.
 
         Attributes
         ----------
@@ -232,6 +260,37 @@ class Citadel:
                 self.round_name: str = data['round_name'] # String
                 self.round_number: int = data['round_number'] # Integer
                 self.notice: str = data['notice'] # String
+                #self.league: Citadel.League = data['league'] # League
+                #self.home_team: Citadel.Roster = data['home_team'] # Roster
+                #self.away_team: Citadel.Roster = data['away_team'] # Roster
+                #self.league_id = data['league']['id']
+                self.created_at: str = data['created_at']
+            except KeyError as e:
+                raise ValueError(f'Missing required field: {e}')
+
+    class Match(PartialMatch):
+        """
+        A class to represent a Match.
+
+        Attributes:
+        -----------
+        league : Citadel.League
+            The league to which the match belongs.
+        home_team : Citadel.Roster
+            The home team participating in the match.
+        away_team : Citadel.Roster
+            The away team participating in the match.
+        league_id : int
+            The ID of the league.
+
+        Methods:
+        --------
+        __init__(data: dict) -> None
+            Initializes the Match object with data from a dictionary.
+        """
+        def __init__(self, data:dict) -> None:
+            super().__init__(data)
+            try:
                 self.league: Citadel.League = data['league'] # League
                 self.home_team: Citadel.Roster = data['home_team'] # Roster
                 self.away_team: Citadel.Roster = data['away_team'] # Roster
