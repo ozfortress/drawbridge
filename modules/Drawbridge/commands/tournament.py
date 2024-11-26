@@ -435,7 +435,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 if player['steam_32'] not in log['names']: #logs.tf uses the 32 bit steam ID for who played
                     r_players.remove(player)
 
-            chosen_player = r_players[random.randint(0, len(r_players)-1)]
+            player_chosen = r_players[random.randint(0, len(r_players)-1)]
+            chosen_player = self.cit.getUser(player_chosen['id'])
             chosem_match = self.cit.getMatch(match_chosen['id'])
             if  chosem_match['home_team'] in chosen_player['rosters']:
                 chosen_team = chosem_match.home_team
