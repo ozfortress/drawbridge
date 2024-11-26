@@ -449,7 +449,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 messageraw = file.read()
             tempmsg = str(messageraw)
 
-            await interaction.edit_original_response(content=f'Random demo check announced. Player chosen is: {chosen_player.name}', ephemeral=True)
+            await interaction.edit_original_response(content=f'Random demo check announced. Player chosen is: {player.name}', ephemeral=True)
 
             demochkmsg = json.loads(self.functions.substitute_strings_in_embed(tempmsg, {
                 '{TEAM_NAME}'   : f'<@&{t['role_id']}>',
