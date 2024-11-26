@@ -154,7 +154,7 @@ class Citadel:
                 self.name: str = data['name'] # String
                 self.description: str = data['description'] # String
                 self.rosters: list[Citadel.Roster] | None = data['rosters'] # [Roster]
-                self.matches: list[Citadel.Match] | None = data['matches'] # [Match]
+                self.matches: list[Citadel.PartialMatch] | None = data['matches'] # [Match]
             except KeyError as e:
                 raise ValueError(f'Missing required field: {e}')
     class Roster(_BaseCitadelObject):
@@ -190,13 +190,13 @@ class Citadel:
                 self.division: str = data['division'] # String
                 self.disbanded: bool = data['disbanded'] # Boolean
                 self.players: list[Citadel.User] | None = data['players'] # [User]
-                self.matches: list[Citadel.Match] | None = data['matches'] # [Match]
+                self.matches: list[Citadel.PartialMatch] | None = data['matches'] # [Match]
             except KeyError as e:
                 raise ValueError(f'Missing required field: {e}')
 
-    class Match(_BaseCitadelObject):
+    class PartialMatch(_BaseCitadelObject):
         """
-        Represents a match in the Citadel module.
+        Represents a partial match in the Citadel module. This minified version of the Match object is used as a child of Rosters and Leagues, and misses some fields.
 
         Attributes
         ----------
@@ -232,6 +232,18 @@ class Citadel:
                 self.round_name: str = data['round_name'] # String
                 self.round_number: int = data['round_number'] # Integer
                 self.notice: str = data['notice'] # String
+                #self.league: Citadel.League = data['league'] # League
+                #self.home_team: Citadel.Roster = data['home_team'] # Roster
+                #self.away_team: Citadel.Roster = data['away_team'] # Roster
+                #self.league_id = data['league']['id']
+                self.created_at: str = data['created_at']
+            except KeyError as e:
+                raise ValueError(f'Missing required field: {e}')
+
+    class Match(PartialMatch):
+        def __init__(self, data:dict) -> None:
+            super().__init__(data)
+            try:
                 self.league: Citadel.League = data['league'] # League
                 self.home_team: Citadel.Roster = data['home_team'] # Roster
                 self.away_team: Citadel.Roster = data['away_team'] # Roster
