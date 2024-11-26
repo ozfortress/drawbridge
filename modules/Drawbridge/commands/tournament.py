@@ -406,7 +406,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             if self.db.get_divs_by_league(league_id) is None:
                 await interaction.edit_original_response(content='League not being monitored. Aborting.', ephemeral=True)
                 return
-            
+
             matches = [m for m in league.matches]
             for m in matches:
                 if m['round_number'] != round_no and m['forfeit_by'] != 'no_forfeit': #and m['away_team'] is not None
@@ -436,6 +436,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     r_players.remove(player)
 
             chosen_player = r_players[random.randint(0, len(r_players)-1)]
+            self.logger.debug(match_chosen)
 
             if  match_chosen['home_team'] in chosen_player['rosters']:
                 chosen_team = match_chosen.home_team
