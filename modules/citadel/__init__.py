@@ -42,6 +42,8 @@ class Citadel:
 
 
     class _BaseCitadelObject:
+        def __getitem__(self, key):
+            return self.__dict__[key]
         def __init__(self, data: dict) -> None:
             pass
         def __str__(self) -> str:
@@ -158,6 +160,8 @@ class Citadel:
             except KeyError as e:
                 raise ValueError(f'Missing required field: {e}')
     class Roster(_BaseCitadelObject):
+        def __getitem__(self, key):
+            return self.__dict__[key]
         """
         Represents a roster in the Citadel module.
 
@@ -241,6 +245,25 @@ class Citadel:
                 raise ValueError(f'Missing required field: {e}')
 
     class Match(PartialMatch):
+        """
+        A class to represent a Match.
+
+        Attributes:
+        -----------
+        league : Citadel.League
+            The league to which the match belongs.
+        home_team : Citadel.Roster
+            The home team participating in the match.
+        away_team : Citadel.Roster
+            The away team participating in the match.
+        league_id : int
+            The ID of the league.
+
+        Methods:
+        --------
+        __init__(data: dict) -> None
+            Initializes the Match object with data from a dictionary.
+        """
         def __init__(self, data:dict) -> None:
             super().__init__(data)
             try:
