@@ -437,7 +437,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
             chosen_player = r_players[random.randint(0, len(r_players)-1)]
             chosem_match = self.cit.getMatch(match_chosen['id'])
-            if  chosem_match['home_team'] in chosem_match['rosters']:
+            if  chosem_match['home_team'] in chosen_player['rosters']:
                 chosen_team = chosem_match.home_team
             else:
                 chosen_team = chosem_match.away_team
@@ -449,7 +449,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 messageraw = file.read()
             tempmsg = str(messageraw)
 
-            await interaction.edit_original_response(content=f'Random demo check announced. Player chosen is: {player.name}', ephemeral=True)
+            await interaction.edit_original_response(content=f'Random demo check announced. Player chosen is: {chosen_player.name}', ephemeral=True)
 
             demochkmsg = json.loads(self.functions.substitute_strings_in_embed(tempmsg, {
                 '{TEAM_NAME}'   : f'<@&{t['role_id']}>',
