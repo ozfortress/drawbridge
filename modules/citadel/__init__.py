@@ -51,7 +51,45 @@ class Citadel:
         def __repr__(self) -> str:
             return json.dumps(self.__dict__)
 
-    class User(_BaseCitadelObject):
+    class PartialUser(_BaseCitadelObject):
+        """
+        Represents a user in the Citadel module. This is a partial user.
+
+        Attributes
+        ----------
+        id: int
+            The user's ID.
+        name: str
+            The user's name.
+        description: str
+            The user's description.
+        created_at: str
+            The user's creation date and time (in ISO 8601 format).
+        profile_url: str
+            The user's profile URL.
+        steam_32: str
+            The user's Steam 32-bit ID.
+        steam_64: int
+            The user's Steam 64-bit ID.
+        steam_id3: str
+            The user's Steam ID3.
+        """
+        def __init__(self, data : dict) -> None:
+            # Throw an error if the data doesnt have the required fields
+            try:
+                self.id: int = data['id'] # Integer
+                self.name: str = data['name'] # String
+                self.description: str = data['description'] # String
+                self.created_at: str = data['created_at'] # DateTime(ISO 8601)
+                self.profile_url: str = data['profile_url'] # String
+                self.steam_32: str = data['steam_32'] # String
+                self.steam_64: int = data['steam_64'] # Integer(64)
+                self.setam_id3: str = data['steam_id3'] # String
+                # self.teams: list[Citadel.Team] | None = data['teams'] # [Team]
+                # self.rosters: list[Citadel.Roster] | None = data['rosters'] # [Roster]
+            except KeyError as e:
+                raise ValueError(f'Missing required field: {e}')
+    class User(PartialUser):
         """
         Represents a user in the Citadel module.
 
@@ -73,30 +111,22 @@ class Citadel:
             The user's Steam 64-bit ID.
         steam_id3: str
             The user's Steam ID3.
-        teams: list[Citadel.Team] | None
-            The teams the user belongs to (optional).
-        rosters: list[Citadel.Roster] | None
-            The rosters the user is part of (optional).
+        teams: list[Citadel.Team]
+            The teams the user belongs to.
+        rosters: list[Citadel.Roster]
+            The rosters the user is part of.
         """
-        def __init__(self, data : dict) -> None:
-            # Throw an error if the data doesnt have the required fields
+        def __init__(self, data: dict) -> None:
+            super().__init__(data)
             try:
-                self.id: int = data['id'] # Integer
-                self.name: str = data['name'] # String
-                self.description: str = data['description'] # String
-                self.created_at: str = data['created_at'] # DateTime(ISO 8601)
-                self.profile_url: str = data['profile_url'] # String
-                self.steam_32: str = data['steam_32'] # String
-                self.steam_64: int = data['steam_64'] # Integer(64)
-                self.setam_id3: str = data['steam_id3'] # String
-                self.teams: list[Citadel.Team] | None = data['teams'] # [Team]
-                self.rosters: list[Citadel.Roster] | None = data['rosters'] # [Roster]
+                self.teams: list[Citadel.PartialTeam] = data['teams'] # [Team]
+                self.rosters: list[Citadel.PartialRoster] = data['rosters'] # [Roster]
             except KeyError as e:
                 raise ValueError(f'Missing required field: {e}')
 
-    class Team(_BaseCitadelObject):
+    class PartialTeam(_BaseCitadelObject):
         """
-        Represents a team in the Citadel module.
+        Represents a partial team in the Citadel module.
 
         Attributes
         ----------
@@ -127,8 +157,39 @@ class Citadel:
                 self.avatar_url: str = data['avatar_url'] # String
                 self.avatar_thumb_url: str = data['avatar_thumb_url'] # String
                 self.avatar_icon_url: str = data['avatar_icon_url'] # String
-                self.players: list[Citadel.User] | None = data['players'] # [User]
-                self.rosters: list[Citadel.Roster] | None = data['rosters'] # [Roster]
+                # self.players: list[Citadel.PartialUser] | None = data['players'] # [User]
+                # self.rosters: list[Citadel.PartialRoster] | None = data['rosters'] # [Roster]
+            except KeyError as e:
+                raise ValueError(f'Missing required field: {e}')
+
+    class Team(PartialTeam):
+        """
+        Represents a team in the Citadel module.
+
+        Attributes
+        ----------
+        id: int
+            The team's ID.
+        name: str
+            The team's name.
+        description: str
+            The team's description.
+        avatar_url: str
+            The team's avatar URL.
+        avatar_thumb_url: str
+            The team's avatar thumbnail URL.
+        avatar_icon_url: str
+            The team's avatar icon URL.
+        players: list[Citadel.User]
+            The players in the team.
+        rosters: list[Citadel.Roster]
+            The rosters in the team.
+        """
+        def __init__(self, data: dict) -> None:
+            super().__init__(data)
+            try:
+                self.players: list[Citadel.PartialUser] = data['players'] # [User]
+                self.rosters: list[Citadel.PartialRoster] = data['rosters'] # [Roster]
             except KeyError as e:
                 raise ValueError(f'Missing required field: {e}')
 
@@ -217,8 +278,8 @@ class Citadel:
         def __init__(self, data: dict) -> None:
             super().__init__(data)
             try:
-                self.players: list[Citadel.User] = data['players'] # [User]
-                self.matches: list[Citadel.Match] = data['matches'] # [Match]
+                self.players: list[Citadel.PartialUser] = data['players'] # [User]
+                self.matches: list[Citadel.PartialMatch] = data['matches'] # [Match]
             except KeyError as e:
                 raise ValueError(f'Missing required field: {e}')
 
