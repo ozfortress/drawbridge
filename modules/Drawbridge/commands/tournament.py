@@ -443,7 +443,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             else:
                 chosen_team = chosem_match.away_team
 
-            t = self.db.get_team_by_id(chosen_team.id)
+            t = self.db.get_team_by_id(chosen_team["id"])
 
             messageraw = ''
             with open('embeds/democheck.json', 'r') as file:
