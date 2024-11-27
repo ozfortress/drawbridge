@@ -460,7 +460,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 '{MATCH_PAGE}'  : f'tbd',
                 '{MATCH_ID}'    : f'tbd'
             }))
-            team_channel = self.bot.get_channel(db_team[4])
+            team_channel = self.bot.get_channel(db_team[3])
             if team_channel is None:
                 await interaction.edit_original_response(content=f'Channel couldn\'t be found. dbsize: {len(db_team)} db_team[0]:{db_team[0]}db_team[1]:{db_team[1]}db_team[2]:{db_team[2]}db_team[3]:{db_team[3]}. Aborting.')
                 return
