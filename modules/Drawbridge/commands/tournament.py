@@ -443,7 +443,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             else:
                 chosen_team = chosem_match.away_team
 
-            db_team = self.db.get_team_by_id(chosen_team['id'])
+            db_team = self.db.get_team_by_id(chosen_team['team_id'])
             if db_team is None:
                 await interaction.edit_original_response(content=f'DB_Team was not assigned. Chosen team id:{chosen_team['id']}. DB call returned: {self.db.get_team_by_id(chosen_team['id'])} Aborting.')
                 return
