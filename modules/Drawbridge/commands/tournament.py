@@ -450,12 +450,10 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 messageraw = file.read()
             tempmsg = str(messageraw)
 
-            await interaction.edit_original_response(content=f'Random demo check announced. Player chosen is: {chosen_player.name}', ephemeral=True)
-
             demochkmsg = json.loads(self.functions.substitute_strings_in_embed(tempmsg, {
                 '{TEAM_NAME}'   : f'<@&{t['role_id']}>',
-                '{TARGET_NAME}' : f'{chosen_player.name}',
-                '{TARGET_ID}'   : f'{chosen_player.id}',
+                '{TARGET_NAME}' : f'{chosen_player['name']}',
+                '{TARGET_ID}'   : f'{chosen_player['id']}',
                 '{MATCH_PAGE}'  : f'tbd',
                 '{MATCH_ID}'    : f'tbd'
             }))
@@ -463,7 +461,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             demochkmsg['embed'] = discord.Embed(**demochkmsg['embeds'][0])
             del demochkmsg['embeds']
             await t['team'].send(**demochkmsg)
-
+            await interaction.edit_original_response(content=f'Random demo check announced. Player chosen is: {chosen_player.name}')
         except Exception as e:
             self.logger.error(f'Error conducting demo check: {e}', exc_info=True)
             await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}. Line {e.__traceback__.tb_lineno}.')
