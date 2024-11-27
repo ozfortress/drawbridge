@@ -417,33 +417,24 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 return
 
             random.shuffle(matches)
-            match_chosen = matches[random.randint(0, len(matches)-1)]
+            part_match = matches[random.randint(0, len(matches)-1)]
+            match_chosen = self.cit.getMatch(part_match['id'])
+            if(random.randint(0, 1) == 0):
+                chosen_team = match_chosen.home_team
+            else:
+                chosen_team = match_chosen.away_team
 
             #Get log of match here
+            #log_url = self.db.get_logs_by_match(match_chosen['id'])
             log = requests.get('https://logs.tf/api/v1/log/3757893').json() #WILL ONLY TEST FOR THIS LOG ATM
+            #When log func works
+            #for player in r_players:
+            #    if player['steam_32'] not in log['names']: #logs.tf uses the 32 bit steam ID for who played
+            #        r_players.remove(player)
 
-            # morbid curiosity time - shig
+            player_chosen = chosen_team.players[random.randint(0, len(chosen_team.players)-1)]
 
-            r_id = [id['id'] for id in league.rosters]
-            r_roster = [self.cit.getRoster(r) for r in r_id ]
-            r_players = [pl for p in r_roster for pl in p.players]
-            if (len(r_players) == 0):
-                await interaction.edit_original_response(content=f'No players were found. Aborting.')
-                return
-
-            for player in r_players:
-                if player['steam_32'] not in log['names']: #logs.tf uses the 32 bit steam ID for who played
-                    r_players.remove(player)
-
-            player_chosen = r_players[random.randint(0, len(r_players)-1)]
-            chosen_player = self.cit.getUser(player_chosen['id'])
-            chosem_match = self.cit.getMatch(match_chosen['id'])
-            if  chosem_match.home_team in chosen_player.rosters:
-                chosen_team = chosem_match.home_team
-            else:
-                chosen_team = chosem_match.away_team
-
-            db_team = self.db.get_team_by_id(chosen_team['team_id'])
+            db_team = self.db.get_team_by_id(chosen_team.id)
             if db_team is None:
                 await interaction.edit_original_response(content=f'DB_Team was not assigned. Chosen team id:{chosen_team['id']}. DB call returned: {self.db.get_team_by_id(chosen_team['id'])} Aborting.')
                 return
@@ -455,10 +446,9 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
             demochkmsg = json.loads(self.functions.substitute_strings_in_embed(tempmsg, {
                 '{TEAM_NAME}'   : f'<@&{db_team[3]}>',
-                '{TARGET_NAME}' : f'{chosen_player['name']}',
-                '{TARGET_ID}'   : f'{chosen_player['id']}',
-                '{MATCH_PAGE}'  : f'tbd',
-                '{MATCH_ID}'    : f'tbd'
+                '{TARGET_NAME}' : f'{player_chosen['name']}',
+                '{TARGET_ID}'   : f'{player_chosen['id']}',
+                '{MATCH_ID}'    : f'{match_chosen.id}'
             }))
             team_channel = self.bot.get_channel(db_team[5])
             if team_channel is None:
@@ -467,7 +457,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             demochkmsg['embed'] = discord.Embed(**demochkmsg['embeds'][0])
             del demochkmsg['embeds']
             await team_channel.send(**demochkmsg)
-            await interaction.edit_original_response(content=f'Random demo check announced. Player chosen is: {chosen_player['name']}')
+            await interaction.edit_original_response(content=f'Random demo check announced. Player chosen is: {player_chosen['name']}')
         except Exception as e:
             self.logger.error(f'Error conducting demo check: {e}', exc_info=True)
             await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}. Line {e.__traceback__.tb_lineno}.')
