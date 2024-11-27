@@ -401,10 +401,10 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         try:
             league = self.cit.getLeague(league_id)
             if league is None:
-                await interaction.edit_original_response(content='League not found. Aborting.', ephemeral=True)
+                await interaction.edit_original_response(content='League not found. Aborting.')
                 return
             if self.db.get_divs_by_league(league_id) is None:
-                await interaction.edit_original_response(content='League not being monitored. Aborting.', ephemeral=True)
+                await interaction.edit_original_response(content='League not being monitored. Aborting.')
                 return
             
             matches = [m for m in league.matches]
@@ -413,7 +413,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     matches.remove(m)
 
             if len(matches) == 0:
-                await interaction.edit_original_response(content=f'No matches were found for round {round_no}. Aborting.', ephemeral=True)
+                await interaction.edit_original_response(content=f'No matches were found for round {round_no}. Aborting.')
                 return
 
             random.shuffle(matches)
@@ -428,7 +428,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             r_roster = [self.cit.getRoster(r) for r in r_id ]
             r_players = [pl for p in r_roster for pl in p.players]
             if (len(r_players) == 0):
-                await interaction.edit_original_response(content=f'No players were found. Aborting.', ephemeral=True)
+                await interaction.edit_original_response(content=f'No players were found. Aborting.')
                 return
 
             for player in r_players:
@@ -445,7 +445,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
             db_team = self.db.get_team_by_id(chosen_team['id'])
             if db_team is None:
-                await interaction.edit_original_response(content=f'DB_Team was not assigned. Chosen team id:{chosen_team['id']}. Aborting.', ephemeral=True)
+                await interaction.edit_original_response(content=f'DB_Team was not assigned. Chosen team id:{chosen_team['id']}. Aborting.')
                 return
             
             messageraw = ''
