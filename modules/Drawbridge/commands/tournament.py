@@ -383,7 +383,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             name='randomdemocheck',
             description='Still WIP. Currently chooses a random team in any div'
     )
-    async def randomdemocheck(self, interaction : discord.Interaction, league_id : int, round_no : int, spes_user: int = 0):
+    async def randomdemocheck(self, interaction : discord.Interaction, league_id : int = 69, round_no : int = 1, spes_user: int = 0):
         """Conduct a random demo check.
 
         Parameters
@@ -445,7 +445,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
             db_team = self.db.get_team_by_id(chosen_team['id'])
             if db_team is None:
-                await interaction.edit_original_response(content=f'DB_Team was not assigned. Chosen team id:{chosen_team['id']}. Aborting.')
+                await interaction.edit_original_response(content=f'DB_Team was not assigned. Chosen team id:{chosen_team['id']}. DB call returned: {self.db.get_team_by_id(chosen_team['id'])} Aborting.')
                 return
             
             messageraw = ''
