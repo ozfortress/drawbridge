@@ -431,10 +431,10 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             #for player in r_players:
             #    if player['steam_32'] not in log['names']: #logs.tf uses the 32 bit steam ID for who played
             #        r_players.remove(player)
+            pot_players = chosen_team['players']
+            player_chosen = pot_players[random.randint(0, len(pot_players)-1)]
 
-            player_chosen = chosen_team.players[random.randint(0, len(chosen_team.players)-1)]
-
-            db_team = self.db.get_team_by_id(chosen_team.id)
+            db_team = self.db.get_team_by_id(chosen_team['id'])
             if db_team is None:
                 await interaction.edit_original_response(content=f'DB_Team was not assigned. Chosen team id:{chosen_team['id']}. DB call returned: {self.db.get_team_by_id(chosen_team['id'])} Aborting.')
                 return
