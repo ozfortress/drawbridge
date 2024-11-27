@@ -443,7 +443,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     await interaction.edit_original_response(content=f'Player could not be found with ID:{spes_user}. Aborting.')
                     return
                 for roster in player_chosen.rosters:
-                    db_team = self.db.get_team_by_id(roster['id'])
+                    db_team = self.db.get_team_by_id(roster['team_id'])
                     if db_team is not None and db_team[2] is league_id:
                         pl_roster = self.cit.getRoster(roster['id'])
                         break
