@@ -383,7 +383,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             name='randomdemocheck',
             description='Still WIP. Currently chooses a random team in any div'
     )
-    async def randomdemocheck(self, interaction : discord.Interaction, league_id : int = 69, round_no : int = 1, spes_user: int = 0):
+    async def randomdemocheck(self, interaction : discord.Interaction, league_id : int, round_no : int = 1, spes_user: int = 0):
         """Conduct a random demo check.
 
         Parameters
@@ -392,7 +392,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             league to demo check
 
         round_no:
-            the round that admins will check
+            the round that admins will check (DOESN"T WORK ATM)
 
         spes_user:
             does nothing atm but will be used to target a specific player
@@ -400,44 +400,59 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         await interaction.response.send_message('Democheck is in progress ...', ephemeral=True)
         try:
             league = self.cit.getLeague(league_id)
+
+            player_chosen = None #player we're going to democheck
+            match_chosen = None #The match they played on
+            db_team = None #The database entry for the roster they're on
+
             if league is None:
                 await interaction.edit_original_response(content='League not found. Aborting.')
                 return
             if self.db.get_divs_by_league(league_id) is None:
                 await interaction.edit_original_response(content='League not being monitored. Aborting.')
                 return
-            
-            matches = [m for m in league.matches]
-            for m in matches:
-                if m['round_number'] != round_no and m['forfeit_by'] != 'no_forfeit': #and m['away_team'] is not None
-                    matches.remove(m)
+            if spes_user is 0:
+                matches = [m for m in league.matches]
+                for m in matches:
+                    if m['round_number'] != round_no and m['forfeit_by'] != 'no_forfeit': #and m['away_team'] is not None
+                        matches.remove(m)
 
-            if len(matches) == 0:
-                await interaction.edit_original_response(content=f'No matches were found for round {round_no}. Aborting.')
-                return
+                if len(matches) == 0:
+                    await interaction.edit_original_response(content=f'No matches were found for round {round_no}. Aborting.')
+                    return
 
-            random.shuffle(matches)
-            part_match = matches[random.randint(0, len(matches)-1)]
-            match_chosen = self.cit.getMatch(part_match['id'])
-            if(random.randint(0, 1) == 0):
-                chosen_team = match_chosen.home_team
+                random.shuffle(matches)
+                part_match = matches[random.randint(0, len(matches)-1)]
+                match_chosen = self.cit.getMatch(part_match['id'])
+
+                if(random.randint(0, 1) == 0):
+                    chosen_team = match_chosen.home_team
+                else:
+                    chosen_team = match_chosen.away_team
+
+                pot_players = chosen_team['players']
+                pl_id = pot_players[random.randint(0, len(pot_players)-1)]
+                player_chosen = self.cit.getUser(pl_id['id'])
+                db_team = self.db.get_team_by_id(chosen_team['team_id'])
+                if db_team is None:
+                    await interaction.edit_original_response(content=f'DB_Team was not assigned. Chosen team id:{chosen_team['id']}. DB call returned: {self.db.get_team_by_id(chosen_team['id'])} Aborting.')
+                    return
             else:
-                chosen_team = match_chosen.away_team
-
-            #Get log of match here
-            #log_url = self.db.get_logs_by_match(match_chosen['id'])
-            log = requests.get('https://logs.tf/api/v1/log/3757893').json() #WILL ONLY TEST FOR THIS LOG ATM
-            #When log func works
-            #for player in r_players:
-            #    if player['steam_32'] not in log['names']: #logs.tf uses the 32 bit steam ID for who played
-            #        r_players.remove(player)
-            pot_players = chosen_team['players']
-            player_chosen = pot_players[random.randint(0, len(pot_players)-1)]
-
-            db_team = self.db.get_team_by_id(chosen_team['team_id'])
-            if db_team is None:
-                await interaction.edit_original_response(content=f'DB_Team was not assigned. Chosen team id:{chosen_team['id']}. DB call returned: {self.db.get_team_by_id(chosen_team['id'])} Aborting.')
-                return
+                player_chosen = self.cit.getUser(spes_user)
+                if player_chosen is None:
+                    await interaction.edit_original_response(content=f'Player could not be found with ID:{spes_user}. Aborting.')
+                    return
+                for roster in player_chosen.rosters:
+                    db_team = self.db.get_team_by_id(roster['id'])
+                    if db_team is not None and db_team[2] is league_id:
+                        pl_roster = self.cit.getRoster(roster['id'])
+                        break
+                if db_team is None:
+                    await interaction.edit_original_response(content=f'Player {player_chosen.name} couldn\'t be found on a roster for league ID: {league_id} Aborting.')
+                    return
+                matches = pl_roster.matches
+                part_match = matches[random.randint(0, len(matches)-1)]
+                match_chosen = self.cit.getMatch(part_match['id'])
             
             messageraw = ''
             with open('embeds/democheck.json', 'r') as file:
@@ -446,8 +461,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
             demochkmsg = json.loads(self.functions.substitute_strings_in_embed(tempmsg, {
                 '{TEAM_NAME}'   : f'<@&{db_team[3]}>',
-                '{TARGET_NAME}' : f'{player_chosen['name']}',
-                '{TARGET_ID}'   : f'{player_chosen['id']}',
+                '{TARGET_NAME}' : f'{player_chosen.name}',
+                '{TARGET_ID}'   : f'{player_chosen.id}',
                 '{MATCH_ID}'    : f'{match_chosen.id}'
             }))
             team_channel = self.bot.get_channel(db_team[5])
@@ -461,6 +476,46 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         except Exception as e:
             self.logger.error(f'Error conducting demo check: {e}', exc_info=True)
             await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}. Line {e.__traceback__.tb_lineno}.')
+
+    ''' I'm saving this logic for later - Ama
+                #This part can be removed to improve performance. Consult amatorii if you have questions
+            get_log = True
+            worked = 0
+            if get_log:
+                num = self.get_log_from_page(part_match['id'])
+                if num is 'fuck':
+                    get_log = False
+                else:
+                    players = self.get_log_JSON(num)
+                    if players is 1:
+                        get_log = False
+                    else:
+                        playerL = list(players['names'].keys())
+                        random.shuffle(playerL)
+                        for player in playerL:
+                            player = player.replace("[","")
+                            player = player.replace("]","")
+                            if  in match_chosen.home_team:
+                                t_player = player
+                                break
+            if not get_log:
+    '''
+
+    def get_log_JSON(self, url : str):
+        response = requests.get(f'https://logs.tf/api/v1/log/{url}')
+        if response is None:
+            return 1
+        return response.json()
+
+    def get_log_from_page(self, num : str):
+        match_page = requests.get(f'https://ozfortress.com/matches/{num}')
+        page_list = match_page.text.splitlines()
+        start_str = '<a href="https://logs.tf/'
+        for l in page_list:
+            l = l.strip()
+            if l.__contains__('<a href="https://logs.tf/'):
+                return l[l.find(start_str)+len(start_str):l.rfind('">')]
+        return 'fuck'
 
     # @app_commands.command(
     #         name='randomdemocheck',
