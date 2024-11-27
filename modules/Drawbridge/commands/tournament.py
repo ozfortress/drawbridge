@@ -439,9 +439,9 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             chosen_player = self.cit.getUser(player_chosen['id'])
             chosem_match = self.cit.getMatch(match_chosen['id'])
             if  chosem_match['home_team'] in chosen_player['rosters']:
-                chosen_team = chosem_match.home_team
+                chosen_team = chosem_match['home_team']
             else:
-                chosen_team = chosem_match.away_team
+                chosen_team = chosem_match['away_team']
 
             t = self.db.get_team_by_id(chosen_team["id"])
 
