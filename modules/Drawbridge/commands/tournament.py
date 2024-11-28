@@ -486,7 +486,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
             demochkmsg = json.loads(self.functions.substitute_strings_in_embed(tempmsg, {
                 '{TEAM_NAME}'   : f'<@&{db_team[3]}>',
-                '{ROUND_NO}'    : f'Round given:{round_no} Length :{len(matches)} Init len: {init_size} Matches round:{match_chosen.round_number} Matches removed: {matches.__len__ - filtered_matches.__len__} Checking condition: {round_no != m['round_number']}',
+                '{ROUND_NO}'    : f'Round given:{round_no} Length :{len(matches)} Init len: {init_size} Matches round:{match_chosen.round_number} Matches removed: {len(matches) - len(filtered_matches)} Checking condition: {round_no != m['round_number']}',
                 '{TARGET_NAME}' : f'{player_chosen.name}',
                 '{TARGET_ID}'   : f'{player_chosen.id}',
                 '{MATCH_ID}'    : f'{match_chosen.id}'
