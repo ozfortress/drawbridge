@@ -419,10 +419,12 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             if spes_user is 0:
                 matches = [m for m in league.matches]
                 for m in matches:
-                    if m['forfeit_by'] != 'no_forfeit': #and m['away_team'] is not None
-                        matches.remove(m)
                     if round_no > 0 and round_no is not m['round_number']:
                         matches.remove(m)
+                        continue
+                    if m['forfeit_by'] != 'no_forfeit': #and m['away_team'] is not None
+                        matches.remove(m)
+
 
                 if len(matches) == 0:
                     await interaction.edit_original_response(content=f'No matches were found for round {round_no}. Aborting.')
