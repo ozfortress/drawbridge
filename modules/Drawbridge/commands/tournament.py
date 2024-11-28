@@ -484,7 +484,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             await interaction.edit_original_response(content=f'Random demo check announced. Player chosen is: {player_chosen['name']}')
         except Exception as e:
             self.logger.error(f'Error conducting demo check: {e}', exc_info=True)
-            await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}. Line {e.__traceback__.tb_lineno}.')
+            await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}. Line {e.__traceback__.tb_lineno}. Potential match pool length = {len(matches)}')
 
     ''' I'm saving this logic for later - Ama
                 #This part can be removed to improve performance. Consult amatorii if you have questions
