@@ -409,7 +409,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             player_chosen = None #player we're going to democheck
             match_chosen = None #The match they played on
             db_team = None #The database entry for the roster they're on
-
+            matches_removed = 0
             if league is None:
                 await interaction.edit_original_response(content='League not found. Aborting.')
                 return
@@ -419,8 +419,9 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             if spes_user is 0:
                 matches = [m for m in league.matches]
                 for m in matches:
-                    if round_no > 0 and round_no is not m['round_number']:
+                    if round_no > 0 and round_no != m['round_number']:
                         matches.remove(m)
+                        matches_removed += 1
                         continue
                     if m['forfeit_by'] != 'no_forfeit': #and m['away_team'] is not None
                         matches.remove(m)
@@ -470,7 +471,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
             demochkmsg = json.loads(self.functions.substitute_strings_in_embed(tempmsg, {
                 '{TEAM_NAME}'   : f'<@&{db_team[3]}>',
-                '{ROUND_NO}'    : f'Round given:{round_no} Length :{len(matches)} Matches round:{match_chosen.round_number}',
+                '{ROUND_NO}'    : f'Round given:{round_no} Length :{len(matches)} Matches round:{match_chosen.round_number} Matches removed: {matches_removed} Checking condition: {round_no != m['round_number']}',
                 '{TARGET_NAME}' : f'{player_chosen.name}',
                 '{TARGET_ID}'   : f'{player_chosen.id}',
                 '{MATCH_ID}'    : f'{match_chosen.id}'
