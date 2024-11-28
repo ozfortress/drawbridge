@@ -379,11 +379,16 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
         await interaction.edit_original_response(content='Round ended. All channels have been archived.')
 
+    #Todo:
+    #[x] Filter by specific rounds
+    #[x] Record all teams who succeed / fail a check
+    #[x] Pull log to find active players
+    #       - need to convert from steamid3 to steam64
     @app_commands.command(
             name='randomdemocheck',
-            description='Still WIP. Currently chooses a random team in any div'
+            description='Initiates a random demo for a specific round. Optional: target specific player'
     )
-    async def randomdemocheck(self, interaction : discord.Interaction, league_id : int, round_no : int = 1, spes_user: int = 0):
+    async def randomdemocheck(self, interaction : discord.Interaction, league_id : int, round_no : int = 0, spes_user: int = 0):
         """Conduct a random demo check.
 
         Parameters
@@ -395,7 +400,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             the round that admins will check (DOESN"T WORK ATM)
 
         spes_user:
-            does nothing atm but will be used to target a specific player
+            target a specific player
         """
         await interaction.response.send_message('Democheck is in progress ...', ephemeral=True)
         try:
@@ -414,7 +419,9 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             if spes_user is 0:
                 matches = [m for m in league.matches]
                 for m in matches:
-                    if m['round_number'] != round_no and m['forfeit_by'] != 'no_forfeit': #and m['away_team'] is not None
+                    if m['forfeit_by'] != 'no_forfeit': #and m['away_team'] is not None
+                        matches.remove(m)
+                    if round_no > 0 and round_no is not m['round_number']:
                         matches.remove(m)
 
                 if len(matches) == 0:
