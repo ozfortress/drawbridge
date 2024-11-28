@@ -421,8 +421,9 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             if spes_user is 0:
                 matches = [m for m in league.matches]
                 init_size = matches.__len__()
-                self.logger.debug(f'matches: {matches}\n\nround_no: {round_no}\n filtered: {round_no != m['round_number']}')
+                self.logger.debug(f'matches: {matches}\n\nround_no: {round_no}')
                 for m in matches:
+                    self.logger.debug(f'filtered: {round_no != m['round_number']}')
                     if round_no > 0 and round_no != m['round_number']:
                         matches.remove(m)
                         matches_removed += 1
