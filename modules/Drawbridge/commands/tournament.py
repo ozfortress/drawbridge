@@ -419,18 +419,21 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 await interaction.edit_original_response(content='League not being monitored. Aborting.')
                 return
             if spes_user is 0:
+                # to make life easier we need to remove the description field of all matches
                 matches = [m for m in league.matches]
+                for m in matches:
+                    m['notice'] = ''
                 init_size = matches.__len__()
                 self.logger.debug(f'matches: {matches}\n\nround_no: {round_no}')
                 for m in matches:
-                    self.logger.debug(f'filtered: {round_no != m['round_number']}')
+                    self.logger.debug(f'filtered: {round_no != m['round_number']} - {m['round_number']}')
                     if round_no > 0 and round_no != m['round_number']:
                         matches.remove(m)
                         matches_removed += 1
                         continue
                     if m['forfeit_by'] != 'no_forfeit': #and m['away_team'] is not None
                         matches.remove(m)
-
+                self.logger.debug(f'Filtered matches: {matches}')
 
                 if len(matches) == 0:
                     await interaction.edit_original_response(content=f'No matches were found for round {round_no}. Aborting.')
@@ -439,6 +442,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 random.shuffle(matches)
                 part_match = matches[random.randint(0, len(matches)-1)]
                 match_chosen = self.cit.getMatch(part_match['id'])
+                self.logger.debug(f'Chosen match: {match_chosen}')
 
                 if(random.randint(0, 1) == 0):
                     chosen_team = match_chosen.home_team
