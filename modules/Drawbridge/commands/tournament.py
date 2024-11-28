@@ -425,22 +425,28 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     m['notice'] = ''
                 init_size = matches.__len__()
                 self.logger.debug(f'matches: {matches}\n\nround_no: {round_no}')
+                filtered_matches = []
                 for m in matches:
                     self.logger.debug(f'filtered: {round_no != m['round_number']} - {m['round_number']}')
+                    # if round_no > 0 and round_no != m['round_number']:
+                    #     matches.remove(m)
+                    #     matches_removed += 1
+                    #     continue
+                    # Shigbeard note - Python is a little funny about modifying lists while iterating over them
+                    # This is a common pattern to avoid that issue
                     if round_no > 0 and round_no != m['round_number']:
-                        matches.remove(m)
-                        matches_removed += 1
                         continue
                     if m['forfeit_by'] != 'no_forfeit': #and m['away_team'] is not None
-                        matches.remove(m)
-                self.logger.debug(f'Filtered matches: {matches}')
+                        continue
+                    filtered_matches.append(m)
+                self.logger.debug(f'Filtered matches: {filtered_matches}')
 
-                if len(matches) == 0:
+                if len(filtered_matches) == 0:
                     await interaction.edit_original_response(content=f'No matches were found for round {round_no}. Aborting.')
                     return
 
-                random.shuffle(matches)
-                part_match = matches[random.randint(0, len(matches)-1)]
+                random.shuffle(filtered_matches)
+                part_match = filtered_matches[random.randint(0, len(filtered_matches)-1)]
                 match_chosen = self.cit.getMatch(part_match['id'])
                 self.logger.debug(f'Chosen match: {match_chosen}')
 
@@ -480,7 +486,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
             demochkmsg = json.loads(self.functions.substitute_strings_in_embed(tempmsg, {
                 '{TEAM_NAME}'   : f'<@&{db_team[3]}>',
-                '{ROUND_NO}'    : f'Round given:{round_no} Length :{len(matches)} Init len: {init_size} Matches round:{match_chosen.round_number} Matches removed: {matches_removed} Checking condition: {round_no != m['round_number']}',
+                '{ROUND_NO}'    : f'Round given:{round_no} Length :{len(matches)} Init len: {init_size} Matches round:{match_chosen.round_number} Matches removed: {matches.__len__ - filtered_matches.__len__} Checking condition: {round_no != m['round_number']}',
                 '{TARGET_NAME}' : f'{player_chosen.name}',
                 '{TARGET_ID}'   : f'{player_chosen.id}',
                 '{MATCH_ID}'    : f'{match_chosen.id}'
