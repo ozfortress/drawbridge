@@ -21,7 +21,7 @@ checks = Checks()
 @checks.is_head()
 @discord.app_commands.guild_only()
 class Tournament(discord_commands.GroupCog, group_name='tournament', name='tournamnet', group_description='Commands for managing tournaments. This is a new string',):
-    def __init__(self, bot:discord_commands.Bot, db:database.Database, cit:citadel.Citadel, logger) -> None:
+    def __init__(self, bot:discord_commands.Bot, db:database.Database, cit:citadel.Citadel, logger:logging.Logger) -> None:
         self.bot = bot
         self.cit = cit
         self.db = db
@@ -409,7 +409,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             player_chosen = None #player we're going to democheck
             match_chosen = None #The match they played on
             db_team = None #The database entry for the roster they're on
-            
+
             matches_removed = 0
             init_size = 0
             if league is None:
@@ -421,6 +421,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             if spes_user is 0:
                 matches = [m for m in league.matches]
                 init_size = matches.__len__()
+                self.logger.debug(f'matches: {matches}\n\nround_no: {round_no}\n filtered: {round_no != m['round_number']}')
                 for m in matches:
                     if round_no > 0 and round_no != m['round_number']:
                         matches.remove(m)
@@ -466,7 +467,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 matches = pl_roster.matches
                 part_match = matches[random.randint(0, len(matches)-1)]
                 match_chosen = self.cit.getMatch(part_match['id'])
-            
+
             messageraw = ''
             with open('embeds/democheck.json', 'r') as file:
                 messageraw = file.read()
