@@ -419,14 +419,13 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 return
             if spes_user is 0:
                 # to make life easier we need to remove the description field of all matches
-                matches = [m for m in league.matches]
-                for m in matches:
-                    m['notice'] = ''
+                matches = [mt for mt in league.matches]
                 filtered_matches = []
                 for m in matches:
-                    if round_no > 0 and round_no != m['round_number']:
+                    m = self.cit.getMatch(m['id'])
+                    if round_no > 0 and round_no != m.round_number:
                         continue
-                    if m['forfeit_by'] != 'no_forfeit' or m['away_team'] is 'null':
+                    if m.forfeit_by != 'no_forfeit' or m.away_team is 'null':
                         continue
                     filtered_matches.append(m)
 
@@ -491,7 +490,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         except Exception as e:
             self.logger.error(f'Error conducting demo check: {e}', exc_info=True)
             try:
-                await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}. Line {e.__traceback__.tb_lineno}. Match object: {m} \n away_team = {m['away_team']}')
+                await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}. Line {e.__traceback__.tb_lineno}. Match object: {m}')
             except Exception as e2:
                 await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}. Line {e.__traceback__.tb_lineno}.')
 
