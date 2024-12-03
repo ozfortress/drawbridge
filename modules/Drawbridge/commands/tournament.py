@@ -422,10 +422,9 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 matches = [mt for mt in league.matches]
                 filtered_matches = []
                 for m in matches:
-                    m = self.cit.getMatch(m['id'])
-                    if round_no > 0 and round_no != m.round_number:
+                    if round_no > 0 and round_no != m['round_number']:
                         continue
-                    if m.forfeit_by != 'no_forfeit' or m.away_team is 'null':
+                    if m['forfeit_by'] != 'no_forfeit' or m['away_team'] is 'null':
                         continue
                     filtered_matches.append(m)
 
@@ -466,7 +465,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 matches = pl_roster.matches
                 part_match = matches[random.randint(0, len(matches)-1)]
                 match_chosen = self.cit.getMatch(part_match['id'])
-
+            round = match_chosen.round_number
             messageraw = ''
             with open('embeds/democheck.json', 'r') as file:
                 messageraw = file.read()
@@ -474,7 +473,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
             demochkmsg = json.loads(self.functions.substitute_strings_in_embed(tempmsg, {
                 '{TEAM_NAME}'   : f'<@&{db_team[3]}>',
-                '{ROUND_NO}'    : f'{round_no}',
+                '{ROUND_NO}'    : f'{round}',
                 '{TARGET_NAME}' : f'{player_chosen.name}',
                 '{TARGET_ID}'   : f'{player_chosen.id}',
                 '{MATCH_ID}'    : f'{match_chosen.id}'
@@ -490,9 +489,9 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         except Exception as e:
             self.logger.error(f'Error conducting demo check: {e}', exc_info=True)
             try:
-                await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}. Line {e.__traceback__.tb_lineno}. Match object: {m}')
+                await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}. Line {e.__traceback__.tb_lineno}. Object m keys: {m.keys()}')
             except Exception as e2:
-                await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}. Line {e.__traceback__.tb_lineno}.')
+                await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}. Line {e.__traceback__.tb_lineno}. Other exception: {e2}')
 
     ''' I'm saving this logic for later - Ama
                 #This part can be removed to improve performance. Consult amatorii if you have questions
