@@ -424,7 +424,11 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 for m in matches:
                     if round_no > 0 and round_no != m['round_number']:
                         continue
-                    if m['forfeit_by'] != 'no_forfeit' or m['away_team'] is 'null':
+                    if m['forfeit_by'] != 'no_forfeit':
+                        continue
+
+                    m = self.db.get_match_by_id(m['id'])
+                    if  m[3] is 'null':
                         continue
                     filtered_matches.append(m)
 
@@ -489,7 +493,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         except Exception as e:
             self.logger.error(f'Error conducting demo check: {e}', exc_info=True)
             try:
-                await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}. Line {e.__traceback__.tb_lineno}. Object m keys: {m.keys()}')
+                await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}. Line {e.__traceback__.tb_lineno}.\n Object m keys: {m}')
             except Exception as e2:
                 await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}. Line {e.__traceback__.tb_lineno}. Other exception: {e2}')
 
