@@ -410,7 +410,6 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             match_chosen = None #The match they played on
             db_team = None #The database entry for the roster they're on
 
-            matches_removed = 0
             init_size = 0
             if league is None:
                 await interaction.edit_original_response(content='League not found. Aborting.')
@@ -423,23 +422,13 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 matches = [m for m in league.matches]
                 for m in matches:
                     m['notice'] = ''
-                init_size = matches.__len__()
-                self.logger.debug(f'matches: {matches}\n\nround_no: {round_no}')
                 filtered_matches = []
                 for m in matches:
-                    self.logger.debug(f'filtered: {round_no != m['round_number']} - {m['round_number']}')
-                    # if round_no > 0 and round_no != m['round_number']:
-                    #     matches.remove(m)
-                    #     matches_removed += 1
-                    #     continue
-                    # Shigbeard note - Python is a little funny about modifying lists while iterating over them
-                    # This is a common pattern to avoid that issue
                     if round_no > 0 and round_no != m['round_number']:
                         continue
-                    if m['forfeit_by'] != 'no_forfeit': #and m['away_team'] is not None
+                    if m['forfeit_by'] != 'no_forfeit' or m['away_team'] is None:
                         continue
                     filtered_matches.append(m)
-                self.logger.debug(f'Filtered matches: {filtered_matches}')
 
                 if len(filtered_matches) == 0:
                     await interaction.edit_original_response(content=f'No matches were found for round {round_no}. Aborting.')
@@ -486,7 +475,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
             demochkmsg = json.loads(self.functions.substitute_strings_in_embed(tempmsg, {
                 '{TEAM_NAME}'   : f'<@&{db_team[3]}>',
-                '{ROUND_NO}'    : f'Round given:{round_no} Length :{len(matches)} Init len: {init_size} Matches round:{match_chosen.round_number} Matches removed: {len(matches) - len(filtered_matches)} Checking condition: {round_no != m['round_number']}',
+                '{ROUND_NO}'    : f'{round_no}',
                 '{TARGET_NAME}' : f'{player_chosen.name}',
                 '{TARGET_ID}'   : f'{player_chosen.id}',
                 '{MATCH_ID}'    : f'{match_chosen.id}'
@@ -501,7 +490,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             await interaction.edit_original_response(content=f'Random demo check announced. Player chosen is: {player_chosen['name']}')
         except Exception as e:
             self.logger.error(f'Error conducting demo check: {e}', exc_info=True)
-            await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}. Line {e.__traceback__.tb_lineno}. Potential match pool length = {len(matches)}')
+            await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}. Line {e.__traceback__.tb_lineno}')
 
     ''' I'm saving this logic for later - Ama
                 #This part can be removed to improve performance. Consult amatorii if you have questions
