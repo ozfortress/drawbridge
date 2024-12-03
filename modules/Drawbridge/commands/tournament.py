@@ -380,7 +380,6 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         await interaction.edit_original_response(content='Round ended. All channels have been archived.')
 
     #Todo:
-    #[x] Filter by specific rounds
     #[x] Record all teams who succeed / fail a check
     #[x] Pull log to find active players
     #       - need to convert from steamid3 to steam64
@@ -397,7 +396,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             league to demo check
 
         round_no:
-            the round that admins will check (DOESN"T WORK ATM)
+            the round that admins will check
 
         spes_user:
             target a specific player
@@ -419,6 +418,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 return
             if spes_user is 0:
                 # to make life easier we need to remove the description field of all matches
+
+                # This method is a lot slower that my previous attempt but idgaf -ama
                 matches = [self.cit.getMatch(mt['id']) for mt in league.matches]
                 filtered_matches = []
                 for m in matches:
