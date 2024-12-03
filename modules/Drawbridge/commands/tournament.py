@@ -427,8 +427,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     if m['forfeit_by'] != 'no_forfeit':
                         continue
 
-                    m = self.db.get_match_by_id(m['id'])
-                    if  m[3] is 'null':
+                    db_m = self.db.get_match_by_id(m['id'])
+                    if  db_m[3] is 'null':
                         continue
                     filtered_matches.append(m)
 
@@ -493,9 +493,9 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         except Exception as e:
             self.logger.error(f'Error conducting demo check: {e}', exc_info=True)
             try:
-                await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}. Line {e.__traceback__.tb_lineno}.\n Object m keys: {m}')
+                await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}.\n Line {e.__traceback__.tb_lineno}. Object m keys: {db_m}')
             except Exception as e2:
-                await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}. Line {e.__traceback__.tb_lineno}. Other exception: {e2}')
+                await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}.\n Line {e.__traceback__.tb_lineno}.\n Other exception: {e2}')
 
     ''' I'm saving this logic for later - Ama
                 #This part can be removed to improve performance. Consult amatorii if you have questions
