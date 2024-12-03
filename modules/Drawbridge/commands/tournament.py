@@ -493,7 +493,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         except Exception as e:
             self.logger.error(f'Error conducting demo check: {e}', exc_info=True)
             try:
-                await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}.\n Line {e.__traceback__.tb_lineno}. db_m values: {self.db.get_match_details(m['id'])} \n m id = {m['id']}')
+                await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}.\n Line {e.__traceback__.tb_lineno}. db_m values: {self.db.get_match_by_id(m['id'])} \n m id = {m['id']}')
             except Exception as e2:
                 await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}.\n Line {e.__traceback__.tb_lineno}.\n Other exception: {e2}')
 
