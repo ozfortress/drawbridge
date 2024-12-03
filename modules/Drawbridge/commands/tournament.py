@@ -484,7 +484,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             }))
             team_channel = self.bot.get_channel(db_team[5])
             if team_channel is None:
-                await interaction.edit_original_response(content=f'Channel for team {db_team[4]} couldn\'t be found. dbsize: {len(db_team)} db_team[0]:{db_team[0]} db_team[1]:{db_team[1]} db_team[2]:{db_team[2]} db_team[3]:{db_team[3]} db_team[5]:{db_team[5]}  db_team[6]:{db_team[6]}. Aborting.')
+                await interaction.edit_original_response(content=f'Channel for team {db_team[4]} couldn\'t be found. Aborting.')
                 return
             demochkmsg['embed'] = discord.Embed(**demochkmsg['embeds'][0])
             del demochkmsg['embeds']
@@ -493,7 +493,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         except Exception as e:
             self.logger.error(f'Error conducting demo check: {e}', exc_info=True)
             try:
-                await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}.\n Line {e.__traceback__.tb_lineno}. db_m values: {db_m}')
+                await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}.\n Line {e.__traceback__.tb_lineno}. db_m values: {self.db.get_match_details(m['id'])} \n m id = {m['id']}')
             except Exception as e2:
                 await interaction.edit_original_response(content=f'An error occurred while announcing the random demo check. Error: {e}.\n Line {e.__traceback__.tb_lineno}.\n Other exception: {e2}')
 
