@@ -1,0 +1,11 @@
+// This is incase I need to adjust the message
+
+\n Hey {TEAM_NAME}, under rule [8.9.1 Demo Checking](https://docs.ozfortress.com/rules/global/?h=demo#891-demo-checking) we are performing random demo checks on players. Please let [{TARGET_NAME}](https://ozfortress.com/users/{TARGET_ID}) know to submit their POV demo from your match on [round {ROUND_NO}](https://ozfortress.com/matches/{MATCH_ID}) to the [Random Check Submission Form](https://forms.gle/uyMsaEPZB7oP2FeT8). 
+\n
+\n If you have any questions, please see our [Frequently Asked Questions](https://docs.ozfortress.com/faq/demo_requests/) page for more information, or reach out to your division administrator via this channel.
+\n
+\n We've attached an easy copy-paste to send to the player we've requested POV demos from.
+\n This message is a copy-paste provided by ozfortress administration for captains to send to their players:
+\n>``` Hey @player, under [8.9.1 Demo Checking](https://docs.ozfortress.com/rules/global/?h=demo#891-demo-checking) we are performing random demo checks on players and you have been selected from your roster {TEAM_NAME}. Please submit your POV demo/s from [your last match](https://ozfortress.com/matches/0000) to the [Random Check Submission Form](https://forms.gle/uyMsaEPZB7oP2FeT8). 
+\n> 
+\n> If you have any questions, please see our [Frequently Asked Questions](https://docs.ozfortress.com/faq/demo_requests/) page for more information.```
