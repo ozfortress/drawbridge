@@ -173,43 +173,47 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         teams = self.db.get_teams_by_league(league_id)
         match_channels = self.db.get_match_channels_by_league(league_id)
 
-        await interaction.edit_original_response(content='Deleting channels... (1/3)')
+        self.logger.debug(f'Teams: {teams}')
+        self.logger.debug(f'Match Channels: {match_channels}')
+        self.logger.debug(f'Divisions: {divs}')
 
-        for channel in guild.channels:
-            for team in teams:
-                if channel.id == team[4]:
-                    await channel.delete()
-                    break
-            for match_channel in match_channels:
-                if channel.id == match_channel[0]:
-                    await channel.delete()
+        # await interaction.edit_original_response(content='Deleting channels... (1/3)')
 
-        await interaction.edit_original_response(content='Deleting categories... (2/3)')
+        # for channel in guild.channels:
+        #     for team in teams:
+        #         if channel.id == team[3]:
+        #             await channel.delete()
+        #             break
+        #     for match_channel in match_channels:
+        #         if channel.id == match_channel[0]:
+        #             await channel.delete()
 
-        for div in divs:
-            for category in guild.categories:
-                if category.id == div[4]:
-                    await category.delete()
-                    break
-            for role in guild.roles:
-                if role.id == div[3]:
-                    await role.delete()
-                    break
+        # await interaction.edit_original_response(content='Deleting categories... (2/3)')
 
-        await interaction.edit_original_response(content='Deleting roles... (3/3)')
+        # for div in divs:
+        #     for category in guild.categories:
+        #         if category.id == div[4]:
+        #             await category.delete()
+        #             break
+        #     for role in guild.roles:
+        #         if role.id == div[3]:
+        #             await role.delete()
+        #             break
 
-        for role in guild.roles:
-            for team in teams:
-                if role.id == team[2]:
-                    await role.delete()
-                    break
+        # await interaction.edit_original_response(content='Deleting roles... (3/3)')
 
-        self.db.delete_matches_by_league(league_id)
-        self.db.delete_teams_by_league(league_id)
-        self.db.delete_divisions_by_league(league_id)
+        # for role in guild.roles:
+        #     for team in teams:
+        #         if role.id == team[2]:
+        #             await role.delete()
+        #             break
+
+        # self.db.delete_matches_by_league(league_id)
+        # self.db.delete_teams_by_league(league_id)
+        # self.db.delete_divisions_by_league(league_id)
 
 
-        await interaction.edit_original_response(content='Tournament ended. All channels and roles have been archived.')
+        await interaction.edit_original_response(content='[DEBUG - nothin actually happened ok check console] Tournament ended. All channels and roles have been archived.')
 
     @app_commands.command(
         name='roundgen'
@@ -440,7 +444,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     return
 
                 random.shuffle(filtered_matches)
-                part_match = filtered_matches[random.randint(0, len(filtered_matches)-1)] #partial match 
+                part_match = filtered_matches[random.randint(0, len(filtered_matches)-1)] #partial match
                 match_chosen = self.cit.getMatch(part_match['id'])
                 self.logger.debug(f'Chosen match: {match_chosen}')
 
@@ -480,7 +484,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
             demochkmsg = json.loads(self.functions.substitute_strings_in_embed(tempmsg, {
                 '{CHANNEL_ID}'  : f'<@&{db_team[3]}>', #These two may cause bugs depending on the data base
-                '{TEAM_NAME}'   : f'{db_team[4]}', 
+                '{TEAM_NAME}'   : f'{db_team[4]}',
                 '{ROUND_NO}'    : f'{round}',
                 '{TARGET_NAME}' : f'{player_chosen.name}',
                 '{TARGET_ID}'   : f'{player_chosen.id}',
