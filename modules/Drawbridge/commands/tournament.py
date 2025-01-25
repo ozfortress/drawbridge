@@ -56,6 +56,9 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 return
 
             rawlaunchpadmessage = ''
+            # sort divs like this - Premier, High, Intermediate, Main, Open
+            priority_order = ['Premier', 'High', 'Intermediate', 'Main', 'Open']
+            divs = sorted(divs, key=lambda div: priority_order.index(div[1]))
             for leagues in leagues:
                 rawlaunchpadmessage += f'# {leagues.name}\n'
                 for div in divs:
@@ -68,14 +71,13 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                         rawlaunchpadmessage += f'### Matches\n'
                         for match in matches:
                             # self.logger.debug(f'Match league id {match[6]} == {leagues.id} and match div id {match[1]} == {div[0]}')
-                            c = 0
                             if (int(match[6]) == int(leagues.id)) and (int(match[1]) == int(div[0])):
                                 c = c+1
                                 if match[4] == 0:
                                     rawlaunchpadmessage += f'- [{match[0]}](<https://ozfortress.com/matches/{match[0]}>) -> Bye\n'
                                 else:
                                     rawlaunchpadmessage += f'- [{match[0]}](<https://ozfortress.com/matches/{match[0]}>) -> <#{match[4]}>\n'
-                        if c == 0:
+                        if len(matches) == 0:
                             rawlaunchpadmessage += f'- No matches found\n'
                         rawlaunchpadmessage += '\n'
             launchpadmessages = []
@@ -808,7 +810,9 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
 
 async def initialize(bot: discord_commands.Bot, db, cit, logger):
-    await bot.add_cog(Tournament(bot, db, cit, logger), guilds=[bot.get_guild(int(os.getenv('DISCORD_GUILD_ID')))])
+    tournament = Tournament(bot, db, cit, logger)
+    await bot.add_cog(tournament, guilds=[bot.get_guild(int(os.getenv('DISCORD_GUILD_ID')))])
+    await tournament.update_launchpad() # on startup
     # list = await bot.tree.sync(guild=discord.Object(id=os.getenv('DISCORD_GUILD_ID')))
     # logger.info(f'Loaded Tournament Commands: {list}')
 
