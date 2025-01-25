@@ -29,6 +29,59 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         self.logger.info('Loaded Tournament Commands.')
         self.functions = Functions(self.db, self.cit)
 
+    async def update_launchpad(self):
+        # purge all messages in the launchpad channel
+        # get the launchpad channel
+        def is_me(m):
+            return m.author == self.bot.user
+        guild = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID')))
+        channel = guild.get_channel(int(os.getenv('LAUNCHPAD_CHANNEL_ID')))
+        async with channel.typing():
+            await channel.purge(limit=100, check=is_me)
+            teams = self.db.get_all_teams()
+            matches = self.db.get_matches_not_yet_archived()
+            leagueids = []
+            leagues=[]
+            divids=[]
+            divs=[]
+            for team in teams:
+                if team[1] not in leagueids:
+                    leagueids.append(team[1])
+                    leagues.append(self.cit.getLeague(team[1]))
+                if team[5] not in divids:
+                    divids.append(team[5])
+                    divs.append(self.db.get_div_by_id(team[5]))
+
+
+            rawlaunchpadmessage = ''
+            for leagues in leagues:
+                rawlaunchpadmessage += f'# {leagues.name}\n'
+                for div in divs:
+                    if div[2] == leagues.id: ## Does the league_id field match the league we're looking at?
+                        rawlaunchpadmessage += f'## {div[1]}\n'
+                        rawlaunchpadmessage += f'### Teams\n'
+                        for team in teams:
+                            if (team[1] == leagues.id) and (team[5] == div[0]):
+                                rawlaunchpadmessage += f'- {team[3]} -> <#{team[4]}>\n'
+                        rawlaunchpadmessage += f'### Matches\n'
+                        for match in matches:
+                            # self.logger.debug(f'Match league id {match[6]} == {leagues.id} and match div id {match[1]} == {div[0]}')
+                            if (int(match[6]) == int(leagues.id)) and (int(match[1]) == int(div[0])):
+                                if match[4] == 0:
+                                    rawlaunchpadmessage += f'- [{match[0]}](<https://ozfortress.com/matches/{match[0]}>) -> Bye\n'
+                                else:
+                                    rawlaunchpadmessage += f'- [{match[0]}](<https://ozfortress.com/matches/{match[0]}>) -> <#{match[4]}>\n'
+                        rawlaunchpadmessage += '\n'
+            launchpadmessages = []
+            # split on the first \n under 2000 chars
+            while len(rawlaunchpadmessage) > 2000:
+                index = rawlaunchpadmessage[:2000].rfind('\n')
+                launchpadmessages.append(rawlaunchpadmessage[:index])
+                rawlaunchpadmessage = rawlaunchpadmessage[index:]
+            launchpadmessages.append(rawlaunchpadmessage)
+            for message in launchpadmessages:
+                await channel.send(content=message)
+
     @app_commands.command(
         name='test'
     )
