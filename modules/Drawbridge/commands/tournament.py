@@ -51,7 +51,9 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 if team[6] not in divids:
                     divids.append(team[6])
                     divs.append(self.db.get_div_by_id(team[6]))
-
+            if len(leagueids) == 0:
+                await channel.send(content='There are no active tournaments running.')
+                return
 
             rawlaunchpadmessage = ''
             for leagues in leagues:
