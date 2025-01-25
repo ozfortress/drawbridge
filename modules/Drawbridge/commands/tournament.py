@@ -51,7 +51,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
     @app_commands.command(
         name='start'
     )
-    async def start(self, interaction : discord.Interaction, league_id : int, league_shortcode: str):
+    async def start(self, interaction : discord.Interaction, league_id : int, league_shortcode: str, share : bool=False):
         """Generate team roles and channels for a given league
 
         Parameters
@@ -62,7 +62,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             The Shortcode for this league (eg: HL 27, 6s 30 ), this will be appended to role names.
         """
 
-        await interaction.response.send_message('Generating teams...', ephemeral=True)
+        await interaction.response.send_message('Generating teams...', ephemeral=not share)
         league = self.cit.getLeague(league_id)
         rosters = league.rosters
         divs = []
@@ -144,6 +144,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     await teamchannel.send(**teammessage)
                     await interaction.edit_original_response(content=f'Generating Division Categories, Team Channels, and Roles.\nLeague: {league.name}\nDivisions: {d}/{len(divs)}\nTeams: {r}/{len(rosters)}')
                     dbteam = {
+                        'roster_id': roster['id'],
                         'team_id': team_id,
                         'league_id': league_id,
                         'role_id': role.id,
@@ -152,12 +153,12 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                         'team_name': roster_name
                     }
                     self.db.insert_team(dbteam)
-        await interaction.edit_original_response(content=f'Generated.\nLeague: {league.name}\nDivisions: {d}/{len(divs)}\nTeams: {r}/{len(rosters)}')
+        await interaction.edit_original_response(content=f'Generated.\nLeague: {league.name}\nDivisions: {d}/{len(divs)}\nTeams: {r}/{len(rosters)}\n\n#All done :3')
 
     @app_commands.command(
         name='end'
     )
-    async def end(self, interaction : discord.Interaction, league_id : int):
+    async def end(self, interaction : discord.Interaction, league_id : int, share : bool=False):
         """End a tournament and archive all channels and roles
 
         Parameters
@@ -166,7 +167,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             The League ID to end the tournament for
         """
 
-        await interaction.response.send_message('Ending tournament...', ephemeral=True)
+        await interaction.response.send_message('Ending tournament...', ephemeral=not share)
 
         divs = self.db.get_divs_by_league(league_id)
         guild = interaction.guild

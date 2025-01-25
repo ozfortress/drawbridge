@@ -927,7 +927,7 @@ class Database:
             except mariadb.Error as e:
                 print(f'Error in get_matches_by_league: {e}')
                 return None
-            
+
     def get_team_channels(self):
         with self.pool.get_connection() as conn:
             try:
@@ -988,8 +988,8 @@ class Database:
         with self.pool.get_connection() as conn:
             try:
                 cursor = conn.cursor()
-                query = "INSERT INTO teams (team_id, league_id, role_id, team_channel, division, team_name) VALUES (?, ?, ?, ?, ?, ?)"
-                cursor.execute(query, (team['team_id'], team['league_id'], team['role_id'], team['team_channel'], team['division'], team['team_name']))
+                query = "INSERT INTO teams (roster_id, team_id, league_id, role_id, team_channel, division, team_name) VALUES (?, ?, ?, ?, ?, ?, ?)"
+                cursor.execute(query, (team['roster_id'], team['team_id'], team['league_id'], team['role_id'], team['team_channel'], team['division'], team['team_name']))
                 conn.commit()
                 return cursor.lastrowid
             except mariadb.Error as e:
