@@ -174,59 +174,63 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         teams = self.db.get_teams_by_league(league_id)
         match_channels = self.db.get_match_channels_by_league(league_id)
 
+        last_five = []
+        def insert_to_lastfive(string: str):
+            # add to the end, remove the first if there are more than 5
+            last_five.append(string)
+            if len(last_five) > 5:
+                last_five.pop(0)
         self.logger.debug(f'Teams: {teams}')
         self.logger.debug(f'Match Channels: {match_channels}')
         self.logger.debug(f'Divisions: {divs}')
-        status = "Deleting channels... (1/3)\n```"
-        await interaction.edit_original_response(content=f'{status}\n```')
+        status = "Deleting channels... (1/3)"
+        await interaction.edit_original_response(content=f'{status}')
 
         for channel in guild.channels:
             for team in teams:
                 if channel.id == team[5]:
-                    status = f'{status}\n{channel.name}'
+                    insert_to_lastfive(channel.name)
                     await channel.delete(
                         reason='Tournament ended'
                     )
-                    await interaction.edit_original_response(content=f'{status}\n```')
+                    await interaction.edit_original_response(content=f'{status}\n```\n{format(last_five)}\n```')
                     break
-            status = f'Deleting channels... (1/3)\n```\nAll Team Channels Deleted!\n\n'
             for match_channel in match_channels:
                 if channel.id == match_channel[0]:
-                    status = f'{status}\n\n{channel.name}'
+                    insert_to_lastfive(channel.name)
                     await channel.delete(
                         reason='Tournament ended'
                     )
-                    await interaction.edit_original_response(content=f'{status}\n```')
+                    await interaction.edit_original_response(content=f'{status}\n```\n{format(last_five)}\n```')
 
-        status = f'All Channels Deleted!\nDeleting categories... (2/3)\n```'
-        await interaction.edit_original_response(content=f'{status}\n```')
+        last_five = []
+        status = f'All Channels Deleted!\nDeleting categories... (2/3)'
+        await interaction.edit_original_response(content=f'{status}')
 
         for div in divs:
             for category in guild.categories:
                 if category.id == div[4]:
-                    status = f'{status}\n{category.name}'
+                    insert_to_lastfive(category.name)
                     await category.delete()
-                    await interaction.edit_original_response(content=f'{status}\n```')
+                    await interaction.edit_original_response(content=f'{status}\n```\n{format(last_five)}\n```')
                     break
-
+        last_five = []
         status = f'All Channels Deleted!\nAll Categories Deleted!\nDeleting roles... (3/3)\n```'
-        await interaction.edit_original_response(content=f'{status}\n```')
+        await interaction.edit_original_response(content=f'{status}')
 
         for role in guild.roles:
             for team in teams:
                 if role.id == team[3]:
-                    status = f'{status}\n{role.name}'
+                    insert_to_lastfive(role.name)
                     await role.delete()
-                    await interaction.edit_original_response(content=f'{status}\n```')
+                    await interaction.edit_original_response(content=f'{status}\n```\n{format(last_five)}\n```')
                     break
-        status = f'All Channels Deleted!\nAll Categories Deleted!\nDeleting roles... (3/3)\n```\nAll Team Roles Deleted!\n\n'
-        await interaction.edit_original_response(content=f'{status}\n```')
         for div in divs:
             for role in guild.roles:
                 if role.id == div[3]:
                     status = f'{status}\n{role.name}'
                     await role.delete()
-                    await interaction.edit_original_response(content=f'{status}\n```')
+                    await interaction.edit_original_response(content=f'{status}\n```\n{format(last_five)}\n```')
                     break
 
         self.db.delete_matches_by_league(league_id)
