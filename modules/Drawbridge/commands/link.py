@@ -64,7 +64,8 @@ class Link(discord_commands.Cog):
     async def on_member_join(self, member):
         channel = member.guild.system_channel
         if channel is not None:
-            await channel.send(f'Welcome {member.mention}! Please link your Citadel account with the command `/link`.')
+            # await channel.send(f'Welcome {member.mention}! Please link your Citadel account with the command `/link`.')
+            pass # Disable welcome message for now
 
     @app_commands.command(name='link', description='Link your Citadel account with your Discord account.')
     async def link(self, interaction : discord.Interaction):
