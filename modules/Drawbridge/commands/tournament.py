@@ -319,14 +319,14 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 # self.logger.debug(f' ==== PASSING THIS {match.home_team['team_id']}')
                 team_home = self.db.get_team_by_id(match.home_team['team_id'])
                 # self.logger.debug(f'{match}')
-                role_home = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID'))).get_role(team_home[2])
+                role_home = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID'))).get_role(team_home[3])
                 # team_channel = discord.Object(id=team_home[4])
-                team_channel = self.bot.get_channel(team_home[4])
+                team_channel = self.bot.get_channel(team_home[5])
                 await team_channel.send(f'Matches for round {match.round_number} were just generated. {role_home.mention} have a bye this round, and thus will be awarded a win.') #TODO - JSON embed for this
                 self.db.insert_match({
                     'match_id': match.id,
-                    'division': team_home[5],
-                    'team_home': team_home[0],
+                    'division': team_home[6],
+                    'team_home': team_home[1],
                     'team_away': 0,
                     'channel_id': 0, # 0 for bye,
                     'league_id': match.league_id
@@ -353,8 +353,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
                 overrides = {
                     interaction.guild.default_role: discord.PermissionOverwrite(view_channel=False),
-                    interaction.guild.get_role(team_home[2]): discord.PermissionOverwrite(view_channel=True),
-                    interaction.guild.get_role(team_away[2]): discord.PermissionOverwrite(view_channel=True),
+                    interaction.guild.get_role(team_home[3]): discord.PermissionOverwrite(view_channel=True),
+                    interaction.guild.get_role(team_away[3]): discord.PermissionOverwrite(view_channel=True),
                 }
                 all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'CASTER', 'BOT')
                 for role in all_access:
@@ -365,20 +365,20 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     raise Exception(f'Category not found for division {match.home_team["division"]}')
                 if match.round_name == '':
                     match.round_name = f'Round {match.round_number}'
-                channel_name = f'🗡️-{match_id}-{team_home[3]}-vs-{team_away[3]}-{match.round_name}'
+                channel_name = f'🗡️-{match_id}-{team_home[4]}-vs-{team_away[4]}-{match.round_name}'
                 trimmed = False
                 if len(channel_name) > 100:
-                    trimmed_home_team = team_home[3][:10]
-                    trimmed_away_team = team_away[3][:10]
+                    trimmed_home_team = team_home[4][:10]
+                    trimmed_away_team = team_away[4][:10]
                     channel_name = f'🗡️{match_id}-{trimmed_home_team}-vs-{trimmed_away_team}-{match.round_name}'
-                    self.logger.warning(f'Channel name too long when generating match {match.round_number} {team_home[3]} vs {team_away[3]}, trimming to {channel_name}')
-                match_channel = await interaction.guild.create_text_channel(channel_name, category=cat)
+                    self.logger.warning(f'Channel name too long when generating match {match.round_number} {team_home[4]} vs {team_away[4]}, trimming to {channel_name}')
+                match_channel = await interaction.guild.create_text_channel(channel_name, category=cat, overwrites=overrides)
                 # Load the message
                 tempmatchmessage = str(rawmatchmessage)
 
                 matchmessage = json.loads(self.functions.substitute_strings_in_embed(tempmatchmessage, {
-                    '{TEAM_HOME}': f'<@&{team_home[2]}>', # team role as a mention
-                    '{TEAM_AWAY}': f'<@&{team_away[2]}>', # team role as a mention
+                    '{TEAM_HOME}': f'<@&{team_home[3]}>', # team role as a mention
+                    '{TEAM_AWAY}': f'<@&{team_away[3]}>', # team role as a mention
                     '{ROUND_NAME}': match.round_name,
                     '{MATCH_ID}': match_id,
                     '{CHANNEL_ID}': str(match_channel.id),
@@ -390,17 +390,17 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 # Update the database
                 self.db.insert_match({
                     'match_id': match_id,
-                    'division': team_home[5], # division
-                    'team_home': team_home[0], # team_id
-                    'team_away': team_away[0], # team_id
+                    'division': team_home[6], # division
+                    'team_home': team_home[1], # team_id
+                    'team_away': team_away[1], # team_id
                     'channel_id': match_channel.id,
                     'league_id': match.league_id
                 })
 
                 # Lets also say something in their team channel
                 try:
-                    team_home_channel = self.bot.get_channel(team_home[4]) # team_channel
-                    team_away_channel = self.bot.get_channel(team_away[4]) # team_channel
+                    team_home_channel = self.bot.get_channel(team_home[5]) # team_channel
+                    team_away_channel = self.bot.get_channel(team_away[5]) # team_channel
                     await team_home_channel.send(f'Match for round {match.round_number} has been generated. Please head to {match_channel.mention} to organise your match.')
                     await team_away_channel.send(f'Match for round {match.round_number} has been generated. Please head to {match_channel.mention} to organise your match.')
                     if trimmed:
