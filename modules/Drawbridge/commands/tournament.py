@@ -344,7 +344,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     return
                 category_id = 0
                 for d in divs:
-                    if d[0] == match.home_team['division']:
+                    if d[1] == match.home_team['division']:
                         category_id = d[4]
                         break
                 if category_id == 0:
@@ -372,7 +372,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     trimmed_away_team = team_away[3][:10]
                     channel_name = f'🗡️{match_id}-{trimmed_home_team}-vs-{trimmed_away_team}-{match.round_name}'
                     self.logger.warning(f'Channel name too long when generating match {match.round_number} {team_home[3]} vs {team_away[3]}, trimming to {channel_name}')
-                match_channel = await interaction.guild.create_text_channel(channel_name, category=cat, overwrites=overrides)
+                match_channel = await interaction.guild.create_text_channel(channel_name, category=cat)
                 # Load the message
                 tempmatchmessage = str(rawmatchmessage)
 
