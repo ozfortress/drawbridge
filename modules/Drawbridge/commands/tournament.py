@@ -178,40 +178,40 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         self.logger.debug(f'Match Channels: {match_channels}')
         self.logger.debug(f'Divisions: {divs}')
 
-        # await interaction.edit_original_response(content='Deleting channels... (1/3)')
+        await interaction.edit_original_response(content='Deleting channels... (1/3)')
 
-        # for channel in guild.channels:
-        #     for team in teams:
-        #         if channel.id == team[3]:
-        #             await channel.delete()
-        #             break
-        #     for match_channel in match_channels:
-        #         if channel.id == match_channel[0]:
-        #             await channel.delete()
+        for channel in guild.channels:
+            for team in teams:
+                if channel.id == team[5]:
+                    await channel.delete()
+                    break
+            for match_channel in match_channels:
+                if channel.id == match_channel[0]:
+                    await channel.delete()
 
-        # await interaction.edit_original_response(content='Deleting categories... (2/3)')
+        await interaction.edit_original_response(content='Deleting categories... (2/3)')
 
-        # for div in divs:
-        #     for category in guild.categories:
-        #         if category.id == div[4]:
-        #             await category.delete()
-        #             break
-        #     for role in guild.roles:
-        #         if role.id == div[3]:
-        #             await role.delete()
-        #             break
+        for div in divs:
+            for category in guild.categories:
+                if category.id == div[4]:
+                    await category.delete()
+                    break
+            for role in guild.roles:
+                if role.id == div[3]:
+                    await role.delete()
+                    break
 
-        # await interaction.edit_original_response(content='Deleting roles... (3/3)')
+        await interaction.edit_original_response(content='Deleting roles... (3/3)')
 
-        # for role in guild.roles:
-        #     for team in teams:
-        #         if role.id == team[2]:
-        #             await role.delete()
-        #             break
+        for role in guild.roles:
+            for team in teams:
+                if role.id == team[2]:
+                    await role.delete()
+                    break
 
-        # self.db.delete_matches_by_league(league_id)
-        # self.db.delete_teams_by_league(league_id)
-        # self.db.delete_divisions_by_league(league_id)
+        self.db.delete_matches_by_league(league_id)
+        self.db.delete_teams_by_league(league_id)
+        self.db.delete_divisions_by_league(league_id)
 
 
         await interaction.edit_original_response(content='[DEBUG - nothin actually happened ok check console] Tournament ended. All channels and roles have been archived.')
