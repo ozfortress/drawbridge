@@ -329,6 +329,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     'channel_id': 0, # 0 for bye,
                     'league_id': match.league_id
                 })
+                self.db.archive_match(match_id) # Marks the match as archived
             else:
                 # Team roles
                 team_home = self.db.get_team_by_id(match.home_team['team_id'])
