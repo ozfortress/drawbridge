@@ -250,8 +250,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     await interaction.edit_original_response(content=f'{status}\n```\n{format(last_five)}\n```')
                     break
         last_five = []
-        status = f'All Channels Deleted!\nAll Categories Deleted!\nDeleting roles... (3/3)\n```'
-        await interaction.edit_original_response(content=f'{status}')
+        status = f'All Channels Deleted!\nAll Categories Deleted!\nDeleting roles... (3/3)'
+        await interaction.edit_original_response(content=f'{status}\n```')
 
         for role in guild.roles:
             for team in teams:
@@ -263,7 +263,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         for div in divs:
             for role in guild.roles:
                 if role.id == div[3]:
-                    status = f'{status}\n{role.name}'
+                    insert_to_lastfive(role.name)
                     await role.delete()
                     await interaction.edit_original_response(content=f'{status}\n```\n{format(last_five)}\n```')
                     break
