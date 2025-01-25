@@ -83,25 +83,6 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 await channel.send(content=message)
 
     @app_commands.command(
-        name='test'
-    )
-    async def test(self, interaction : discord.Interaction):
-        await interaction.response.send_message('Test command.', ephemeral=True)
-
-    @app_commands.command(
-        name='test'
-    )
-    async def test(self, interaction : discord.Interaction, league_id : int):
-        league = self.cit.getLeague(league_id)
-        rosters = league.rosters
-
-        for roster in rosters:
-            print(roster['name'] + ' ' + str(roster['team_id']))
-
-        rawteammessage = json.load(open('embeds/teams.json', 'r'))
-        await interaction.response.send_message(str(type(rawteammessage['embeds'])))
-
-    @app_commands.command(
         name='start'
     )
     async def start(self, interaction : discord.Interaction, league_id : int, league_shortcode: str, share : bool=False):
@@ -207,6 +188,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     }
                     self.db.insert_team(dbteam)
         await interaction.edit_original_response(content=f'Generated.\nLeague: {league.name}\nDivisions: {d}/{len(divs)}\nTeams: {r}/{len(rosters)}\n\n# All done :3')
+        await self.update_launchpad()
 
     @app_commands.command(
         name='end'
@@ -292,6 +274,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
 
         await interaction.edit_original_response(content='Tournament ended. All channels, categories and roles have been archived.')
+        await self.update_launchpad()
 
     @app_commands.command(
         name='roundgen'
@@ -418,6 +401,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     self.logger.error(f'Error sending message to team channels: {e}')
 
             await interaction.edit_original_response(content='Matches generated.')
+            await self.update_launchpad()
         except Exception as e:
             self.logger.error(f'Error generating match: {e}', exc_info=True)
             await interaction.edit_original_response(content=f'An error occurred while generating matches.\n ```\n{e}\n```')
@@ -466,6 +450,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         self.db.archive_match(match_id)
 
         await interaction.edit_original_response(content='Round ended. All channels have been archived.')
+        await self.update_launchpad()
 
     #Todo:
     #[x] Record all teams who succeed / fail a check
@@ -741,56 +726,56 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
 
 
-    @app_commands.command(
-        name='launchpad',
-        description='Generate a launchpad for all matches and team channels currently active'
-    )
-    async def launchpad(self, interaction : discord.Interaction, share : bool=False):
-        # self.logger.debug(f'Generating Launchpad. Share: {share}')
-        await interaction.response.send_message('Generating Launchpad...', ephemeral=(not share))
-        teams = self.db.get_all_teams()
-        matches = self.db.get_matches_not_yet_archived()
-        leagueids = []
-        leagues=[]
-        divids=[]
-        divs=[]
-        for team in teams:
-            if team[1] not in leagueids:
-                leagueids.append(team[1])
-                leagues.append(self.cit.getLeague(team[1]))
-            if team[5] not in divids:
-                divids.append(team[5])
-                divs.append(self.db.get_div_by_id(team[5]))
+    # @app_commands.command(
+    #     name='launchpad',
+    #     description='Generate a launchpad for all matches and team channels currently active'
+    # )
+    # async def launchpad(self, interaction : discord.Interaction, share : bool=False):
+    #     # self.logger.debug(f'Generating Launchpad. Share: {share}')
+    #     await interaction.response.send_message('Generating Launchpad...', ephemeral=(not share))
+    #     teams = self.db.get_all_teams()
+    #     matches = self.db.get_matches_not_yet_archived()
+    #     leagueids = []
+    #     leagues=[]
+    #     divids=[]
+    #     divs=[]
+    #     for team in teams:
+    #         if team[1] not in leagueids:
+    #             leagueids.append(team[1])
+    #             leagues.append(self.cit.getLeague(team[1]))
+    #         if team[5] not in divids:
+    #             divids.append(team[5])
+    #             divs.append(self.db.get_div_by_id(team[5]))
 
 
-        rawlaunchpadmessage = ''
-        for leagues in leagues:
-            rawlaunchpadmessage += f'# {leagues.name}\n'
-            for div in divs:
-                if div[2] == leagues.id: ## Does the league_id field match the league we're looking at?
-                    rawlaunchpadmessage += f'## {div[1]}\n'
-                    rawlaunchpadmessage += f'### Teams\n'
-                    for team in teams:
-                        if (team[1] == leagues.id) and (team[5] == div[0]):
-                            rawlaunchpadmessage += f'- {team[3]} -> <#{team[4]}>\n'
-                    rawlaunchpadmessage += f'### Matches\n'
-                    for match in matches:
-                        # self.logger.debug(f'Match league id {match[6]} == {leagues.id} and match div id {match[1]} == {div[0]}')
-                        if (int(match[6]) == int(leagues.id)) and (int(match[1]) == int(div[0])):
-                            if match[4] == 0:
-                                rawlaunchpadmessage += f'- [{match[0]}](<https://ozfortress.com/matches/{match[0]}>) -> Bye\n'
-                            else:
-                                rawlaunchpadmessage += f'- [{match[0]}](<https://ozfortress.com/matches/{match[0]}>) -> <#{match[4]}>\n'
-                    rawlaunchpadmessage += '\n'
-        launchpadmessages = []
-        # split on the first \n under 2000 chars
-        while len(rawlaunchpadmessage) > 2000:
-            index = rawlaunchpadmessage[:2000].rfind('\n')
-            launchpadmessages.append(rawlaunchpadmessage[:index])
-            rawlaunchpadmessage = rawlaunchpadmessage[index:]
-        launchpadmessages.append(rawlaunchpadmessage)
-        for message in launchpadmessages:
-            await interaction.followup.send(content=message, ephemeral=(not share))
+    #     rawlaunchpadmessage = ''
+    #     for leagues in leagues:
+    #         rawlaunchpadmessage += f'# {leagues.name}\n'
+    #         for div in divs:
+    #             if div[2] == leagues.id: ## Does the league_id field match the league we're looking at?
+    #                 rawlaunchpadmessage += f'## {div[1]}\n'
+    #                 rawlaunchpadmessage += f'### Teams\n'
+    #                 for team in teams:
+    #                     if (team[1] == leagues.id) and (team[5] == div[0]):
+    #                         rawlaunchpadmessage += f'- {team[3]} -> <#{team[4]}>\n'
+    #                 rawlaunchpadmessage += f'### Matches\n'
+    #                 for match in matches:
+    #                     # self.logger.debug(f'Match league id {match[6]} == {leagues.id} and match div id {match[1]} == {div[0]}')
+    #                     if (int(match[6]) == int(leagues.id)) and (int(match[1]) == int(div[0])):
+    #                         if match[4] == 0:
+    #                             rawlaunchpadmessage += f'- [{match[0]}](<https://ozfortress.com/matches/{match[0]}>) -> Bye\n'
+    #                         else:
+    #                             rawlaunchpadmessage += f'- [{match[0]}](<https://ozfortress.com/matches/{match[0]}>) -> <#{match[4]}>\n'
+    #                 rawlaunchpadmessage += '\n'
+    #     launchpadmessages = []
+    #     # split on the first \n under 2000 chars
+    #     while len(rawlaunchpadmessage) > 2000:
+    #         index = rawlaunchpadmessage[:2000].rfind('\n')
+    #         launchpadmessages.append(rawlaunchpadmessage[:index])
+    #         rawlaunchpadmessage = rawlaunchpadmessage[index:]
+    #     launchpadmessages.append(rawlaunchpadmessage)
+    #     for message in launchpadmessages:
+    #         await interaction.followup.send(content=message, ephemeral=(not share))
 
     @app_commands.command(
         name='archive'
