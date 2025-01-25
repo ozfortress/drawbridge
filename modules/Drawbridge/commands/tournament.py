@@ -45,12 +45,12 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             divids=[]
             divs=[]
             for team in teams:
-                if team[1] not in leagueids:
-                    leagueids.append(team[1])
-                    leagues.append(self.cit.getLeague(team[1]))
-                if team[5] not in divids:
-                    divids.append(team[5])
-                    divs.append(self.db.get_div_by_id(team[5]))
+                if team[2] not in leagueids:
+                    leagueids.append(team[2])
+                    leagues.append(self.cit.getLeague(team[2]))
+                if team[6] not in divids:
+                    divids.append(team[6])
+                    divs.append(self.db.get_div_by_id(team[6]))
 
 
             rawlaunchpadmessage = ''
