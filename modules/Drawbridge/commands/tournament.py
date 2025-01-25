@@ -344,7 +344,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     return
                 category_id = 0
                 for d in divs:
-                    if d[1] == match.home_team['division']:
+                    if d[0] == match.home_team['division']:
                         category_id = d[4]
                         break
                 if category_id == 0:
