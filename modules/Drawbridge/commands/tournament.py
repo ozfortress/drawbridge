@@ -142,7 +142,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     teammessage['embed'] = discord.Embed(**teammessage['embeds'][0])
                     del teammessage['embeds']
                     await teamchannel.send(**teammessage)
-                    await interaction.edit_original_response(content=f'Generating Division Categories, Team Channels, and Roles.\nLeague: {league.name}\nDivisions: {d}/{len(divs)}\nTeams: {r}/{len(rosters)}')
+                    await interaction.edit_original_response(content=f'Generating Division Categories, Team Channels, and Roles.\nLeague: {league.name}\nDivisions: {d}/{len(divs)}\nTeams: {r}/{len(rosters)}\n\nLast Generated: {roster_name} ({league_shortcode})')
                     dbteam = {
                         'roster_id': roster['id'],
                         'team_id': team_id,
