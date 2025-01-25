@@ -61,8 +61,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                         rawlaunchpadmessage += f'## {div[1]}\n'
                         rawlaunchpadmessage += f'### Teams\n'
                         for team in teams:
-                            if (team[1] == leagues.id) and (team[5] == div[0]):
-                                rawlaunchpadmessage += f'- {team[3]} -> <#{team[4]}>\n'
+                            if (team[2] == leagues.id) and (team[6] == div[0]):
+                                rawlaunchpadmessage += f'- {team[4]} -> <#{team[4]}>\n'
                         rawlaunchpadmessage += f'### Matches\n'
                         for match in matches:
                             # self.logger.debug(f'Match league id {match[6]} == {leagues.id} and match div id {match[1]} == {div[0]}')
