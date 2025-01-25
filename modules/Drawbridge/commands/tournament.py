@@ -106,7 +106,13 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             for roster in rosters:
                 if roster['division'] == div:
                     r+=1
-                    role = await interaction.guild.create_role(name=f'{roster['name']} ({league_shortcode})', mentionable=True)
+                    if (len(roster['name']) > 50):
+                        roster_name = f'{roster['name'][:47]}...'
+                        role = await interaction.guild.create_role(name=f'{roster_name} ({league_shortcode})', mentionable=True)
+                    else:
+                        roster_name = roster['name']
+
+                    role = await interaction.guild.create_role(name=f'{roster_name} ({league_shortcode})', mentionable=True)
                     overwrites = {
                         interaction.guild.default_role: discord.PermissionOverwrite(view_channel=False),
                         role: discord.PermissionOverwrite(view_channel=True)
@@ -115,15 +121,15 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'BOT')
                     for permrole in all_access:
                         overrides[interaction.guild.get_role(permrole)] = discord.PermissionOverwrite(view_channel=True)
-                    channel_name = f'🛡️{roster['name']} ({league_shortcode})'
+                    channel_name = f'🛡️{roster_name} ({league_shortcode})'
                     if len(channel_name) > 45:
-                        channel_name = f'🛡️{roster['name'][:20]} ({league_shortcode})'
-                        self.logger.warning(f'Channel name for {roster['name']} is too long, trimming to {channel_name}')
+                        channel_name = f'🛡️{roster_name[:20]} ({league_shortcode})'
+                        self.logger.warning(f'Channel name for {roster_name} is too long, trimming to {channel_name}')
                     teamchannel = await interaction.guild.create_text_channel(channel_name, category=channelcategory, overwrites=overwrites)
                     team_id = roster['team_id']
                     subsitutions = {
                         '{TEAM_MENTION}': f'<@&{role.id}>',
-                        '{TEAM_NAME}': roster['name'],
+                        '{TEAM_NAME}': roster_name,
                         '{TEAM_ID}': team_id,
                         '{DIVISION}': div,
                         '{LEAGUE_NAME}': league.name,
@@ -143,7 +149,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                         'role_id': role.id,
                         'team_channel': teamchannel.id,
                         'division': divid,
-                        'team_name': roster['name']
+                        'team_name': roster_name
                     }
                     self.db.insert_team(dbteam)
         await interaction.edit_original_response(content=f'Generated.\nLeague: {league.name}\nDivisions: {d}/{len(divs)}\nTeams: {r}/{len(rosters)}')
@@ -434,7 +440,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     return
 
                 random.shuffle(filtered_matches)
-                part_match = filtered_matches[random.randint(0, len(filtered_matches)-1)]
+                part_match = filtered_matches[random.randint(0, len(filtered_matches)-1)] #partial match 
                 match_chosen = self.cit.getMatch(part_match['id'])
                 self.logger.debug(f'Chosen match: {match_chosen}')
 
@@ -473,7 +479,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             tempmsg = str(messageraw)
 
             demochkmsg = json.loads(self.functions.substitute_strings_in_embed(tempmsg, {
-                '{CHANNEL_ID}'  : f'<@&{db_team[3]}>',
+                '{CHANNEL_ID}'  : f'<@&{db_team[3]}>', #These two may cause bugs depending on the data base
                 '{TEAM_NAME}'   : f'{db_team[4]}', 
                 '{ROUND_NO}'    : f'{round}',
                 '{TARGET_NAME}' : f'{player_chosen.name}',
