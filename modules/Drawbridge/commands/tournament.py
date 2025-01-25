@@ -119,7 +119,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             # role = await ctx.guild.create_role(name=role_name)
             # db.insert_team(roster)
 
-        await interaction.edit_original_response(content=f'Generating Division Categories, Team Channels, and Roles.\nLeague: {league.name}\nDivisions: {len(divs)}\nTeams: {len(rosters)}')
+        await interaction.edit_original_response(content=f'Generating Division Categories, Team Channels, and Roles.\nLeague: {league.name}\nDivisions: {len(divs)}\nTeams: {len(rosters)}\n\nIf we seem frozen, wait 5 minutes we might be rate limited.')
         r=0 #counters
         d=0 #counters
         for div in divs:
@@ -182,7 +182,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     teammessage['embed'] = discord.Embed(**teammessage['embeds'][0])
                     del teammessage['embeds']
                     await teamchannel.send(**teammessage)
-                    await interaction.edit_original_response(content=f'Generating Division Categories, Team Channels, and Roles.\nLeague: {league.name}\nDivisions: {d}/{len(divs)}\nTeams: {r}/{len(rosters)}\n\nLast Generated: {roster_name} ({league_shortcode})')
+                    await interaction.edit_original_response(content=f'Generating Division Categories, Team Channels, and Roles.\nLeague: {league.name}\nDivisions: {d}/{len(divs)}\nTeams: {r}/{len(rosters)}\n\nLast Generated: {roster_name} ({league_shortcode})\n\nIf we seem frozen, wait 5 minutes we might be rate limited.')
                     dbteam = {
                         'roster_id': roster['id'],
                         'team_id': team_id,
