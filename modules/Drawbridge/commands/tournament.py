@@ -205,7 +205,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
         for role in guild.roles:
             for team in teams:
-                if role.id == team[2]:
+                if role.id == team[3]:
                     await role.delete()
                     break
 
