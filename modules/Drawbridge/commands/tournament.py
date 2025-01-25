@@ -361,6 +361,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     overrides[interaction.guild.get_role(role)] = discord.PermissionOverwrite(view_channel=True)
 
                 cat = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID'))).get_channel(category_id)
+                if cat == None:
+                    raise Exception(f'Category not found for division {match.home_team["division"]}')
                 if match.round_name == '':
                     match.round_name = f'Round {match.round_number}'
                 channel_name = f'🗡️-{match_id}-{team_home[3]}-vs-{team_away[3]}-{match.round_name}'
