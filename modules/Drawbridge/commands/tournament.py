@@ -153,7 +153,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                         'team_name': roster_name
                     }
                     self.db.insert_team(dbteam)
-        await interaction.edit_original_response(content=f'Generated.\nLeague: {league.name}\nDivisions: {d}/{len(divs)}\nTeams: {r}/{len(rosters)}\n\n#All done :3')
+        await interaction.edit_original_response(content=f'Generated.\nLeague: {league.name}\nDivisions: {d}/{len(divs)}\nTeams: {r}/{len(rosters)}\n\n# All done :3')
 
     @app_commands.command(
         name='end'
@@ -177,36 +177,56 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         self.logger.debug(f'Teams: {teams}')
         self.logger.debug(f'Match Channels: {match_channels}')
         self.logger.debug(f'Divisions: {divs}')
-
-        await interaction.edit_original_response(content='Deleting channels... (1/3)')
+        status = "Deleting channels... (1/3)\n```"
+        await interaction.edit_original_response(content=f'{status}\n```')
 
         for channel in guild.channels:
             for team in teams:
                 if channel.id == team[5]:
-                    await channel.delete()
+                    status = f'{status}\n{channel.name}'
+                    await channel.delete(
+                        reason='Tournament ended'
+                    )
+                    await interaction.edit_original_response(content=f'{status}\n```')
                     break
+            status = f'Deleting channels... (1/3)\n```\nAll Team Channels Deleted!\n\n'
             for match_channel in match_channels:
                 if channel.id == match_channel[0]:
-                    await channel.delete()
+                    status = f'{status}\n\n{channel.name}'
+                    await channel.delete(
+                        reason='Tournament ended'
+                    )
+                    await interaction.edit_original_response(content=f'{status}\n```')
 
-        await interaction.edit_original_response(content='Deleting categories... (2/3)')
+        status = f'All Channels Deleted!\nDeleting categories... (2/3)\n```'
+        await interaction.edit_original_response(content=f'{status}\n```')
 
         for div in divs:
             for category in guild.categories:
                 if category.id == div[4]:
+                    status = f'{status}\n{category.name}'
                     await category.delete()
-                    break
-            for role in guild.roles:
-                if role.id == div[3]:
-                    await role.delete()
+                    await interaction.edit_original_response(content=f'{status}\n```')
                     break
 
-        await interaction.edit_original_response(content='Deleting roles... (3/3)')
+        status = f'All Channels Deleted!\nAll Categories Deleted!\nDeleting roles... (3/3)\n```'
+        await interaction.edit_original_response(content=f'{status}\n```')
 
         for role in guild.roles:
             for team in teams:
                 if role.id == team[3]:
+                    status = f'{status}\n{role.name}'
                     await role.delete()
+                    await interaction.edit_original_response(content=f'{status}\n```')
+                    break
+        status = f'All Channels Deleted!\nAll Categories Deleted!\nDeleting roles... (3/3)\n```\nAll Team Roles Deleted!\n\n'
+        await interaction.edit_original_response(content=f'{status}\n```')
+        for div in divs:
+            for role in guild.roles:
+                if role.id == div[3]:
+                    status = f'{status}\n{role.name}'
+                    await role.delete()
+                    await interaction.edit_original_response(content=f'{status}\n```')
                     break
 
         self.db.delete_matches_by_league(league_id)
@@ -214,7 +234,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         self.db.delete_divisions_by_league(league_id)
 
 
-        await interaction.edit_original_response(content='[DEBUG - nothin actually happened ok check console] Tournament ended. All channels and roles have been archived.')
+        await interaction.edit_original_response(content='Tournament ended. All channels, categories and roles have been archived.')
 
     @app_commands.command(
         name='roundgen'
