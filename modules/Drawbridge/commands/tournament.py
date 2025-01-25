@@ -35,7 +35,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         def is_me(m):
             return m.author == self.bot.user
         guild = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID')))
-        channel = guild.get_channel(int(os.getenv('LAUNCHPAD_CHANNEL_ID')))
+        channel = guild.get_channel(int(os.getenv('LAUNCH_PAD_CHANNEL')))
         async with channel.typing():
             await channel.purge(limit=100, check=is_me)
             teams = self.db.get_all_teams()
