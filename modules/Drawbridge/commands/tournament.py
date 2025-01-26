@@ -17,7 +17,6 @@ __title__ = 'Tournament Commands'
 __description__ = 'Commands for managing tournaments.'
 __version__ = '0.0.1'
 checks = Checks()
-@checks.is_head()
 @discord.app_commands.guild_only()
 class Tournament(discord_commands.GroupCog, group_name='tournament', name='tournamnet', group_description='Commands for managing tournaments. This is a new string',):
     def __init__(self, bot:discord_commands.Bot, db:database.Database, cit:citadel.Citadel, logger:logging.Logger) -> None:
@@ -31,6 +30,14 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
     @app_commands.command(
         name='launchpad'
+    )
+    @checks.has_roles(
+        'DIRECTOR',
+        'HEAD',
+        'ADMIN',
+        'TRIAL',
+        'DEVELOPER',
+        'BOT'
     )
     async def launchpad(self, interaction : discord.Interaction, share : bool=False):
         """Generate a launchpad message for all active tournaments"""
@@ -101,6 +108,11 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
     @app_commands.command(
         name='start'
+    )
+    @checks.has_roles(
+        'DIRECTOR',
+        'HEAD',
+        'DEVELOPER',
     )
     async def start(self, interaction : discord.Interaction, league_id : int, league_shortcode: str, share : bool=False):
         """Generate team roles and channels for a given league
@@ -209,6 +221,15 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
     @app_commands.command(
         name='end'
+    )
+    @checks.has_roles(
+        'DIRECTOR',
+        'HEAD',
+        'DEVELOPER',
+    )
+    @checks.has_been_warned(
+        warned_for='end_tournament',
+        warning_message='This command will archive all channels and roles for this tournament. Rerun the comamnd if you are prepared to proceed.'
     )
     async def end(self, interaction : discord.Interaction, league_id : int, share : bool=False):
         """End a tournament and archive all channels and roles
@@ -405,6 +426,13 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
     @app_commands.command(
         name='matchgenround'
     )
+    @checks.has_roles(
+        'DIRECTOR',
+        'HEAD',
+        'DEVELOPER',
+        'ADMIN',
+        'TRIAL',
+    )
     async def matchgenround(self, interaction : discord.Interaction, league_id : int, round_number : Optional[int]):
         """Generate ALL match channels for a given league (optionally limiting to a specific round). Attempts to skip matches already generated.
 
@@ -445,6 +473,13 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
     @app_commands.command(
         name='matchgen'
+    )
+    @checks.has_roles(
+        'DIRECTOR',
+        'HEAD',
+        'DEVELOPER',
+        'ADMIN',
+        'TRIAL',
     )
     async def matchgen(self, interaction : discord.Interaction, match_id : int):
         """Generate match channels for a given match id
@@ -586,6 +621,13 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
     @app_commands.command(
         name='matchend'
     )
+    @checks.has_roles(
+        'DIRECTOR',
+        'HEAD',
+        'DEVELOPER',
+        'ADMIN',
+        'TRIAL',
+    )
     async def matchend(self, interaction : discord.Interaction, match_id : int):
         """End a match and archive all channels
 
@@ -636,6 +678,13 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
     @app_commands.command(
             name='randomdemocheck',
             description='Initiates a random demo for a specific round. Optional: target specific player'
+    )
+    @checks.has_roles(
+        'DIRECTOR',
+        'HEAD',
+        'DEVELOPER',
+        'ADMIN',
+        'TRIAL',
     )
     async def randomdemocheck(self, interaction : discord.Interaction, league_id : int, round_no : int = 0, spes_user: int = 0):
         """Conduct a random demo check.
@@ -957,6 +1006,9 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
     @app_commands.command(
         name='archive'
     )
+    @checks.has_roles(
+        'DEVELOPER',
+    )
     async def archive(self, interaction : discord.Interaction, match_id : int):
         """Archive all channels and roles for a league
 
@@ -965,7 +1017,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         match_id: int
             The Match ID to archive
         """
-        await Logging.archive_match(match_id)
+        await Logging.archive_match(match_id,interaction)
 
     # @tournament.error
     # async def tournament_error(self, ctx : discord.Interaction, error):
