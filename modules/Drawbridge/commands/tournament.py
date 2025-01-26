@@ -16,7 +16,6 @@ from discord.ext import tasks as discord_tasks
 __title__ = 'Tournament Commands'
 __description__ = 'Commands for managing tournaments.'
 __version__ = '0.0.1'
-
 checks = Checks()
 @checks.is_head()
 @discord.app_commands.guild_only()
@@ -28,6 +27,16 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         self.logger = logger
         self.logger.info('Loaded Tournament Commands.')
         self.functions = Functions(self.db, self.cit)
+
+
+    @app_commands.command(
+        name='launchpad'
+    )
+    async def launchpad(self, interaction : discord.Interaction, share : bool=False):
+        """Generate a launchpad message for all active tournaments"""
+        await interaction.response.send_message('Generating launchpad...', ephemeral=not share)
+        await self.update_launchpad()
+        await interaction.edit_original_response(content='Launchpad generated and sent to the launchpad channel.')
 
     async def update_launchpad(self):
         # purge all messages in the launchpad channel
@@ -72,7 +81,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                         for match in matches:
                             # self.logger.debug(f'Match league id {match[6]} == {leagues.id} and match div id {match[1]} == {div[0]}')
                             if (int(match[6]) == int(leagues.id)) and (int(match[1]) == int(div[0])):
-                                c = c+1
+                                # c = c+1
                                 if match[4] == 0:
                                     rawlaunchpadmessage += f'- [{match[0]}](<https://ozfortress.com/matches/{match[0]}>) -> Bye\n'
                                 else:
