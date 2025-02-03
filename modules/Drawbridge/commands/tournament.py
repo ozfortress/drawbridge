@@ -151,7 +151,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 interaction.guild.default_role: discord.PermissionOverwrite(view_channel=False)
             }
 
-            all_access = checks._get_role_ids('HEAD', 'ADMIN', '!AC', 'TRIAL', 'DEVELOPER', 'CASTER', 'BOT')
+            all_access = checks._get_role_ids('HEAD', 'ADMIN', '!AC', 'TRIAL', 'DEVELOPER', 'APPROVED', 'BOT')
             for role in all_access:
                 overrides[interaction.guild.get_role(role)] = discord.PermissionOverwrite(view_channel=True)
 
@@ -370,7 +370,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 guild.get_role(team_home[3]): discord.PermissionOverwrite(view_channel=True),
                 guild.get_role(team_away[3]): discord.PermissionOverwrite(view_channel=True),
             }
-            all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'CASTER', 'BOT')
+            all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'APPROVED', 'BOT')
             for role in all_access:
                 overrides[guild.get_role(role)] = discord.PermissionOverwrite(view_channel=True)
             cat = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID'))).get_channel(category_id)
@@ -501,123 +501,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         except Exception as e:
             self.logger.error(f'Error generating match: {e}', exc_info=True)
             await interaction.edit_original_response(content=f'An error occurred while generating matches.\n ```\n{e}\n```')
-        #     if self.db.get_match_by_id(match_id) is not None:
-        #         await interaction.edit_original_response(content='This match has already been generated.')
-        #         return
-
-        #     rawmatchmessage = ''
-        #     with open('embeds/match.json', 'r') as file:
-        #         rawmatchmessage = file.read()
-
-        #     if match.home_team is None:
-        #         await interaction.edit_original_response(content='Match not found. See console output for more info')
-        #         self.logger.error(f'Match not found: {match_id}')
-        #         # try:
-        #         #     self.logger.debug(f'match: {match}')
-        #         # except Exception as e:
-        #         #     self.logger.error(f'Error printing match: {e}')
-        #         return
-        #     if match.away_team is None:
-        #         # This is a bye, we don't need to generate a channel for this.
-        #         # self.logger.debug(f' ==== PASSING THIS {match.home_team['team_id']}')
-        #         team_home = self.db.get_team_by_id(match.home_team['team_id'])
-        #         # self.logger.debug(f'{match}')
-        #         role_home = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID'))).get_role(team_home[3])
-        #         # team_channel = discord.Object(id=team_home[4])
-        #         team_channel = self.bot.get_channel(team_home[5])
-        #         await team_channel.send(f'Matches for round {match.round_number} were just generated. {role_home.mention} have a bye this round, and thus will be awarded a win.') #TODO - JSON embed for this
-        #         self.db.insert_match({
-        #             'match_id': match.id,
-        #             'division': team_home[6],
-        #             'team_home': team_home[1],
-        #             'team_away': 0,
-        #             'channel_id': 0, # 0 for bye,
-        #             'league_id': match.league_id
-        #         })
-        #         self.db.archive_match(match_id) # Marks the match as archived
-        #     else:
-        #         # Team roles
-        #         team_home = self.db.get_team_by_id(match.home_team['team_id'])
-        #         team_away = self.db.get_team_by_id(match.away_team['team_id'])
-        #         # Category ID for the division
-        #         # category_id = self.db.get_div_by_name(match.home_team['division'])[4] # always pull from home team, 4 is category_id btw
-        #         divs = self.db.get_divs_by_league(match.league_id) # Div name could be different depending on league. Account for this.
-        #         if len(divs) == 0:
-        #             await interaction.edit_original_response(content='No divisions found for the league for this match???? Pester shigbeard, this shouldn\'t happen.')
-        #             return
-        #         category_id = 0
-        #         for d in divs:
-        #             if d[1] == match.home_team['division']:
-        #                 category_id = d[4]
-        #                 break
-        #         if category_id == 0:
-        #             await interaction.edit_original_response(content='Division not found for the match. Pester shigbeard, this shouldn\'t happen.')
-        #             return
-
-        #         overrides = {
-        #             interaction.guild.default_role: discord.PermissionOverwrite(view_channel=False),
-        #             interaction.guild.get_role(team_home[3]): discord.PermissionOverwrite(view_channel=True),
-        #             interaction.guild.get_role(team_away[3]): discord.PermissionOverwrite(view_channel=True),
-        #         }
-        #         all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'CASTER', 'BOT')
-        #         for role in all_access:
-        #             overrides[interaction.guild.get_role(role)] = discord.PermissionOverwrite(view_channel=True)
-
-        #         cat = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID'))).get_channel(category_id)
-        #         if cat == None:
-        #             raise Exception(f'Category not found for division {match.home_team["division"]}')
-        #         if match.round_name == '':
-        #             match.round_name = f'Round {match.round_number}'
-        #         channel_name = f'🗡️-{match_id}-{team_home[4]}-vs-{team_away[4]}-{match.round_name}'
-        #         trimmed = False
-        #         if len(channel_name) > 100:
-        #             trimmed_home_team = team_home[4][:10]
-        #             trimmed_away_team = team_away[4][:10]
-        #             channel_name = f'🗡️{match_id}-{trimmed_home_team}-vs-{trimmed_away_team}-{match.round_name}'
-        #             self.logger.warning(f'Channel name too long when generating match {match.round_number} {team_home[4]} vs {team_away[4]}, trimming to {channel_name}')
-        #         match_channel = await interaction.guild.create_text_channel(channel_name, category=cat, overwrites=overrides)
-        #         # Load the message
-        #         tempmatchmessage = str(rawmatchmessage)
-
-        #         matchmessage = json.loads(self.functions.substitute_strings_in_embed(tempmatchmessage, {
-        #             '{TEAM_HOME}': f'<@&{team_home[3]}>', # team role as a mention
-        #             '{TEAM_AWAY}': f'<@&{team_away[3]}>', # team role as a mention
-        #             '{ROUND_NAME}': match.round_name,
-        #             '{MATCH_ID}': match_id,
-        #             '{CHANNEL_ID}': str(match_channel.id),
-        #             '{CHANNEL_LINK}': f'<#{match_channel.id}>'
-        #         }))
-        #         matchmessage['embed'] = discord.Embed(**matchmessage['embeds'][0])
-        #         del matchmessage['embeds']
-        #         await match_channel.send(**matchmessage)
-        #         # Update the database
-        #         self.db.insert_match({
-        #             'match_id': match_id,
-        #             'division': team_home[6], # division
-        #             'team_home': team_home[1], # team_id
-        #             'team_away': team_away[1], # team_id
-        #             'channel_id': match_channel.id,
-        #             'league_id': match.league_id
-        #         })
-
-        #         # Lets also say something in their team channel
-        #         try:
-        #             team_home_channel = self.bot.get_channel(team_home[5]) # team_channel
-        #             team_away_channel = self.bot.get_channel(team_away[5]) # team_channel
-        #             await team_home_channel.send(f'Match for round {match.round_number} has been generated. Please head to {match_channel.mention} to organise your match.')
-        #             await team_away_channel.send(f'Match for round {match.round_number} has been generated. Please head to {match_channel.mention} to organise your match.')
-        #             if trimmed:
-        #                 await team_home_channel.send(f'Heads up: Due to a discord limitation, we had to trim your match name down to {channel_name}. We apologise for any inconvenience.')
-        #                 await team_away_channel.send(f'Heads up: Due to a discord limitation, we had to trim your match name down to {channel_name}. We apologise for any inconvenience.')
-        #         except Exception as e:
-        #             self.logger.error(f'Error sending message to team channels: {e}')
-
-        #     await interaction.edit_original_response(content='Matches generated.')
-        #     await self.update_launchpad()
-        # except Exception as e:
-        #     self.logger.error(f'Error generating match: {e}', exc_info=True)
-        #     await interaction.edit_original_response(content=f'An error occurred while generating matches.\n ```\n{e}\n```')
-
+            
     @app_commands.command(
         name='matchend'
     )
