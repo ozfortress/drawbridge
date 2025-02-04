@@ -1,16 +1,23 @@
 # Drawbridge
 
-Drawbridge aims to be a modular Discord Bot designed to interface with the Citadel esports framework in order to provide a streamlined match organizing and captaincy experience.
+Drawbridge is a Python bot designed to assist ozfortress tournament admins with the operation of active cups and seasonal tournaments. It is compatible with any Citadel-powered league.
 
-The goal of this project is to enable end users to register within a discord server to receive roles and alerts for upcoming matches, as well as to provide a platform for league admins to manage captains and matches.
+It's features include
 
-At this early stage, the application is still in development and does not function. The following features are planned for the initial release:
+- Automated creation of Division categories and roles
+- Automated creation of Team channels and roles
+- Automated creation of Match channels
+- Assisted Demochecking (in which logs are checked to identify a player who played)
+- Logging of all match communications
+- A launchpad to find your way around
 
-- [ ] Account linking between Discord and Steam (for the purposes of identifying a user on Citadel)
-- [ ] Administration Panel for importing matches from Citadel
-- [ ] Pick/Ban management for captains
-- [ ] User/Role management
-- [ ] Match Comms management (including archival and retrieval)
+Still to come
+
+- Automated team captain assignment
+    - Blocked by Citadel API not including captain information
+- Automatic Database configuration
+    - TODO
+- Web Interface for fetching logs, configuring embeds, etc
 
 ## Getting Started
 
@@ -31,6 +38,8 @@ pip install -r requirements.txt
 ```
 
 The application is configured using environment variables. Create a .env file in the root directory of the project by copying the .env.example file and filling in the required values.
+
+Note: The database is not auto-configured. You will have to apply the template database.
 
 To run the application, after activating the venv as seen above, execute the following command:
 

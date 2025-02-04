@@ -1,111 +1,89 @@
--- MySQL dump 10.13  Distrib 8.0.19, for Win64 (x86_64)
---
--- Host: 51.161.212.218    Database: drawbridge_test
--- ------------------------------------------------------
--- Server version	5.5.5-10.11.6-MariaDB-1:10.11.6+maria~ubu2204
+-- drawbridge.divisions definition
 
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!50503 SET NAMES utf8mb4 */;
-/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
-/*!40103 SET TIME_ZONE='+00:00' */;
-/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
-/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
-/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
-/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
-
---
--- Table structure for table `divisions`
---
-
-DROP TABLE IF EXISTS `divisions`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `divisions` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `division_name` varchar(100) NOT NULL,
-  `league_id` int(11) NOT NULL,
-  `role_id` bigint(20) NOT NULL,
-  `category_id` bigint(20) NOT NULL,
+  `division_name` varchar(100) DEFAULT NULL,
+  `league_id` int(11) DEFAULT NULL,
+  `role_id` bigint(20) DEFAULT NULL,
+  `category_id` bigint(20) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=84 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Table structure for table `logs`
---
 
-DROP TABLE IF EXISTS `logs`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
+-- drawbridge.leagues definition
+
+CREATE TABLE `leagues` (
+  `league_id` int(11) NOT NULL,
+  `league_name` varchar(100) DEFAULT NULL,
+  `league_shortcode` varchar(100) DEFAULT NULL,
+  PRIMARY KEY (`league_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+
+-- drawbridge.linked_users definition
+
+CREATE TABLE `linked_users` (
+  `discord_id` bigint(20) DEFAULT NULL,
+  `steam_id` bigint(20) DEFAULT NULL,
+  `citadel_id` int(11) DEFAULT NULL,
+  `link_status` int(11) DEFAULT NULL,
+  `link_code` varchar(100) DEFAULT NULL,
+  `time_started` datetime NOT NULL,
+  `time_finished` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+
+-- drawbridge.logs definition
+
 CREATE TABLE `logs` (
-  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT 'internal unique id',
-  `match_id` int(11) DEFAULT NULL COMMENT 'match id on citadel',
-  `team_id` int(11) DEFAULT NULL COMMENT 'FK to teams.id - admins are 1 and casters are 2',
-  `user_id` bigint(20) NOT NULL COMMENT 'discord uid',
-  `user_name` varchar(32) DEFAULT NULL COMMENT 'actual username of discord user',
-  `user_nick` varchar(32) DEFAULT NULL COMMENT 'user''s alias in-server',
-  `user_avatar` varchar(255) DEFAULT NULL COMMENT 'link to avatar on discord',
-  `message_id` bigint(20) DEFAULT NULL COMMENT 'message id on discord',
-  `message_content` varchar(3000) DEFAULT NULL COMMENT 'Text Only content of the message. Includes markdown. Does not included attachments or images.',
-  `message_additionals` varchar(255) DEFAULT NULL COMMENT 'I guess maybe filename of an attachment or attachments? To be decided how this will be used.',
-  `log_type` varchar(6) NOT NULL COMMENT 'edit/create/delete',
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `match_id` int(11) DEFAULT NULL,
+  `team_id` int(11) DEFAULT NULL,
+  `user_id` bigint(20) DEFAULT NULL,
+  `user_name` varchar(32) DEFAULT NULL,
+  `user_nick` varchar(32) DEFAULT NULL,
+  `user_avatar` varchar(255) DEFAULT NULL,
+  `message_id` bigint(20) DEFAULT NULL,
+  `message_content` varchar(3000) DEFAULT NULL,
+  `message_additionals` varchar(255) DEFAULT NULL,
+  `log_type` varchar(6) DEFAULT NULL,
   `log_timestamp` timestamp NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=51 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
+) ENGINE=InnoDB AUTO_INCREMENT=31136 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Table structure for table `matches`
---
 
-DROP TABLE IF EXISTS `matches`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
+-- drawbridge.matches definition
+
 CREATE TABLE `matches` (
   `match_id` int(11) NOT NULL,
-  `division` varchar(12) NOT NULL,
-  `team_home` int(11) NOT NULL COMMENT 'fk to teams',
-  `team_away` int(11) NOT NULL COMMENT 'fk to teams',
-  `channel_id` bigint(20) NOT NULL COMMENT 'discord channel id',
-  `archived` tinyint(1) DEFAULT NULL COMMENT 'dont process this one again (already archived or deleted)',
-  `league_id` int(11) NOT NULL,
+  `division` varchar(12) DEFAULT NULL,
+  `team_home` int(11) DEFAULT NULL,
+  `team_away` int(11) DEFAULT NULL,
+  `channel_id` bigint(20) DEFAULT NULL,
+  `archived` tinyint(1) DEFAULT NULL,
+  `league_id` int(11) DEFAULT NULL,
   PRIMARY KEY (`match_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
 
 
---
--- Table structure for table `teams`
---
+-- drawbridge.schema_migrations definition
 
-DROP TABLE IF EXISTS `teams`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `teams` (
-  `team_id` int(11) NOT NULL,
-  `league_id` int(11) NOT NULL,
-  `role_id` bigint(20) NOT NULL COMMENT 'discord role id',
-  `team_name` varchar(100) NOT NULL,
-  `team_channel` bigint(20) NOT NULL,
-  `division` int(11) NOT NULL,
-  KEY `teams_divisions_FK` (`division`),
-  CONSTRAINT `teams_divisions_FK` FOREIGN KEY (`division`) REFERENCES `divisions` (`id`)
+CREATE TABLE `schema_migrations` (
+  `version` int(11) NOT NULL,
+  `applied_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`version`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
 
---
--- Dumping routines for database 'drawbridge_test'
---
-/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
-/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
-/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
-/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+-- drawbridge.teams definition
 
--- Dump completed on 2024-06-25  0:42:26
+CREATE TABLE `teams` (
+  `roster_id` int(11) NOT NULL,
+  `team_id` int(11) DEFAULT NULL,
+  `league_id` int(11) DEFAULT NULL,
+  `role_id` bigint(20) DEFAULT NULL,
+  `team_name` varchar(100) DEFAULT NULL,
+  `team_channel` bigint(20) DEFAULT NULL,
+  `division` int(11) DEFAULT NULL,
+  PRIMARY KEY (`roster_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
