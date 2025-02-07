@@ -26,6 +26,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         self.logger = logger
         self.logger.info('Loaded Tournament Commands.')
         self.functions = Functions(self.db, self.cit)
+        self.perms_last_fixed = 0
 
 
     @app_commands.command(
@@ -909,9 +910,17 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
     @checks.has_roles(
         'DEVELOPER',
     )
+    @checks.has_been_warned(
+        warned_for='fixperms',
+        warning_message='This is a very expensive command to run. Only use this if you have 15-30 minutes to spare!'
+    )
     async def fixperms(self, interaction : discord.Interaction):
         """Fix permissions for all channels and roles for a league"""
         # get all channels
+        if (datetime.datetime.now() - self.perms_last_fixed).seconds < 900:
+            await interaction.response.send_message('Permissions were fixed less than 15 minutes ago. Please wait before running this command again.', ephemeral=True)
+            return
+        self.perms_last_fixed = datetime.datetime.now()
         guild = interaction.guild
         teams = self.db.get_all_teams()
         matches = self.db.get_all_matches()
@@ -919,6 +928,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         for channel in guild.channels:
             if isinstance(channel, discord.TextChannel):
                 # check if its a team channel
+                await interaction.edit_original_response(content=f'Fixing permissions for {channel.name}...')
                 if channel.id in [team[5] for team in teams]:
                     team = [team for team in teams if team[5] == channel.id][0]
                     role = guild.get_role(team[3])
@@ -940,6 +950,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     for role in all_access:
                         await channel.set_permissions(guild.get_role(role), read_messages=True, send_messages=True)
         await interaction.edit_original_response(content='Permissions fixed.')
+        
         
                 
         
