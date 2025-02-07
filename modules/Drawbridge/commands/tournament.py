@@ -902,7 +902,47 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             The Match ID to archive
         """
         await Logging.archive_match(match_id,interaction)
-
+    
+    @app_commands.command(
+        name='fixperms'
+    )
+    @checks.has_roles(
+        'DEVELOPER',
+    )
+    async def fixperms(self, interaction : discord.Interaction):
+        """Fix permissions for all channels and roles for a league"""
+        # get all channels
+        guild = interaction.guild
+        teams = self.db.get_all_teams()
+        matches = self.db.get_all_matches()
+        await interaction.response.send_message('Fixing permissions...', ephemeral=True)
+        for channel in guild.channels:
+            if isinstance(channel, discord.TextChannel):
+                # check if its a team channel
+                if channel.id in [team[5] for team in teams]:
+                    team = [team for team in teams if team[5] == channel.id][0]
+                    role = guild.get_role(team[3])
+                    all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', '!AC', 'DEVELOPER', 'APPROVED', 'BOT')
+                    await channel.set_permissions(role, read_messages=True, send_messages=True)
+                    # add admins
+                    await channel.set_permissions(guild.default_role, read_messages=False)
+                    for role in all_access:
+                        await channel.set_permissions(guild.get_role(role), read_messages=True, send_messages=True)
+                # check if its a match channel
+                if channel.id in [match[4] for match in matches]:
+                    match = [match for match in matches if match[4] == channel.id][0]
+                    all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'APPROVED', 'BOT')
+                    await channel.set_permissions(guild.default_role, read_messages=False)
+                    team_home = self.db.get_team_by_id(match[2])
+                    team_away = self.db.get_team_by_id(match[3])
+                    await channel.set_permissions(guild.get_role(team_home[3]), read_messages=True, send_messages=True)
+                    await channel.set_permissions(guild.get_role(team_away[3]), read_messages=True, send_messages=True)
+                    for role in all_access:
+                        await channel.set_permissions(guild.get_role(role), read_messages=True, send_messages=True)
+        await interaction.edit_original_response(content='Permissions fixed.')
+        
+                
+        
     # @tournament.error
     # async def tournament_error(self, ctx : discord.Interaction, error):
     #     if isinstance(error, discord_commands.errors.MissingPermissions):

@@ -1181,3 +1181,14 @@ class Database:
             except mariadb.Error as e:
                 print(f'Error: {e}')
                 return None
+
+    def get_all_matches(self):
+        with self.pool.get_connection() as conn:
+            try:
+                cursor = conn.cursor()
+                query = 'SELECT * FROM matches;'
+                cursor.execute(query)
+                return cursor.fetchall()
+            except mariadb.Error as e:
+                print(f'Error: {e}')
+                return None
