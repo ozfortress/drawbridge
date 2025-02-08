@@ -932,16 +932,20 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 if channel.id in [team[5] for team in teams]:
                     team = [team for team in teams if team[5] == channel.id][0]
                     role = guild.get_role(team[3])
-                    all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', '!AC', 'DEVELOPER', 'APPROVED', 'BOT')
+                    all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', '!AC', 'DEVELOPER', 'BOT')
+                    no_access = checks._get_role_ids('CASTER')
                     await channel.set_permissions(role, read_messages=True, send_messages=True)
                     # add admins
                     await channel.set_permissions(guild.default_role, read_messages=False)
                     for role in all_access:
                         await channel.set_permissions(guild.get_role(role), read_messages=True, send_messages=True)
+                    for role in no_access:
+                        await channel.set_permissions(guild.get_role(role), read_messages=False)
                 # check if its a match channel
                 if channel.id in [match[4] for match in matches]:
                     match = [match for match in matches if match[4] == channel.id][0]
                     all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'APPROVED', 'BOT')
+                    no_access = checks._get_role_ids('UNAPPROVED')
                     await channel.set_permissions(guild.default_role, read_messages=False)
                     team_home = self.db.get_team_by_id(match[2])
                     team_away = self.db.get_team_by_id(match[3])
@@ -949,6 +953,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     await channel.set_permissions(guild.get_role(team_away[3]), read_messages=True, send_messages=True)
                     for role in all_access:
                         await channel.set_permissions(guild.get_role(role), read_messages=True, send_messages=True)
+                    for role in no_access:
+                        await channel.set_permissions(guild.get_role(role), read_messages=False)
         await interaction.edit_original_response(content='Permissions fixed.')
         
         
