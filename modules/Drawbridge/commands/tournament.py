@@ -451,8 +451,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             matches = league.matches
             for match in matches:
                 # discard all who's status is 'confirmed'
-                match = citadel.Citadel.PartialMatch(match)
-                if match.status == 'confirmed':
+                match2 = citadel.Citadel.PartialMatch(match)
+                if match2.status == 'confirmed':
                     matches.remove(match)
                 # discard all who's round number doesn't match the number we've been given.
                 if round_number is not None and match.round_number != round_number:
@@ -464,7 +464,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 await interaction.edit_original_response(content='No matches found - all are byes, already generated, or completed matches.')
             c=0
             for match in matches:
-                match = citadel.Citadel.PartialMatch(match)
+                match2 = citadel.Citadel.PartialMatch(match)
                 c=c+1
                 await interaction.edit_original_response(content=f'Generating {c}/{len(matches)} matches...')
                 fullmatch = self.cit.getMatch(match.id)
