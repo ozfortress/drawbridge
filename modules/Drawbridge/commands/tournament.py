@@ -26,7 +26,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         self.logger = logger
         self.logger.info('Loaded Tournament Commands.')
         self.functions = Functions(self.db, self.cit)
-        self.perms_last_fixed = 0
+        self.perms_last_fixed = 0.0
 
 
     @app_commands.command(
@@ -917,10 +917,10 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
     async def fixperms(self, interaction : discord.Interaction):
         """Fix permissions for all channels and roles for a league"""
         # get all channels
-        if (datetime.datetime.now() - self.perms_last_fixed).seconds < 900:
+        if (datetime.datetime.now().timestamp() - self.perms_last_fixed) < 900.0:
             await interaction.response.send_message('Permissions were fixed less than 15 minutes ago. Please wait before running this command again.', ephemeral=True)
             return
-        self.perms_last_fixed = datetime.datetime.now()
+        self.perms_last_fixed = datetime.datetime.now().timestamp()
         guild = interaction.guild
         teams = self.db.get_all_teams()
         matches = self.db.get_all_matches()
