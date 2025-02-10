@@ -12,6 +12,7 @@ from typing import Optional
 from discord import app_commands
 from discord.ext import commands as discord_commands
 from discord.ext import tasks as discord_tasks
+import asyncio
 
 __title__ = 'Tournament Commands'
 __description__ = 'Commands for managing tournaments.'
@@ -926,38 +927,64 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         guild = interaction.guild
         teams = self.db.get_all_teams()
         matches = self.db.get_all_matches()
+        message_has_timed_out = False
         await interaction.response.send_message('Fixing permissions...', ephemeral=True)
         for channel in guild.channels:
             if isinstance(channel, discord.TextChannel):
                 # check if its a team channel
-                await interaction.edit_original_response(content=f'Fixing permissions for {channel.name}...')
+                try:
+                    if message_has_timed_out == False:
+                        await interaction.edit_original_response(content=f'Fixing permissions for {channel.name}...')
+                    else:
+                        break
+                except discord.errors.HTTPException as e:
+                    # if 401 Unauthorized
+                    if e.code == 401:
+                        message_has_timed_out = True
+                        await interaction.channel.send(content=f'Hey <@{interaction.user.id}>, Discord is giving us errors for editing the earlier interaction. We\'ll continue quietly in the background.')
+                        break
+                        
                 if channel.id in [team[5] for team in teams]:
                     team = [team for team in teams if team[5] == channel.id][0]
                     role = guild.get_role(team[3])
                     all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', '!AC', 'DEVELOPER', 'BOT')
                     no_access = checks._get_role_ids('CASTER')
                     await channel.set_permissions(role, read_messages=True, send_messages=True)
+                    # wait one second
+                    await asyncio.sleep(1)
                     # add admins
                     await channel.set_permissions(guild.default_role, read_messages=False)
+                    await asyncio.sleep(1)
                     for role in all_access:
                         await channel.set_permissions(guild.get_role(role), read_messages=True, send_messages=True)
+                        await asyncio.sleep(1)
                     for role in no_access:
                         await channel.set_permissions(guild.get_role(role), read_messages=False)
+                        await asyncio.sleep(1)
                 # check if its a match channel
                 if channel.id in [match[4] for match in matches]:
                     match = [match for match in matches if match[4] == channel.id][0]
                     all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'APPROVED', 'BOT')
                     no_access = checks._get_role_ids('UNAPPROVED')
                     await channel.set_permissions(guild.default_role, read_messages=False)
+                    await asyncio.sleep(1)
                     team_home = self.db.get_team_by_id(match[2])
                     team_away = self.db.get_team_by_id(match[3])
                     await channel.set_permissions(guild.get_role(team_home[3]), read_messages=True, send_messages=True)
+                    await asyncio.sleep(1)
                     await channel.set_permissions(guild.get_role(team_away[3]), read_messages=True, send_messages=True)
+                    await asyncio.sleep(1)
                     for role in all_access:
                         await channel.set_permissions(guild.get_role(role), read_messages=True, send_messages=True)
+                        await asyncio.sleep(1)
                     for role in no_access:
                         await channel.set_permissions(guild.get_role(role), read_messages=False)
-        await interaction.edit_original_response(content='Permissions fixed.')
+                        await asyncio.sleep(1) 
+        try:
+            await interaction.edit_original_response(content='Permissions fixed.')
+        except discord.errors.HTTPException as e:
+            if e.code == 401:
+                await interaction.channel.send(content='Permissions fixed.')
         
         
                 
