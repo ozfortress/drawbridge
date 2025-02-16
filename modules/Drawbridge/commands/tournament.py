@@ -76,7 +76,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             rawlaunchpadmessage = ''
             # sort divs like this - Premier, High, Intermediate, Main, Open
             priority_order = ['Premier', 'High', 'Intermediate', 'Main', 'Open']
-            divs = sorted(divs, key=lambda div: priority_order.index(div[1]))
+            divs = sorted(divs, key=lambda div: priority_order.index(div[1]) if div[1] in priority_order else len(priority_order))
             for leagues in leagues:
                 rawlaunchpadmessage += f'# {leagues.name}\n'
                 for div in divs:
