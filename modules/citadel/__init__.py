@@ -78,13 +78,14 @@ class Citadel:
             # Throw an error if the data doesnt have the required fields
             try:
                 self.id: int = data['id'] # Integer
+                self.is_captain = data.get('is_captain', False) # Boolean
                 self.name: str = data['name'] # String
                 self.description: str = data['description'] # String
                 self.created_at: str = data['created_at'] # DateTime(ISO 8601)
                 self.profile_url: str = data['profile_url'] # String
                 self.steam_32: str = data['steam_32'] # String
                 self.steam_64: int = data['steam_64'] # Integer(64)
-                self.setam_id3: str = data['steam_id3'] # String
+                self.steam_id3: str = data['steam_id3'] # String
                 # self.teams: list[Citadel.Team] | None = data['teams'] # [Team]
                 # self.rosters: list[Citadel.Roster] | None = data['rosters'] # [Roster]
             except KeyError as e:
