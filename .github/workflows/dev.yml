@@ -70,4 +70,5 @@ jobs:
           docker run -d \
             --name ${CONTAINER_NAME} \
             --env-file ${{ env.ENV_FILE_PATH }} \
+            --mount type=bind,source=/opt/ozf-projects/drawbridge/logs/${CONTAINER_NAME},target=/app/logs \
             ghcr.io/ozfortress/drawbridge:dev
