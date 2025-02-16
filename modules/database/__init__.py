@@ -631,7 +631,8 @@ class Database:
 
     def __init__(self, conn_params):
         self._throw_if_bad_config(conn_params)
-        conn_params['pool_name'] = 'drawbridge'
+        if not conn_params.get('pool_name'):
+            conn_params['pool_name'] = 'drawbridge'
         self.pool = mariadb.ConnectionPool(**conn_params)
         self.logger = logging.getLogger('drawbridge.database')
         # self._run_migrations() # TODO: WIP
@@ -685,7 +686,8 @@ class Database:
                 print(f"Error: {e}")
 
     def _close(self):
-        self.pool.close()
+        # self.pool.close()
+        pass
 
     def _run_migrations(self):
         # Check state of database

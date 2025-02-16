@@ -35,7 +35,7 @@ db = database.Database( conn_params={
     "host": os.getenv('DB_HOST'),
     "port": int(os.getenv('DB_PORT'))
 })
-cit = citadel.Citadel(os.getenv('CITADEL_API_KEY'))
+cit = citadel.Citadel(os.getenv('CITADEL_API_KEY'), baseURL=os.getenv('CITADEL_API_HOST'))
 socket_path = "/tmp/drawbridge.sock"
 healthstatus={
     'status': b"NOT OK"
@@ -78,6 +78,7 @@ def main():
 
 @client.event
 async def on_ready():
+    logger.debug(f'token: {os.getenv("DISCORD_TOKEN")}')
     logger.info(f'Logged in as {client.user.name}#{client.user.discriminator} ({client.user.id})')
     # await Drawbridge.load_all_commands(
     await Drawbridge.initialize(client, db, cit, logger)
