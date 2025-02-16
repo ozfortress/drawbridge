@@ -44,7 +44,77 @@ class LinkModal(discord.ui.Modal, title='Link Account'):
     )
 
     async def on_submit(self, interaction: discord.Interaction):
-        await interaction.response.send_message(f'Profile: {self.profile.value}\nTeam: {self.team.value}', ephemeral=True)
+        # await interaction.response.send_message(f'Profile: {self.profile.value}\nTeam: {self.team.value}', ephemeral=True)
+        # verify profile
+        await interaction.response.send_message('Checking your profile and team...', ephemeral=True)
+        profile = self.profile.value
+        team = self.team.value  
+        if not profile.startswith('https://ozfortress.com/users/') or not team.startswith('https://ozfortress.com/teams/'):
+            await interaction.response.edit_message('Invalid profile or team link. Please make sure you are using the correct links.')
+            return
+        # verify team
+        citadelapi = citadel.Citadel(
+            os.getenv('CITADEL_API_KEY')
+        )
+        db = database.Database(
+            {
+                'host': os.getenv('DB_HOST'),
+                'user': os.getenv('DB_USER'),
+                'password': os.getenv('DB_PASS'),
+                'database': os.getenv('DB_NAME')
+            }
+        )
+        team_id = team.split('/')[-1]
+        # reject if team_id is not a number
+        if not team_id.isdigit():
+            await interaction.response.edit_message('Invalid team link. Please make sure you are using the correct links.')
+            return
+        cteam = citadelapi.getTeam(team_id)
+        if not cteam:
+            await interaction.response.edit_message('Inavalid team link. Please make sure you are using the correct links.')
+            return
+
+        all_teams = db.get_all_teams()
+        if len(all_teams) == 0:
+            await interaction.response.edit_message('Sorry, there appears to be no active tournaments at the moment. Please try again later.')
+            return
+        for team in all_teams:
+            if team['team_id'] != team_id:
+                all_teams.remove(team)
+        if len(all_teams) == 0:
+            await interaction.response.edit_message('Sorry, that team is not rostered in any currently active tournaments. You can get your roles once seedings have been completed.')
+            return
+        
+        # is the profile valid?
+        user_id = profile.split('/')[-1]
+        if not user_id.isdigit():
+            await interaction.response.edit_message('Invalid profile link. Please make sure you are using the correct links.')
+            return
+        cuser = citadelapi.getUser(user_id)
+        if not cuser:
+            await interaction.response.edit_message('Invalid profile link. Please make sure you are using the correct links.')
+            return
+        
+        # find all teams the user is a captain in.
+        # teams = []
+        roles = []
+        for team in all_teams:
+            # get their roster
+            t = citadelapi.getTeam(team[1])
+            for player in t.players:
+                if player.is_captain and player.id == cuser.id:
+                    # found a team they are captain in
+                    # add them to their team roles
+                    roles.append(interaction.guild.get_role(int(team[3])))
+                    break
+        if len(roles) == 0:
+            await interaction.response.edit_message('You are not a captain in any of the teams rostered in the current tournaments. Please try again later.')
+            return
+        # assign roles
+        await interaction.user.add_roles(roles=roles, reason=f'Linked via Drawbridge to Citadel User ID: {cuser.id}')
+        await interaction.response.edit_message('Successfully linked your account and assigned roles.')
+        return
+        
 
     async def on_error(self, interaction: discord.Interaction, error: Exception):
         await interaction.response.send_message(f'An error occurred: \n```\n{error}\n```', ephemeral=True)
@@ -64,8 +134,8 @@ class Link(discord_commands.Cog):
     async def on_member_join(self, member):
         channel = member.guild.system_channel
         if channel is not None:
-            # await channel.send(f'Welcome {member.mention}! Please link your Citadel account with the command `/link`.')
-            pass # Disable welcome message for now
+            await channel.send(f'Welcome {member.mention}! Please link your Citadel account with the command `/link`.')
+            #pass # Disable welcome message for now
 
     @app_commands.command(name='link', description='Link your Citadel account with your Discord account.')
     async def link(self, interaction : discord.Interaction):
