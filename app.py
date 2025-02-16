@@ -14,6 +14,7 @@ import subprocess
 import datetime
 import socket
 import asyncio
+import traceback
 
 
 load_dotenv()
@@ -112,7 +113,9 @@ async def on_error(event, *args, **kwargs):
     # and log it to the console
     try:
         botmisc= client.get_channel(int(os.getenv('ANNOUNCE_CHANNEL')))
-        await botmisc.send(f'# Unhandled Error\n in event {event}: \n args: {args} \n kwargs: {kwargs}')
+        tb_str = ''.join(traceback.format_exception(None, args[0], args[0].__traceback__))
+        await botmisc.send(f'# Unhandled Error\n```\n{tb_str}\n```')
+        # await botmisc.send(f'# Unhandled Error\n in event {event}: \n args: {args} \n kwargs: {kwargs}')
     except Exception as e:
         logger.error(f'Error in on_error: {e}', exc_info=True)
 
