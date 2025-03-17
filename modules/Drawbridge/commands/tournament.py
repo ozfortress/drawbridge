@@ -47,6 +47,14 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         await self.update_launchpad()
         await interaction.edit_original_response(content='Launchpad generated and sent to the launchpad channel.')
 
+    def better_lambda(self, div):
+        priority_order = ['Premier', 'High', 'Intermediate', 'Main', 'Open']
+
+        try:
+            priority_order.index(div[1])
+        except:
+            return div[0]
+
     async def update_launchpad(self):
         # purge all messages in the launchpad channel
         # get the launchpad channel
@@ -75,8 +83,9 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
             rawlaunchpadmessage = ''
             # sort divs like this - Premier, High, Intermediate, Main, Open
-            priority_order = ['Premier', 'High', 'Intermediate', 'Main', 'Open']
-            divs = sorted(divs, key=lambda div: priority_order.index(div[1]) if div[1] in priority_order else len(priority_order))
+            #priority_order = ['Premier', 'High', 'Intermediate', 'Main', 'Open']
+
+            divs = sorted(divs, key=self.better_lambda)
             for leagues in leagues:
                 rawlaunchpadmessage += f'# {leagues.name}\n'
                 for div in divs:
@@ -603,7 +612,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             if self.db.get_divs_by_league(league_id) is None:
                 await interaction.edit_original_response(content='League not being monitored. Aborting.')
                 return
-            if spes_user is 0:
+            if spes_user == 0:
                 # to make life easier we need to remove the description field of all matches
 
                 # This method is a lot slower that my previous attempt but idgaf -ama
@@ -612,7 +621,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 for m in matches:
                     if round_no > 0 and round_no != m.round_number:
                         continue
-                    if m.forfeit_by != 'no_forfeit' or m.away_team is 'null':
+                    if m.forfeit_by != 'no_forfeit' or m.away_team is None:
                         continue
                     filtered_matches.append(m)
 
