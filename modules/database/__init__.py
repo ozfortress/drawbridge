@@ -888,10 +888,21 @@ class Database:
     def get_team_by_id(self, team_id):
         with self.pool.get_connection() as conn:
             try:
-                #query = "SELECT * FROM teams LEFT JOIN divisions ON teams.division = divisions.id WHERE team_id = %s"
                 cursor = conn.cursor()
                 query = 'SELECT * FROM teams WHERE team_id=?;'
                 cursor.execute(query, (team_id,))
+                return cursor.fetchone()
+            except mariadb.Error as e:
+                print(f"Error: {e}")
+                return None
+            
+    # to fix ambiguity for a team signed up for more than 1 league
+    def get_team_by_id_and_league(self, team_id, league_id):
+        with self.pool.get_connection() as conn:
+            try:
+                cursor = conn.cursor()
+                query = 'SELECT * FROM teams WHERE team_id=? and league_id=?;'
+                cursor.execute(query, (team_id,league_id))
                 return cursor.fetchone()
             except mariadb.Error as e:
                 print(f"Error: {e}")

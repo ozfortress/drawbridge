@@ -51,7 +51,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         priority_order = ['Premier', 'High', 'Intermediate', 'Main', 'Open']
 
         try:
-            priority_order.index(div[1])
+            return priority_order.index(div[1])
         except:
             return div[0]
 
@@ -347,7 +347,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         if self.db.get_match_by_id(match.id) is not None:
             return False # It's already in the Database, must already be generated.
         if match.home_team is None:
-            team_home = self.db.get_team_by_id(match.home_team['team_id'])
+            team_home = self.db.get_team_by_id_and_league(match.home_team['team_id'], match.league.id)
             role_home = guild.get_role(team_home[3])
             team_channel = self.bot.get_channel(team_home[5])
             await team_channel.send(f'Matches for round {match.round_number} were just generated. {role_home.mention} have a bye this round, and thus will be awarded a win.')
