@@ -86,6 +86,7 @@ class Citadel:
                 self.steam_32: str = data['steam_32'] # String
                 self.steam_64: int = data['steam_64'] # Integer(64)
                 self.steam_id3: str = data['steam_id3'] # String
+                self.discord_id: int = data.get('discord_id',None) # Integer(64)
                 # self.teams: list[Citadel.Team] | None = data['teams'] # [Team]
                 # self.rosters: list[Citadel.Roster] | None = data['rosters'] # [Roster]
             except KeyError as e:
@@ -112,9 +113,11 @@ class Citadel:
             The user's Steam 64-bit ID.
         steam_id3: str
             The user's Steam ID3.
-        teams: list[Citadel.Team]
+        discord_id: int
+            The user's Discord ID.
+        teams: list[Citadel.PartialTeam]
             The teams the user belongs to.
-        rosters: list[Citadel.Roster]
+        rosters: list[Citadel.PartialRoster]
             The rosters the user is part of.
         """
         def __init__(self, data: dict) -> None:
@@ -411,6 +414,32 @@ class Citadel:
         if 'status' in response:
             raise Citadel.APIException(response['status'], response['message'])
         return self.User(response['user'])
+    
+    def getUserByDiscordID(self, discord_id: str|int) -> User:
+        """
+        Retrieves a user by their Discord ID.
+
+        Args:
+            discord_id (str|int): The Discord ID of the user.
+
+        Returns:
+            User: The user object corresponding to the given Discord ID.
+
+        Raises:
+            ValueError: If the Discord ID is invalid.
+            Citadel.APIException: If the API response contains an error status.
+        """
+        # Discord ID must be 64 bit version, reject if not
+        if len(discord_id) != 18 | discord_id.isdigit() == False:
+            raise ValueError('Invalid Discord ID. Must be a number.')
+        url = f'{self._base_url}users/discord_id/{discord_id}'
+        headers = {'X-API-Key': self._api_key}
+        response: dict = requests.get(url, headers=headers).json()
+        if 'status' in response:
+            raise Citadel.APIException(response['status'], response['message'])
+        return self.User(response['user'])
+        
+        
 
     def getTeam(self, id: int) -> Team:
         """
