@@ -381,7 +381,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 guild.get_role(team_home[3]): discord.PermissionOverwrite(view_channel=True),
                 guild.get_role(team_away[3]): discord.PermissionOverwrite(view_channel=True),
             }
-            all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'APPROVED', 'BOT')
+            all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'APPROVED', 'BOT', 'STAFF')
             for role in all_access:
                 overrides[guild.get_role(role)] = discord.PermissionOverwrite(view_channel=True)
             cat = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID'))).get_channel(category_id)
