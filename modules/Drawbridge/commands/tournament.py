@@ -466,7 +466,10 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     matches.remove(match)
                 # discard all who's round number doesn't match the number we've been given.
                 if round_number is not None and match2.round_number != round_number:
-                    matches.remove(match)
+                    try:
+                        matches.remove(match)
+                    except ValueError:
+                        pass
                 # discard all matches that exist in the database
                 if self.db.get_match_by_id(match2.id) is not None:
                     matches.remove(match)
