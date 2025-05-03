@@ -469,7 +469,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     try:
                         matches.remove(match)
                     except ValueError:
-                        pass
+                        self.logger.debug(f'Match {match2.id} not in matches list')
+                        continue
                 # discard all matches that exist in the database
                 if self.db.get_match_by_id(match2.id) is not None:
                     matches.remove(match)
