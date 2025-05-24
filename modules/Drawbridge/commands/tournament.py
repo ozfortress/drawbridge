@@ -542,13 +542,16 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
         match = self.db.get_match_by_id(match_id)
         if match is None:
-            await interaction.response.edit_message(content='Match not found.')
+            # await interaction.response.edit_message(content='Match not found.')
+            await interaction.edit_original_response(content='Match not found in the database. Please ensure it has been generated first.')
             return
         if match[4] == 0: # channel_id
-            await interaction.response.edit_message(content='Match is a bye, cannot end.')
+            # await interaction.response.edit_message(content='Match is a bye, cannot end.')
+            await interaction.edit_original_response(content='Match is a bye, cannot end. Please ensure the match has been generated first.')
             return
         if match[5] == 1: # archived
-            await interaction.response.edit_message(content='Match has already been archived.')
+            # await interaction.response.edit_message(content='Match has already been archived.')
+            await interaction.edit_original_response(content='Match has already been archived. Please ensure the match has not already been ended.')
             return
         #match_channel = discord.Object(id=match[4])
         match_channel = interaction.guild.get_channel(match[4])
