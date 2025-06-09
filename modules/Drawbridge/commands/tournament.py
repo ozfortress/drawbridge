@@ -194,7 +194,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
                     all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'BOT')
                     for permrole in all_access:
-                        overrides[interaction.guild.get_role(permrole)] = discord.PermissionOverwrite(view_channel=True)
+                        overwrites[interaction.guild.get_role(permrole)] = discord.PermissionOverwrite(view_channel=True)
                     channel_name = f'🛡️{roster_name} ({league_shortcode})'
                     if len(channel_name) > 45:
                         channel_name = f'🛡️{roster_name[:20]} ({league_shortcode})'
