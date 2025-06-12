@@ -1126,48 +1126,36 @@ class Database:
                 print(f'Error: {e}')
                 return None
 
-    def check_link_status(self, user_id):
+
+    def discord_user_has_synced(self, discord_id):
         with self.pool.get_connection() as conn:
             try:
                 cursor = conn.cursor()
-                query = 'SELECT link_status FROM linked_users WHERE discord_id = ?'
-                cursor.execute(query, (user_id,))
-                return cursor.fetchone()
+                query = 'SELECT count(discord_id) FROM synced_users WHERE discord_id = ?'
+                cursor.execute(query, (discord_id,))
+                return cursor.fetchone()[0] == 1
             except mariadb.Error as e:
                 print(f'Error: {e}')
                 return None
 
-    def check_for_linked_steamid(self, steam_id):
+    def insert_user(self, citadel_id, discord_id, steam_id):
         with self.pool.get_connection() as conn:
             try:
                 cursor = conn.cursor()
-                query = 'SELECT * FROM linked_users WHERE steam_id = ?'
-                cursor.execute(query, (steam_id,))
-                return cursor.fetchone()
-            except mariadb.Error as e:
-                print(f'Error: {e}')
-                return None
-
-    def start_link(self, user_id, link_code):
-        with self.pool.get_connection() as conn:
-            try:
-                cursor = conn.cursor()
-                query = 'INSERT INTO linked_users (discord_id, link_code, link_status) VALUES (?, ?, ?)'
-                cursor.execute(query, (user_id, link_code, 0))
+                query = 'INSERT INTO synced_users(citadel_id, discord_id, steam_id, time_created, time_modified) VALUES (?, ?, ?, NOW(), NOW())'
+                cursor.execute(query, (citadel_id, discord_id, steam_id))
                 conn.commit()
             except mariadb.Error as e:
                 print(f'Error: {e}')
                 return None
 
-    def link_steam_to_discord(self,steam_id, link_code, cit_id):
+    def update_user(self, citadel_id, discord_id, steam_id):
         with self.pool.get_connection() as conn:
             try:
                 cursor = conn.cursor()
-                query = 'UPDATE linked_users SET steam_id = ?, link_status = ?, citadel_id = ? WHERE link_code = ?'
-                status = 1
-                if cit_id is None:
-                    status = 2
-                cursor.execute(query, (steam_id, status, cit_id, link_code))
+                query = 'UPDATE synced_users SET citadel_id = ?, discord_id = ?, steam_id = ?, time_modified = NOW() WHERE citadel_id = ?'
+                cursor.execute(
+                    query, (citadel_id, discord_id, steam_id, citadel_id))
                 conn.commit()
             except mariadb.Error as e:
                 print(f'Error: {e}')
