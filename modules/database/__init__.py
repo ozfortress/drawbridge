@@ -930,6 +930,18 @@ class Database:
                 print(f'Error in get_teams_by_league: {e}')
                 return None
 
+    def get_teams_by_div(self, div_id):
+        with self.pool.get_connection() as conn:
+            try:
+                cursor = conn.cursor()
+                query = 'SELECT * FROM teams WHERE division=?'
+                cursor.execute(query, (div_id,))
+                return cursor.fetchall()
+            except mariadb.Error as e:
+                print(f'Error in get_teams_by_league: {e}')
+                return None
+
+
     def get_matches_by_league(self, league_id):
         with self.pool.get_connection() as conn:
             try:
@@ -1126,6 +1138,16 @@ class Database:
                 print(f'Error: {e}')
                 return None
 
+    def citadel_user_has_synced(self, citadel_id):
+        with self.pool.get_connection() as conn:
+            try:
+                cursor = conn.cursor()
+                query = 'SELECT count(citadel_id) FROM synced_users WHERE citadel_id = ?'
+                cursor.execute(query, (citadel_id,))
+                return cursor.fetchone()[0] == 1
+            except mariadb.Error as e:
+                print(f'Error: {e}')
+                return None
 
     def discord_user_has_synced(self, discord_id):
         with self.pool.get_connection() as conn:
@@ -1160,6 +1182,18 @@ class Database:
             except mariadb.Error as e:
                 print(f'Error: {e}')
                 return None
+
+    def get_discord_id_by_citadel_id(self, citadel_id):
+        with self.pool.get_connection() as conn:
+            try:
+                cursor = conn.cursor()
+                query = 'SELECT discord_id FROM synced_users WHERE citadel_id = ?;'
+                cursor.execute(query, (citadel_id, ))
+                return cursor.fetchone()[0]
+            except mariadb.Error as e:
+                print(f'Error: {e}')
+                return None
+
 
     def get_matches_not_yet_archived(self):
         with self.pool.get_connection() as conn:
