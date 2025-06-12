@@ -223,11 +223,11 @@ class Citadel:
                 # self.matches: list[Citadel.PartialMatch] | None = data['matches'] # [Match]
             except KeyError as e:
                 raise ValueError(f'Missing required field: {e}')
-            
+
     class League(PartialLeague):
         """
         Represents a league in the Citadel module.
-        
+
         Attributes
         ----------
         id: int
@@ -457,13 +457,13 @@ class Citadel:
         """
         url = f'{self._base_url}users/discord_id/{discord_id}'
         headers = {'X-API-Key': self._api_key}
-        response: dict = requests.get(url, headers=headers).json()
+        request = requests.get(url, headers=headers)
+        if request.status_code == 404:
+            return None
+        response: dict = request.json()
         if 'status' in response:
-            if response['status'] == 404:
-                return None
-            else:
-                raise Citadel.APIException(
-                    response['status'], response['message'])
+            raise Citadel.APIException(
+                response['status'], response['message'])
         return self.User(response['user'])
 
     def getTeam(self, id: int) -> Team:
