@@ -131,7 +131,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 team_id = team[1]
                 team_role_id = team[3]
                 team_role = self.guild.get_role(team_role_id)
-                team: Team = self.cit.getTeam(team_id)
+                team: citadel.Team = self.cit.getTeam(team_id)
                 for user in team.players:
                     if user['is_captain']:
                         if self.db.citadel_user_has_synced(user['id']):
@@ -145,9 +145,9 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                                 not_in_server.append(user['name'])
                         else:
                             not_linked.append(user['name'])
-            not_linked_str = f"# Account Not Linked\n{', '.join(not_linked)}\n" if len(not_linked) > 0 else ""
-        not_in_server_str = f"# Not In Server\n{', '.join(not_in_server)}\n" if len(not_in_server) > 0 else ""
-        return f"Could not assign roles to the following Citadel accounts:\n{not_linked_str}\n{not_in_server_str}"
+            not_linked_str = f"## Account Not Linked\n{', '.join(not_linked)}\n" if len(not_linked) > 0 else ""
+        not_in_server_str = f"## Not In Server\n{', '.join(not_in_server)}\n" if len(not_in_server) > 0 else ""
+        return f"# Role Assignment Errors\n{not_linked_str}\n{not_in_server_str}"
 
 
     @app_commands.command(
@@ -260,8 +260,15 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                         'team_name': roster_name
                     }
                     self.db.insert_team(dbteam)
-        failed_role_assignments = await self._assign_roles(league_id)
-        await interaction.edit_original_response(content=f'Generated.\nLeague: {league.name}\nDivisions: {d}/{len(divs)}\nTeams: {r}/{len(rosters)}\n\n{failed_role_assignments}# All done :3')
+        finished_response = '\n'.join([
+            'Generated.'
+            f'League: {league.name}',
+            f'Divisions: {d}/{len(divs)}',
+            f'{r}/{len(rosters)}',
+            await self._assign_roles(league_id),
+            'All done :3'
+        ])
+        await interaction.edit_original_response(content=finished_response)
         await self.update_launchpad()
 
     @app_commands.command(

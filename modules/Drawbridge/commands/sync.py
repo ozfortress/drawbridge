@@ -4,6 +4,7 @@ from ..logging import *
 import logging
 import discord
 import os
+from typing import Optional
 from modules import database
 from modules import citadel
 
