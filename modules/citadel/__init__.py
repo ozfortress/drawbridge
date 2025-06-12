@@ -89,7 +89,7 @@ class Citadel:
                 self.steam_32: str = data['steam_32'] # String
                 self.steam_64: int = data['steam_64'] # Integer(64)
                 self.steam_id3: str = data['steam_id3'] # String
-                self.discord_id: Option[int] = data['discord_id']
+                self.discord_id: Optional[int] = data['discord_id']
                 # self.teams: list[Citadel.Team] | None = data['teams'] # [Team]
                 # self.rosters: list[Citadel.Roster] | None = data['rosters'] # [Roster]
             except KeyError as e:
