@@ -459,28 +459,24 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             # get the league
             league = self.cit.getLeague(league_id)
             matches = league.matches
+            filtered_matches = []
             for match in matches:
-                # discard all who's status is 'confirmed'
                 match2 = citadel.Citadel.PartialMatch(match)
                 if match2.status == 'confirmed':
-                    matches.remove(match)
-                # discard all who's round number doesn't match the number we've been given.
+                    continue
                 if round_number is not None and match2.round_number != round_number:
-                    try:
-                        matches.remove(match)
-                    except ValueError:
-                        self.logger.debug(f'Match {match2.id} not in matches list')
-                        continue
-                # discard all matches that exist in the database
+                    continue
                 if self.db.get_match_by_id(match2.id) is not None:
-                    matches.remove(match)
-            if len(matches) == 0:
+                    continue
+                filtered_matches.append(match)
+            if len(filtered_matches) == 0:
                 await interaction.edit_original_response(content='No matches found - all are byes, already generated, or completed matches.')
+                return
             c=0
-            for match in matches:
+            for match in filtered_matches:
                 match2 = citadel.Citadel.PartialMatch(match)
                 c=c+1
-                await interaction.edit_original_response(content=f'Generating {c}/{len(matches)} matches...')
+                await interaction.edit_original_response(content=f'Generating {c}/{len(filtered_matches)} matches...')
                 fullmatch = self.cit.getMatch(match2.id)
                 await self._generate_match(fullmatch)
             await interaction.edit_original_response(content='Matches generated.')
@@ -555,6 +551,12 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             return
         #match_channel = discord.Object(id=match[4])
         match_channel = interaction.guild.get_channel(match[4])
+        if match_channel is None:
+            await interaction.edit_original_response(content='Match channel not found. It may have already been deleted or never created.')
+            self.logger.error(f'Match channel with ID {match[4]} not found in guild.')
+            self.db.archive_match(match_id)
+            await self.update_launchpad()
+            return
         await match_channel.send('Match has ended. This channel will now be archived.')
         # Make the channel read only
         overwrites = match_channel.overwrites
@@ -562,13 +564,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             if role.id != interaction.guild.default_role.id:
                 overwrites[role] = discord.PermissionOverwrite(read_messages=True, send_messages=False)
 
-        # for overwrite in overwrites:
-        #     if overwrite != interaction.guild.default_role:
-        #         overwrites[interaction.guild.default_role] = discord.PermissionOverwrite(read_messages=True, send_messages=False)
-
         await match_channel.edit(overwrites=overwrites)
 
-        # at this point we'd hand off to the archival process, but that's firmly TODO:
         # Update the database
         self.db.archive_match(match_id)
 
