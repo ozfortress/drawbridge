@@ -188,8 +188,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
                     role = await interaction.guild.create_role(name=f'{roster_name} ({league_shortcode})', mentionable=True)
                     overwrites = {
-                        interaction.guild.default_role: discord.PermissionOverwrite(view_channel=False),
-                        role: discord.PermissionOverwrite(view_channel=True)
+                        interaction.guild.default_role: discord.PermissionOverwrite(view_channel=False, send_messages=False),
+                        role: discord.PermissionOverwrite(view_channel=True, send_messages=True)
                     }
 
                     all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'BOT')
@@ -377,9 +377,9 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             if category_id == 0:
                 raise Exception('Division not found for the match')
             overrides = {
-                guild.default_role: discord.PermissionOverwrite(view_channel=False),
-                guild.get_role(team_home[3]): discord.PermissionOverwrite(view_channel=True),
-                guild.get_role(team_away[3]): discord.PermissionOverwrite(view_channel=True),
+                guild.default_role: discord.PermissionOverwrite(view_channel=False, send_messages=False),
+                guild.get_role(team_home[3]): discord.PermissionOverwrite(view_channel=True, send_messages=True),
+                guild.get_role(team_away[3]): discord.PermissionOverwrite(view_channel=True, send_messages=True),
             }
             all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'APPROVED', 'BOT', 'STAFF')
             for role in all_access:
