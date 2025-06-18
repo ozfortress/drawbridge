@@ -36,7 +36,7 @@ db = database.Database( conn_params={
     "host": os.getenv('DB_HOST'),
     "port": int(os.getenv('DB_PORT'))
 })
-cit = citadel.Citadel(os.getenv('CITADEL_API_KEY'), baseURL=os.getenv('CITADEL_API_HOST'))
+cit = citadel.Citadel(os.getenv('CITADEL_API_KEY'), baseURL=os.getenv('CITADEL_HOST'))
 socket_path = "/tmp/drawbridge.sock"
 healthstatus={
     'status': b"NOT OK"
