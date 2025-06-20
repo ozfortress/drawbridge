@@ -164,7 +164,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
             all_access = checks._get_role_ids('HEAD', 'ADMIN', '!AC', 'TRIAL', 'DEVELOPER', 'APPROVED', 'BOT')
             for role in all_access:
-                overrides[interaction.guild.get_role(role)] = discord.PermissionOverwrite(view_channel=True)
+                overrides[interaction.guild.get_role(role)] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
 
             channelcategory = await interaction.guild.create_category(f'{div} - {league_shortcode}', overwrites=overrides)
 
@@ -194,7 +194,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
                     all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'BOT')
                     for permrole in all_access:
-                        overwrites[interaction.guild.get_role(permrole)] = discord.PermissionOverwrite(view_channel=True)
+                        overwrites[interaction.guild.get_role(permrole)] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
                     channel_name = f'🛡️{roster_name} ({league_shortcode})'
                     if len(channel_name) > 45:
                         channel_name = f'🛡️{roster_name[:20]} ({league_shortcode})'
@@ -383,7 +383,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             }
             all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'APPROVED', 'BOT', 'STAFF')
             for role in all_access:
-                overrides[guild.get_role(role)] = discord.PermissionOverwrite(view_channel=True)
+                overrides[guild.get_role(role)] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
             cat = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID'))).get_channel(category_id)
             if cat == None:
                 raise Exception(f'Category not found for division {match.home_team["division"]}')
