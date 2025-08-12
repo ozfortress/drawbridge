@@ -125,7 +125,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         'HEAD',
         'DEVELOPER',
     )
-    async def start(self, interaction : discord.Interaction, league_id : int, league_shortcode: str, share : bool=False):
+    async def start(self, interaction : discord.Interaction, league_id : int, league_shortcode: str, role_overrides: Optional[str], share : bool=False):
         """Generate team roles and channels for a given league
 
         Parameters
@@ -134,6 +134,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             The League ID to generate teams for
         league_shortcode: str
             The Shortcode for this league (eg: HL 27, 6s 30 ), this will be appended to role names.
+        role_overrides: Optional[str]
+            Roles that should have access to generated team channels. These are comma-separated.
         """
 
         await interaction.response.send_message('Generating teams...', ephemeral=not share)
@@ -165,6 +167,9 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             all_access = checks._get_role_ids('HEAD', 'ADMIN', '!AC', 'TRIAL', 'DEVELOPER', 'APPROVED', 'BOT')
             for role in all_access:
                 overrides[interaction.guild.get_role(role)] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
+            additional_overrides = self.get_role_ids_from_overrides(role_overrides)
+            for override in additional_overrides:
+                overrides[override] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
 
             channelcategory = await interaction.guild.create_category(f'{div} - {league_shortcode}', overwrites=overrides)
 
@@ -195,6 +200,9 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'BOT')
                     for permrole in all_access:
                         overwrites[interaction.guild.get_role(permrole)] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
+                    for overwrites in additional_overrides:
+                        overwrites[override] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
+                        
                     channel_name = f'🛡️{roster_name} ({league_shortcode})'
                     if len(channel_name) > 45:
                         channel_name = f'🛡️{roster_name[:20]} ({league_shortcode})'
@@ -325,13 +333,15 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         await interaction.edit_original_response(content='Tournament ended. All channels, categories and roles have been archived.')
         await self.update_launchpad()
 
-    async def _generate_match(self, match: Citadel.Citadel.Match):
+    async def _generate_match(self, match: Citadel.Citadel.Match, role_overrides: Optional[str] = None):
         """Generate a match channel for a given match
 
         Parameters
         -----------
         match: Citadel.Citadel.Match
             The match to generate a channel for
+        role_overrides: Optional[str]
+            Roles that should have access to generated match channels. These are comma-separated.
 
         Returns
         -----------
@@ -384,6 +394,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'APPROVED', 'BOT', 'STAFF')
             for role in all_access:
                 overrides[guild.get_role(role)] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
+            for role in self.get_role_ids_from_overrides(role_overrides):
+                overrides[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
             cat = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID'))).get_channel(category_id)
             if cat == None:
                 raise Exception(f'Category not found for division {match.home_team["division"]}')
@@ -444,7 +456,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         'ADMIN',
         'TRIAL',
     )
-    async def matchgenround(self, interaction : discord.Interaction, league_id : int, round_number : Optional[int]):
+    async def matchgenround(self, interaction : discord.Interaction, league_id : int, round_number : Optional[int], role_overrides : Optional[str]):
         """Generate ALL match channels for a given league (optionally limiting to a specific round). Attempts to skip matches already generated.
 
         Parameters
@@ -453,6 +465,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             The League ID to generate matches for
         round_number: Optional[int]
             The round number to generate matches for
+        role_overrides: Optional[str]
+            Roles that should have access to generated match/team channels. These are comma-separated.
         """
         await interaction.response.send_message('Finding matches...', ephemeral=True)
         try:
@@ -478,7 +492,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 c=c+1
                 await interaction.edit_original_response(content=f'Generating {c}/{len(filtered_matches)} matches...')
                 fullmatch = self.cit.getMatch(match2.id)
-                await self._generate_match(fullmatch)
+                await self._generate_match(fullmatch, role_overrides)
             await interaction.edit_original_response(content='Matches generated.')
         except Exception as e:
             self.logger.error(f'Error generating matches: {e}', exc_info=True)
@@ -494,13 +508,15 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         'ADMIN',
         'TRIAL',
     )
-    async def matchgen(self, interaction : discord.Interaction, match_id : int):
+    async def matchgen(self, interaction : discord.Interaction, match_id : int, role_overrides : Optional[str]):
         """Generate match channels for a given match id
 
         Parameters
         -----------
         match_id: int
             ID of match to generate
+        role_overrides: Optional[str]
+            Roles that should have access to generated match channels. These are comma-separated.
         """
 
         await interaction.response.send_message('Generating matches...', ephemeral=True)
@@ -509,7 +525,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             if match is None:
                 await interaction.edit_original_response(content='Match not found.')
                 return
-            await self._generate_match(match)
+            await self._generate_match(match, role_overrides)
             await interaction.edit_original_response(content='Match generated.')
         except Exception as e:
             self.logger.error(f'Error generating match: {e}', exc_info=True)
@@ -735,6 +751,16 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 return l[l.find(start_str)+len(start_str):l.rfind('">')]
         return 'fuck'
 
+    def get_role_ids_from_overrides(self, role_overrides: Optional[str]) -> list[discord.Role]:
+        if role_overrides is not None:
+            guild = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID')))
+            roles = []
+            for role in role_overrides.split(','):
+                role_obj = discord.utils.get(guild.roles, name=role.strip())
+                if role_obj is not None:
+                    roles.append(role_obj)
+        else:
+            return []
     # @app_commands.command(
     #         name='randomdemocheck',
     #         description='Announces a truly random demo check, given a League ID. Automatically picks a team in the league, and a match to check'
