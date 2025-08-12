@@ -759,6 +759,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 role_obj = discord.utils.get(guild.roles, name=role.strip())
                 if role_obj is not None:
                     roles.append(role_obj)
+            return roles
         else:
             return []
     # @app_commands.command(
