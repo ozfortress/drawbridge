@@ -49,15 +49,20 @@ class Checks:
         List[int]
             List of role IDs.
         """
-        keywords = [word.upper() for word in keywords]
+        positive_keywords = []
         antikeywords = []
+
+        # Separate positive and negative keywords
         for word in keywords:
             if word.startswith('!'):
-                antikeywords.append(word[1:])
-                keywords.remove(word)
+                antikeywords.append(word[1:].upper())
+            else:
+                positive_keywords.append(word.upper())
+
+        # Filter roles based on keywords
         return [
             int(id) for key, id in self.roles.items()
-            if any(word in key for word in keywords if word) and not any(word in key for word in antikeywords)
+            if any(word in key for word in positive_keywords) and not any(word in key for word in antikeywords)
         ]
 
     def has_roles(self, *keywords: str):

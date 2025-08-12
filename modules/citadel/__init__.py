@@ -12,6 +12,7 @@ __copyright__ = 'Copyright 2024-present ozfortress'
 
 __path__ = __import__('pkgutil').extend_path(__path__, __name__)
 
+from typing import Optional
 import requests
 import json
 
@@ -197,10 +198,34 @@ class Citadel:
             except KeyError as e:
                 raise ValueError(f'Missing required field: {e}')
 
-    class League(_BaseCitadelObject):
+    class PartialLeague(_BaseCitadelObject):
         """
         Represents a league in the Citadel module.
 
+        Attributes
+        ----------
+        id: int
+            The league's ID.
+        name: str
+            The league's name.
+        description: str
+            The league's description.
+        """
+        def __init__(self, data: dict) -> None:
+            # Throw an error if the data doesnt have the required fields
+            try:
+                self.id: int = data['id'] # Integer
+                self.name: str = data['name'] # String
+                self.description: str = data['description'] # String
+                # self.rosters: list[Citadel.PartialRoster] | None = data['rosters'] # [Roster]
+                # self.matches: list[Citadel.PartialMatch] | None = data['matches'] # [Match]
+            except KeyError as e:
+                raise ValueError(f'Missing required field: {e}')
+            
+    class League(PartialLeague):
+        """
+        Represents a league in the Citadel module.
+        
         Attributes
         ----------
         id: int
@@ -215,15 +240,14 @@ class Citadel:
             The matches in the league (optional).
         """
         def __init__(self, data: dict) -> None:
-            # Throw an error if the data doesnt have the required fields
+            super().__init__(data)
             try:
-                self.id: int = data['id'] # Integer
-                self.name: str = data['name'] # String
-                self.description: str = data['description'] # String
-                self.rosters: list[Citadel.PartialRoster] | None = data['rosters'] # [Roster]
-                self.matches: list[Citadel.PartialMatch] | None = data['matches'] # [Match]
+                self.rosters: list[Citadel.PartialRoster] = data['rosters'] # [Roster]
+                self.matches: list[Citadel.PartialMatch] = data['matches'] # [Match]
             except KeyError as e:
                 raise ValueError(f'Missing required field: {e}')
+
+
     class PartialRoster(_BaseCitadelObject):
         """
         Represents a roster in the Citadel module. This is only a partial roster, missing some fields as a consequence of being requested as a child of a league
@@ -356,9 +380,9 @@ class Citadel:
         def __init__(self, data:dict) -> None:
             super().__init__(data)
             try:
-                self.league: Citadel.League = data['league'] # League
-                self.home_team: Citadel.Roster = data['home_team'] # Roster
-                self.away_team: Citadel.Roster = data['away_team'] # Roster
+                self.league: Citadel.PartialLeague = data['league'] # League
+                self.home_team: Citadel.PartialRoster = data['home_team'] # Roster
+                self.away_team: Citadel.PartialRoster | None = data.get('away_team') # Roster
                 self.league_id = data['league']['id']
             except KeyError as e:
                 raise ValueError(f'Missing required field: {e}')
