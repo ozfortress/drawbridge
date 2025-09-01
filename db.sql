@@ -20,16 +20,17 @@ CREATE TABLE `leagues` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
--- drawbridge.linked_users definition
+-- drawbridge.synced_users definition
 
-CREATE TABLE `linked_users` (
-  `discord_id` bigint(20) DEFAULT NULL,
-  `steam_id` bigint(20) DEFAULT NULL,
-  `citadel_id` int(11) DEFAULT NULL,
-  `link_status` int(11) DEFAULT NULL,
-  `link_code` varchar(100) DEFAULT NULL,
-  `time_started` datetime NOT NULL,
-  `time_finished` datetime DEFAULT NULL
+CREATE TABLE `synced_users` (
+    `citadel_id` int NOT NULL,
+    `discord_id` bigint NOT NULL,
+    `steam_id` bigint NOT NULL,
+    `time_created` datetime NOT NULL,
+    `time_modified` datetime NOT NULL,
+    PRIMARY KEY (`citadel_id`),
+    UNIQUE KEY (`discord_id`),
+    UNIQUE KEY (`steam_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 

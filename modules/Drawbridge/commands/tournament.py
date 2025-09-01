@@ -28,6 +28,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         self.logger.info('Loaded Tournament Commands.')
         self.functions = Functions(self.db, self.cit)
         self.perms_last_fixed = 0.0
+        self.guild = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID')))
 
 
     @app_commands.command(
@@ -60,8 +61,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         # get the launchpad channel
         def is_me(m):
             return m.author == self.bot.user
-        guild = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID')))
-        channel = guild.get_channel(int(os.getenv('LAUNCH_PAD_CHANNEL')))
+        channel = self.guild.get_channel(int(os.getenv('LAUNCH_PAD_CHANNEL')))
         async with channel.typing():
             await channel.purge(limit=100, check=is_me)
             teams = self.db.get_all_teams()
@@ -117,6 +117,39 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             for message in launchpadmessages:
                 await channel.send(content=message)
 
+    async def _assign_roles(self, league_id: int):
+        # This needs a fair few requests to Citadel, unfortunately
+        # AFAIK there’s no way to get whether a user is a captain from
+        # the roster (which we already query)
+        # So for each team we then have to query team
+        not_in_server: list[str] = []
+        not_linked: list[str] = []
+        for div in self.db.get_divs_by_league(league_id):
+            div_role_id = div[3]
+            div_role = self.guild.get_role(div_role_id)
+            for team in self.db.get_teams_by_league(league_id):
+                team_id = team[1]
+                team_role_id = team[3]
+                team_role = self.guild.get_role(team_role_id)
+                team: citadel.Team = self.cit.getTeam(team_id)
+                for user in team.players:
+                    if user['is_captain']:
+                        if self.db.citadel_user_has_synced(user['id']):
+                            discord_id = self.db.get_discord_id_by_citadel_id(user['id'])
+                            discord_user = self.bot.get_user(discord_id)
+                            member: Optional[discord.Member] = self.guild.get_member(discord_id)
+                            if member is not None:
+                                await member.add_roles(div_role, reason="Drawbridge role assignment")
+                                await member.add_roles(team_role, reason="Drawbridge role assignment")
+                            else:
+                                not_in_server.append(user['name'])
+                        else:
+                            not_linked.append(user['name'])
+            not_linked_str = f"## Account Not Linked\n{', '.join(not_linked)}\n" if len(not_linked) > 0 else ""
+        not_in_server_str = f"## Not In Server\n{', '.join(not_in_server)}\n" if len(not_in_server) > 0 else ""
+        return f"# Role Assignment Errors\n{not_linked_str}\n{not_in_server_str}"
+
+
     @app_commands.command(
         name='start'
     )
@@ -126,7 +159,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         'DEVELOPER',
     )
     async def start(self, interaction : discord.Interaction, league_id : int, league_shortcode: str, share : bool=False):
-        """Generate team roles and channels for a given league
+        """Generate team roles and channels for a given league. Assign all users with linked Citadel accounts roles.
 
         Parameters
         -----------
@@ -227,8 +260,42 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                         'team_name': roster_name
                     }
                     self.db.insert_team(dbteam)
-        await interaction.edit_original_response(content=f'Generated.\nLeague: {league.name}\nDivisions: {d}/{len(divs)}\nTeams: {r}/{len(rosters)}\n\n# All done :3')
+        finished_response = '\n'.join([
+            'Generated.'
+            f'League: {league.name}',
+            f'Divisions: {d}/{len(divs)}',
+            f'{r}/{len(rosters)}',
+            await self._assign_roles(league_id),
+            'All done :3'
+        ])
+        await interaction.edit_original_response(content=finished_response)
         await self.update_launchpad()
+
+    @app_commands.command(
+        name='assign_roles'
+    )
+    @checks.has_roles(
+        'DIRECTOR',
+        'HEAD',
+        'DEVELOPER',
+    )
+    async def assign_roles(self, interaction: discord.Interaction, league_id: int, show_missing: bool=False):
+        """Assign all roles for a given league. This assumes that the league has been
+        created via the start command.
+
+        Parameters
+        ----------
+        league_id: int
+            The League ID to assign roles for.
+        show_missing: bool
+            Whether to show the users who could not be assigned roles
+        """
+        failed_role_assignments = await self._assign_roles(league_id)
+        if show_missing:
+            await interaction.response.send_message(failed_role_assignments)
+        else:
+            await interaction.response.send_message("Added roles to all linked users", ephemeral=True)
+
 
     @app_commands.command(
         name='end'
@@ -343,12 +410,11 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         Exception
             If the match could not be found or an error occurred
         """
-        guild = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID')))
         if self.db.get_match_by_id(match.id) is not None:
             return False # It's already in the Database, must already be generated.
         if match.away_team is None:
             team_home = self.db.get_team_by_id_and_league(match.home_team['team_id'], match.league_id)
-            role_home = guild.get_role(team_home[3])
+            role_home = self.guild.get_role(team_home[3])
             team_channel = self.bot.get_channel(team_home[5])
             await team_channel.send(f'Matches for round {match.round_number} were just generated. {role_home.mention} have a bye this round, and thus will be awarded a win.')
             self.db.insert_match({
@@ -396,7 +462,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 trimmed_away_team = team_away[4][:10]
                 channel_name = f'🗡️{match.id}-{trimmed_home_team}-vs-{trimmed_away_team}-{match.round_name}'
                 self.logger.warning(f'Channel name too long when generating match {match.round_number} {team_home[4]} vs {team_away[4]}, trimming to {channel_name}')
-            match_channel = await guild.create_text_channel(channel_name, category=cat, overwrites=overrides)
+            match_channel = await self.guild.create_text_channel(channel_name, category=cat, overwrites=overrides)
             # Load the message
             rawmatchmessage = ''
             with open('embeds/match.json', 'r') as file:
