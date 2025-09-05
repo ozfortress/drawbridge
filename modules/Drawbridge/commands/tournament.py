@@ -443,9 +443,9 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             if category_id == 0:
                 raise Exception('Division not found for the match')
             overrides = {
-                guild.default_role: discord.PermissionOverwrite(view_channel=False, send_messages=False),
-                guild.get_role(team_home[3]): discord.PermissionOverwrite(view_channel=True, send_messages=True),
-                guild.get_role(team_away[3]): discord.PermissionOverwrite(view_channel=True, send_messages=True),
+                self.guild.default_role: discord.PermissionOverwrite(view_channel=False, send_messages=False),
+                self.guild.get_role(team_home[3]): discord.PermissionOverwrite(view_channel=True, send_messages=True),
+                self.guild.get_role(team_away[3]): discord.PermissionOverwrite(view_channel=True, send_messages=True),
             }
             all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'APPROVED', 'BOT', 'STAFF')
             for role in all_access:
