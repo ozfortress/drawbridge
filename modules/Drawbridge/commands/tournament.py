@@ -141,9 +141,9 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                             if member is not None:
                                 await member.add_roles(div_role, reason="Drawbridge role assignment")
                                 await member.add_roles(team_role, reason="Drawbridge role assignment")
-                            else:
+                            elif not user['name'] in not_in_server:
                                 not_in_server.append(user['name'])
-                        else:
+                        elif not user['name'] in not_linked:
                             not_linked.append(user['name'])
             not_linked_str = f"## Account Not Linked\n{', '.join(not_linked)}\n" if len(not_linked) > 0 else ""
         not_in_server_str = f"## Not In Server\n{', '.join(not_in_server)}\n" if len(not_in_server) > 0 else ""
@@ -457,7 +457,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             }
             all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'APPROVED', 'BOT', 'STAFF')
             for role in all_access:
-                overrides[guild.get_role(role)] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
+                overrides[self.guild.get_role(role)] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
             for role in self.get_role_ids_from_overrides(role_overrides):
                 overrides[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
             cat = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID'))).get_channel(category_id)
