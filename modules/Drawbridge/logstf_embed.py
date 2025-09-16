@@ -248,19 +248,17 @@ class LogsTFEmbed(discord_commands.Cog):
             x_pos += width_val
 
         # Create image with auto-sized width
-        background_color = (45, 45, 45)
+        background_color = 0x2d2d2d
         img = Image.new('RGB', (width, height), background_color)
         draw = ImageDraw.Draw(img)
 
-        # Try to load fonts - larger and bolder for header
+        # Load Roboto fonts
         try:
-            header_font = ImageFont.truetype("arial.ttf", 36)  # Even larger
-            header_font_bold = ImageFont.truetype("arialbd.ttf", 36)  # Bold if available
-            player_font = ImageFont.truetype("arialbd.ttf", 14)  # Bold and larger
-            small_font = ImageFont.truetype("arialbd.ttf", 12)  # Bold and larger
-        except:
-            # Fallback fonts
-            header_font = ImageFont.load_default()
+            header_font_bold = ImageFont.truetype("embeds/fonts/Roboto-Bold.ttf", 36)
+            player_font = ImageFont.truetype("embeds/fonts/Roboto-Bold.ttf", 14)
+            small_font = ImageFont.truetype("embeds/fonts/Roboto-Bold.ttf", 12)
+        except Exception as e:
+            print(f"Failed to load Roboto fonts: {e}")
             header_font_bold = ImageFont.load_default()
             player_font = ImageFont.load_default()
             small_font = ImageFont.load_default()
@@ -345,7 +343,7 @@ class LogsTFEmbed(discord_commands.Cog):
                     # Apply opacity (100% for primary, 50% for others)
                     if i > 0:  # Not primary class
                         # Create a copy and modify the alpha channel
-                        icon_array = list(icon.getdata())
+                        icon_array = list(icon.getdata()) # type: ignore
                         new_icon_data = []
                         for pixel in icon_array:
                             if len(pixel) == 4:  # RGBA
