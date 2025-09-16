@@ -93,13 +93,13 @@ class LogsTFEmbed(discord_commands.Cog):
                     if not data['version'] == 3:
                         raise Exception(f"Unsupported Logs.tf API version (expected 3, got {data['version']})")
                     embed = discord.Embed(
-                        title=f"logs.tf/{id} — {data['info']['title']}",
-                        description=f"Map: {data['info']['map']}\nDuration: {self.convertSecondsIntoHumanReadable(data['length'])}\nScore: {bluescore} - {redscore}",
+                        title=f"{data['info']['title']}",
+                        description=f"## [logs.tf/{id}](https://logs.tf/{id})\n\nMap: **{data['info']['map']}**\nDuration: **{self.convertSecondsIntoHumanReadable(data['length'])}**\nScore: **{bluescore} – {redscore}**",
                         timestamp=datetime.datetime.utcfromtimestamp(data['info']['date']),
                         color=(bluescore > redscore and discord.Color.from_str("0x3498db") or redscore > bluescore and discord.Color.from_str("0xe74c3c") or discord.Color.from_str("0x95a5a6")),
                         url=f"https://logs.tf/{id}"
                     )
-                    embed.set_author(name=f"Uploaded by {data['info']['uploader']['name']}", url=f"https://logs.tf/profile/{data['info']['uploader']['id']}")
+                    embed.set_footer(text=f"Uploaded by {data['info']['uploader']['name']}")
 
                     # Add scoreboard image if requested
                     if include_scoreboard:
@@ -406,52 +406,4 @@ class LogsTFEmbed(discord_commands.Cog):
         buffer = io.BytesIO()
         img.save(buffer, format='PNG')
         return buffer.getvalue()
-
-    @discord_commands.command(name="logstf_scoreboard", description="Generate a scoreboard image for a logs.tf page")
-    async def logstf_scoreboard_command(self, ctx, log_id: int):
-        """Command to generate a scoreboard for a logs.tf page"""
-
-        try:
-            result = await self.generateEmbed(log_id, include_scoreboard=True)
-            if result:
-                if isinstance(result, tuple):
-                    embed, file = result
-                    await ctx.send(embed=embed, file=file)
-                else:
-                    await ctx.send(embed=result)
-            else:
-                await ctx.send("Failed to generate embed for that logs.tf ID.")
-        except Exception as e:
-            await ctx.send(f"Error: {str(e)}")
-
-    @discord_commands.command(name="scoreboard", description="Generate just a scoreboard image for a logs.tf page")
-    async def scoreboard_only_command(self, ctx, log_id: int):
-        """Command to generate only a scoreboard image"""
-
-        try:
-            # Fetch log data
-            url = f'https://logs.tf/api/v1/log/{log_id}'
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        if not data['success']:
-                            await ctx.send(f"Logs.tf API request failed: {data.get('error', 'Unknown error')}")
-                            return
-
-                        # Generate scoreboard in-memory
-                        scoreboard_data = await self.generate_scoreboard_image(data)
-
-                        # Create Discord file from in-memory data
-                        file = discord.File(
-                            io.BytesIO(scoreboard_data),
-                            filename=f"logstf_{log_id}_scoreboard.png"
-                        )
-                        await ctx.send(f"Scoreboard for logs.tf/{log_id}:", file=file)
-
-                    else:
-                        await ctx.send("Failed to fetch logs.tf data.")
-
-        except Exception as e:
-            await ctx.send(f"Error: {str(e)}")
 
