@@ -5,6 +5,7 @@ import modules.database as database
 from discord.ext import commands as discord_commands
 import os
 import aiohttp
+import datetime
 
 class LogsTFEmbed(discord_commands.Cog):
     def __init__ (self,client : discord_commands.Bot, db : database.Database, cit : Citadel.Citadel):
@@ -84,7 +85,7 @@ class LogsTFEmbed(discord_commands.Cog):
                     embed = discord.Embed(
                         title=f"logs.tf/{id} - {data['info']['title']}",
                         description=f"Map: {data['info']['map']}\nDuration: {self.convertSecondsIntoHumanReadable(data['length'])}\nScore: {bluescore} - {redscore}",
-                        timestamp= discord.utils.parse_time(str(data['info']['date'])),
+                        timestamp=datetime.datetime.utcfromtimestamp(data['info']['date']),
                         color=(bluescore > redscore and discord.Color.from_str("0x3498db") or redscore > bluescore and discord.Color.from_str("0xe74c3c") or discord.Color.from_str("0x95a5a6")),
                         url=f"https://logs.tf/{id}"
                     )
