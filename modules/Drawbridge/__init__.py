@@ -16,6 +16,7 @@ __path__ = __import__('pkgutil').extend_path(__path__, __name__)
 from .checks import *
 from .functions import *
 from .logging import *
+from .logstf_embed import *
 # from .commands import *
 import os
 import pkgutil
