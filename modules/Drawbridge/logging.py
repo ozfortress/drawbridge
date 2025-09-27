@@ -20,14 +20,14 @@ class Logging(discord_commands.Cog):
 
     @discord_commands.Cog.listener()
     async def on_message(self,message : discord.Message):
-        match_id = self.db.get_match_id_of_channel(message.channel.id)
-        if match_id:
-            self.functions.generate_log(message, False, match_id[0], None, "CREATE")
+        match = self.db.matches.get_by_channel_id(message.channel.id)
+        if match:
+            self.functions.generate_log(message, False, match['match_id'], None, "CREATE")
             return
-        
-        team_id = self.db.get_team_id_of_channel(message.channel.id)
-        if team_id:
-            self.functions.generate_log(message, True, None, team_id[0], "CREATE")
+
+        team = self.db.teams.get_by_channel_id(message.channel.id)
+        if team:
+            self.functions.generate_log(message, True, None, team['team_id'], "CREATE")
 
         #else:
             # Verify cache is up to date
@@ -41,13 +41,13 @@ class Logging(discord_commands.Cog):
 
     @discord_commands.Cog.listener()
     async def on_message_edit(self, before : discord.Message, after : discord.Message):
-        match_id = self.db.get_match_id_of_channel(after.channel.id)
-        if match_id:
-            self.functions.generate_log(before, False, match_id[0], None, "EDIT", after)
-        
-        team_id = self.db.get_team_id_of_channel(before.channel.id)
-        if team_id:
-            self.functions.generate_log(before, True, None, team_id[0], "EDIT", after)
+        match = self.db.matches.get_by_channel_id(after.channel.id)
+        if match:
+            self.functions.generate_log(before, False, match['match_id'], None, "EDIT", after)
+
+        team = self.db.teams.get_by_channel_id(before.channel.id)
+        if team:
+            self.functions.generate_log(before, True, None, team['team_id'], "EDIT", after)
         #else:
             # Verify cache is up to date
             # if self.teamchannel_cache['refreshAfter'] < time.time():
@@ -61,13 +61,13 @@ class Logging(discord_commands.Cog):
     @discord_commands.Cog.listener()
     async def on_message_delete(self, message : discord.Message):
         # WARNING - UNRELIABLE - MIGHT MISS OLD MSGS if they arent in cache.
-        match_id = self.db.get_match_id_of_channel(message.channel.id)
-        if match_id:
-            self.functions.generate_log(message, False, match_id[0], None, "DELETE")
-        
-        team_id = self.db.get_team_id_of_channel(message.channel.id)
-        if team_id:
-            self.functions.generate_log(message, True, None, team_id[0], "DELETE")
+        match = self.db.matches.get_by_channel_id(message.channel.id)
+        if match:
+            self.functions.generate_log(message, False, match['match_id'], None, "DELETE")
+
+        team = self.db.teams.get_by_channel_id(message.channel.id)
+        if team:
+            self.functions.generate_log(message, True, None, team['team_id'], "DELETE")
         #else:
             # Verify cache is up to date
             # if self.teamchannel_cache['refreshAfter'] < time.time():
@@ -95,7 +95,7 @@ class Logging(discord_commands.Cog):
     async def _archive_match(self, match_id: int, ctx: discord.Interaction):
         """
         Generates an archive of a match"""
-        logs = self.db.get_logs_by_match(match_id)
+        logs = self.db.logs.get_by_match_id(match_id)
         log_path = f'logs/match_{match_id}.log'
         iteration = 1
         while os.path.exists(log_path):

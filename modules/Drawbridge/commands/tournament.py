@@ -28,8 +28,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         self.logger.info('Loaded Tournament Commands.')
         self.functions = Functions(self.db, self.cit)
         self.perms_last_fixed = 0.0
-        self.guild = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID')))
-
+        self.guild = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID','')))
 
     @app_commands.command(
         name='launchpad'
@@ -52,31 +51,35 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         priority_order = ['Premier', 'High', 'Intermediate', 'Main', 'Open']
 
         try:
-            return priority_order.index(div[1])
+            return priority_order.index(div['division_name'])
         except:
-            return div[0]
+            return div['division_id']
 
     async def update_launchpad(self):
         # purge all messages in the launchpad channel
         # get the launchpad channel
         def is_me(m):
             return m.author == self.bot.user
-        channel = self.guild.get_channel(int(os.getenv('LAUNCH_PAD_CHANNEL')))
+        if self.guild is None:
+            return
+        channel = self.guild.get_channel(int(os.getenv('LAUNCH_PAD_CHANNEL','')))
+        if type(channel) != discord.TextChannel:
+            return
         async with channel.typing():
             await channel.purge(limit=100, check=is_me)
-            teams = self.db.get_all_teams()
-            matches = self.db.get_matches_not_yet_archived()
+            teams = self.db.teams.get_all()
+            matches = self.db.matches.get_unarchived()
             leagueids = []
             leagues=[]
             divids=[]
             divs=[]
             for team in teams:
-                if team[2] not in leagueids:
-                    leagueids.append(team[2])
-                    leagues.append(self.cit.getLeague(team[2]))
-                if team[6] not in divids:
-                    divids.append(team[6])
-                    divs.append(self.db.get_div_by_id(team[6]))
+                if team['league_id'] not in leagueids:
+                    leagueids.append(team['league_id'])
+                    leagues.append(self.cit.getLeague(team['league_id']))
+                if team['division'] not in divids:
+                    divids.append(team['division'])
+                    divs.append(self.db.divisions.get_by_id(team['division']))
             if len(leagueids) == 0:
                 await channel.send(content='There are no active tournaments running.')
                 return
@@ -89,21 +92,21 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             for leagues in leagues:
                 rawlaunchpadmessage += f'# {leagues.name}\n'
                 for div in divs:
-                    if div[2] == leagues.id: ## Does the league_id field match the league we're looking at?
-                        rawlaunchpadmessage += f'## {div[1]}\n'
+                    if div['league_id'] == leagues.id: ## Does the league_id field match the league we're looking at?
+                        rawlaunchpadmessage += f'## {div["division_name"]}\n'
                         rawlaunchpadmessage += f'### Teams\n'
                         for team in teams:
-                            if (team[2] == leagues.id) and (team[6] == div[0]):
-                                rawlaunchpadmessage += f'- {team[4]} -> <#{team[5]}>\n'
+                            if (team['league_id'] == leagues.id) and (team['division'] == div['id']):
+                                rawlaunchpadmessage += f'- {team["team_name"]} -> <#{team["team_channel"]}>\n'
                         rawlaunchpadmessage += f'### Matches\n'
                         for match in matches:
-                            # self.logger.debug(f'Match league id {match[6]} == {leagues.id} and match div id {match[1]} == {div[0]}')
-                            if (int(match[6]) == int(leagues.id)) and (int(match[1]) == int(div[0])):
+                            # self.logger.debug(f'Match league id {match["league_id"]} == {leagues.id} and match div id {match["division"]} == {div["id"]}')
+                            if (int(match['league_id']) == int(leagues.id)) and (int(match['division']) == int(div['id'])):
                                 # c = c+1
-                                if match[4] == 0:
-                                    rawlaunchpadmessage += f'- [{match[0]}](<https://ozfortress.com/matches/{match[0]}>) -> Bye\n'
+                                if match['channel_id'] == 0:
+                                    rawlaunchpadmessage += f'- [{match["match_id"]}](<https://ozfortress.com/matches/{match["match_id"]}>) -> Bye\n'
                                 else:
-                                    rawlaunchpadmessage += f'- [{match[0]}](<https://ozfortress.com/matches/{match[0]}>) -> <#{match[4]}>\n'
+                                    rawlaunchpadmessage += f'- [{match["match_id"]}](<https://ozfortress.com/matches/{match["match_id"]}>) -> <#{match["channel_id"]}>\n'
                         if len(matches) == 0:
                             rawlaunchpadmessage += f'- No matches found\n'
                         rawlaunchpadmessage += '\n'
@@ -124,18 +127,20 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         # So for each team we then have to query team
         not_in_server: list[str] = []
         not_linked: list[str] = []
-        for div in self.db.get_divs_by_league(league_id):
-            div_role_id = div[3]
+        for div in self.db.divisions.get_by_league(league_id):
+            div_role_id = div['role_id']
             div_role = self.guild.get_role(div_role_id)
-            for team in self.db.get_teams_by_league(league_id):
-                team_id = team[1]
-                team_role_id = team[3]
+            for team in self.db.teams.get_by_league(league_id):
+                team_id = team['team_id']
+                team_role_id = team['role_id']
                 team_role = self.guild.get_role(team_role_id)
                 team: citadel.Team = self.cit.getTeam(team_id)
                 for user in team.players:
                     if user['is_captain']:
-                        if self.db.citadel_user_has_synced(user['id']):
-                            discord_id = self.db.get_discord_id_by_citadel_id(user['id'])
+                        if self.db.synced_users.has_synced_citadel(user['id']):
+                            synced_user = self.db.synced_users.get_by_citadel_id(user['id'])
+                            if synced_user:
+                                discord_id = synced_user['discord_id']
                             discord_user = self.bot.get_user(discord_id)
                             member: Optional[discord.Member] = self.guild.get_member(discord_id)
                             if member is not None:
@@ -213,7 +218,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 'category_id': channelcategory.id
             }
             i = 0
-            divid = self.db.insert_div(dbdiv)
+            divid = self.db.divisions.insert(dbdiv)
             for roster in rosters:
                 if roster['division'] == div:
                     r+=1
@@ -265,7 +270,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                         'division': divid,
                         'team_name': roster_name
                     }
-                    self.db.insert_team(dbteam)
+                    self.db.teams.insert(dbteam)
         finished_response = '\n'.join([
             'Generated.'
             f'League: {league.name}',
@@ -326,10 +331,12 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
         await interaction.response.send_message('Ending tournament...', ephemeral=not share)
 
-        divs = self.db.get_divs_by_league(league_id)
+        divs = self.db.divisions.get_by_league(league_id)
         guild = interaction.guild
-        teams = self.db.get_teams_by_league(league_id)
-        match_channels = self.db.get_match_channels_by_league(league_id)
+        teams = self.db.teams.get_by_league(league_id)
+        # Get match channels by querying matches for the league
+        league_matches = self.db.matches.get_by_league(league_id)
+        match_channels = [{'channel_id': match['channel_id']} for match in league_matches if match['channel_id']]
 
         last_five = []
         def insert_to_lastfive(string: str):
@@ -345,7 +352,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
         for channel in guild.channels:
             for team in teams:
-                if channel.id == team[5]:
+                if channel.id == team['team_channel']:
                     insert_to_lastfive(channel.name)
                     await channel.delete(
                         reason='Tournament ended'
@@ -353,7 +360,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     await interaction.edit_original_response(content=f'{status}\n```\n{format(last_five)}\n```')
                     break
             for match_channel in match_channels:
-                if channel.id == match_channel[0]:
+                if channel.id == match_channel['channel_id']:
                     insert_to_lastfive(channel.name)
                     await channel.delete(
                         reason='Tournament ended'
@@ -366,7 +373,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
         for div in divs:
             for category in guild.categories:
-                if category.id == div[4]:
+                if category.id == div['category_id']:
                     insert_to_lastfive(category.name)
                     await category.delete()
                     await interaction.edit_original_response(content=f'{status}\n```\n{format(last_five)}\n```')
@@ -377,22 +384,22 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
         for role in guild.roles:
             for team in teams:
-                if role.id == team[3]:
+                if role.id == team['role_id']:
                     insert_to_lastfive(role.name)
                     await role.delete()
                     await interaction.edit_original_response(content=f'{status}\n```\n{format(last_five)}\n```')
                     break
         for div in divs:
             for role in guild.roles:
-                if role.id == div[3]:
+                if role.id == div['role_id']:
                     insert_to_lastfive(role.name)
                     await role.delete()
                     await interaction.edit_original_response(content=f'{status}\n```\n{format(last_five)}\n```')
                     break
 
-        self.db.delete_matches_by_league(league_id)
-        self.db.delete_teams_by_league(league_id)
-        self.db.delete_divisions_by_league(league_id)
+        self.db.matches.delete_by_league(league_id)
+        self.db.teams.delete_by_league(league_id)
+        self.db.divisions.delete_by_league(league_id)
 
 
         await interaction.edit_original_response(content='Tournament ended. All channels, categories and roles have been archived.')
@@ -418,17 +425,17 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         Exception
             If the match could not be found or an error occurred
         """
-        if self.db.get_match_by_id(match.id) is not None:
+        if self.db.matches.get_by_id(match.id) is not None:
             return False # It's already in the Database, must already be generated.
         if match.away_team is None:
-            team_home = self.db.get_team_by_id_and_league(match.home_team['team_id'], match.league_id)
-            role_home = self.guild.get_role(team_home[3])
-            team_channel = self.bot.get_channel(team_home[5])
+            team_home = self.db.teams.get_by_team_and_league(match.home_team['team_id'], match.league_id)
+            role_home = self.guild.get_role(team_home['role_id'])
+            team_channel = self.bot.get_channel(team_home['channel_id'])
             await team_channel.send(f'Matches for round {match.round_number} were just generated. {role_home.mention} have a bye this round, and thus will be awarded a win.')
             self.db.insert_match({
                 'match_id': match.id,
-                'division': team_home[6],
-                'team_home': team_home[1],
+                'division': team_home['division_id'],
+                'team_home': team_home['team_id'],
                 'team_away': 0,
                 'channel_id': 0, # 0 for bye,
                 'league_id': match.league_id
@@ -437,23 +444,28 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             return True
         else:
             # Team roles
-            team_home = self.db.get_team_by_id(match.home_team['team_id'])
-            team_away = self.db.get_team_by_id(match.away_team['team_id'])
+            team_home = self.db.teams.get_by_team_id(match.home_team['team_id'])
+            team_away = self.db.teams.get_by_team_id(match.away_team['team_id'])
+
+            if not team_home or not team_away:
+                self.logger.error(f'Could not find team data for match {match.id}. Home: {team_home}, Away: {team_away}')
+                return False
+
             # Category ID for the division
             divs = self.db.get_divs_by_league(match.league_id)
             if len(divs) == 0:
                 raise Exception('No divisions found for the league for this match')
             category_id = 0
             for d in divs:
-                if d[1] == match.home_team['division']:
-                    category_id = d[4]
+                if d['division_name'] == match.home_team['division']:
+                    category_id = d['category_id']
                     break
             if category_id == 0:
                 raise Exception('Division not found for the match')
             overrides = {
                 self.guild.default_role: discord.PermissionOverwrite(view_channel=False, send_messages=False),
-                self.guild.get_role(team_home[3]): discord.PermissionOverwrite(view_channel=True, send_messages=True),
-                self.guild.get_role(team_away[3]): discord.PermissionOverwrite(view_channel=True, send_messages=True),
+                self.guild.get_role(team_home['role_id']): discord.PermissionOverwrite(view_channel=True, send_messages=True),
+                self.guild.get_role(team_away['role_id']): discord.PermissionOverwrite(view_channel=True, send_messages=True),
             }
             all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'APPROVED', 'BOT', 'STAFF')
             for role in all_access:
@@ -465,21 +477,21 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 raise Exception(f'Category not found for division {match.home_team["division"]}')
             if match.round_name == '':
                 match.round_name = f'Round {match.round_number}'
-            channel_name = f'🗡️-{match.id}-{team_home[4]}-vs-{team_away[4]}-{match.round_name}'
+            channel_name = f'🗡️-{match.id}-{team_home['team_name']}-vs-{team_away['team_name']}-{match.round_name}'
             trimmed = False
             if len(channel_name) > 100:
-                trimmed_home_team = team_home[4][:10]
-                trimmed_away_team = team_away[4][:10]
+                trimmed_home_team = team_home['team_name'][:10]
+                trimmed_away_team = team_away['team_name'][:10]
                 channel_name = f'🗡️{match.id}-{trimmed_home_team}-vs-{trimmed_away_team}-{match.round_name}'
-                self.logger.warning(f'Channel name too long when generating match {match.round_number} {team_home[4]} vs {team_away[4]}, trimming to {channel_name}')
+                self.logger.warning(f'Channel name too long when generating match {match.round_number} {team_home['team_name']} vs {team_away['team_name']}, trimming to {channel_name}')
             match_channel = await self.guild.create_text_channel(channel_name, category=cat, overwrites=overrides)
             # Load the message
             rawmatchmessage = ''
             with open('embeds/match.json', 'r') as file:
                 rawmatchmessage = file.read()
             matchmessage = json.loads(self.functions.substitute_strings_in_embed(rawmatchmessage, {
-                '{TEAM_HOME}': f'<@&{team_home[3]}>', # team role as a mention
-                '{TEAM_AWAY}': f'<@&{team_away[3]}>', # team role as a mention
+                '{TEAM_HOME}': f'<@&{team_home['role_id']}>', # team role as a mention
+                '{TEAM_AWAY}': f'<@&{team_away['role_id']}>', # team role as a mention
                 '{ROUND_NAME}': match.round_name,
                 '{MATCH_ID}': match.id,
                 '{CHANNEL_ID}': str(match_channel.id),
@@ -491,16 +503,16 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             # Update the database
             self.db.insert_match({
                 'match_id': match.id,
-                'division': team_home[6], # division
-                'team_home': team_home[1], # team_id
-                'team_away': team_away[1], # team_id
+                'division': team_home['division'], # division
+                'team_home': team_home['team_id'], # team_id
+                'team_away': team_away['team_id'], # team_id
                 'channel_id': match_channel.id,
                 'league_id': match.league_id
             })
             # Lets also say something in their team channel
             try:
-                team_home_channel = self.bot.get_channel(team_home[5]) # team_channel
-                team_away_channel = self.bot.get_channel(team_away[5]) # team_channel
+                team_home_channel = self.bot.get_channel(team_home['team_channel']) # team_channel
+                team_away_channel = self.bot.get_channel(team_away['team_channel']) # team_channel
                 await team_home_channel.send(f'Match for round {match.round_number} has been generated. Please head to {match_channel.mention} to organise your match.')
                 await team_away_channel.send(f'Match for round {match.round_number} has been generated. Please head to {match_channel.mention} to organise your match.')
                 if trimmed:
@@ -544,7 +556,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     continue
                 if round_number is not None and match2.round_number != round_number:
                     continue
-                if self.db.get_match_by_id(match2.id) is not None:
+                if self.db.matches.get_by_id(match2.id) is not None:
                     continue
                 filtered_matches.append(match)
             if len(filtered_matches) == 0:
@@ -594,7 +606,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         except Exception as e:
             self.logger.error(f'Error generating match: {e}', exc_info=True)
             await interaction.edit_original_response(content=f'An error occurred while generating matches.\n ```\n{e}\n```')
-            
+
     @app_commands.command(
         name='matchend'
     )
@@ -621,19 +633,17 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             # await interaction.response.edit_message(content='Match not found.')
             await interaction.edit_original_response(content='Match not found in the database. Please ensure it has been generated first.')
             return
-        if match[4] == 0: # channel_id
-            # await interaction.response.edit_message(content='Match is a bye, cannot end.')
+        if match['channel_id'] == 0:
             await interaction.edit_original_response(content='Match is a bye, cannot end. Please ensure the match has been generated first.')
             return
-        if match[5] == 1: # archived
-            # await interaction.response.edit_message(content='Match has already been archived.')
+        if match['archived'] == 1:
             await interaction.edit_original_response(content='Match has already been archived. Please ensure the match has not already been ended.')
             return
-        #match_channel = discord.Object(id=match[4])
-        match_channel = interaction.guild.get_channel(match[4])
+        #match_channel = discord.Object(id=match['channel_id'])
+        match_channel = interaction.guild.get_channel(match['channel_id'])
         if match_channel is None:
             await interaction.edit_original_response(content='Match channel not found. It may have already been deleted or never created.')
-            self.logger.error(f'Match channel with ID {match[4]} not found in guild.')
+            self.logger.error(f'Match channel with ID {match['channel_id']} not found in guild.')
             self.db.archive_match(match_id)
             await self.update_launchpad()
             return
@@ -726,9 +736,9 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 pot_players = chosen_team['players']
                 pl_id = pot_players[random.randint(0, len(pot_players)-1)]
                 player_chosen = self.cit.getUser(pl_id['id'])
-                db_team = self.db.get_team_by_id(chosen_team['team_id'])
+                db_team = self.db.teams.get_by_team_id(chosen_team['team_id'])
                 if db_team is None:
-                    await interaction.edit_original_response(content=f'DB_Team was not assigned. Chosen team id:{chosen_team['id']}. DB call returned: {self.db.get_team_by_id(chosen_team['id'])} Aborting.')
+                    await interaction.edit_original_response(content=f'DB_Team was not assigned. Chosen team id:{chosen_team["id"]}. DB call returned: {self.db.teams.get_by_team_id(chosen_team["id"])} Aborting.')
                     return
             else:
                 player_chosen = self.cit.getUser(spes_user)
@@ -736,8 +746,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     await interaction.edit_original_response(content=f'Player could not be found with ID:{spes_user}. Aborting.')
                     return
                 for roster in player_chosen.rosters:
-                    db_team = self.db.get_team_by_id(roster['team_id'])
-                    if db_team is not None and db_team[2] is league_id:
+                    db_team = self.db.teams.get_by_team_id(roster['team_id'])
+                    if db_team is not None and db_team['league_id'] == league_id:
                         pl_roster = self.cit.getRoster(roster['id'])
                         break
                 if db_team is None:
@@ -753,16 +763,16 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             tempmsg = str(messageraw)
 
             demochkmsg = json.loads(self.functions.substitute_strings_in_embed(tempmsg, {
-                '{CHANNEL_ID}'  : f'<@&{db_team[3]}>', #These two may cause bugs depending on the data base
-                '{TEAM_NAME}'   : f'{db_team[4]}',
+                '{CHANNEL_ID}'  : f'<@&{db_team['role_id']}>', #These two may cause bugs depending on the data base
+                '{TEAM_NAME}'   : f'{db_team['team_name']}',
                 '{ROUND_NO}'    : f'{round}',
                 '{TARGET_NAME}' : f'{player_chosen.name}',
                 '{TARGET_ID}'   : f'{player_chosen.id}',
                 '{MATCH_ID}'    : f'{match_chosen.id}'
             }))
-            team_channel = self.bot.get_channel(db_team[5])
+            team_channel = self.bot.get_channel(db_team['team_channel'])
             if team_channel is None:
-                await interaction.edit_original_response(content=f'Channel for team {db_team[4]} couldn\'t be found. Aborting.')
+                await interaction.edit_original_response(content=f'Channel for team {db_team['team_name']} couldn\'t be found. Aborting.')
                 return
             demochkmsg['embed'] = discord.Embed(**demochkmsg['embeds'][0])
             del demochkmsg['embeds']
@@ -1010,7 +1020,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             The Match ID to archive
         """
         await Logging.archive_match(match_id,interaction)
-    
+
     @app_commands.command(
         name='fixperms'
     )
@@ -1047,7 +1057,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                         message_has_timed_out = True
                         await interaction.channel.send(content=f'Hey <@{interaction.user.id}>, Discord is giving us errors for editing the earlier interaction. We\'ll continue quietly in the background.')
                         break
-                        
+
                 if channel.id in [team[5] for team in teams]:
                     team = [team for team in teams if team[5] == channel.id][0]
                     role = guild.get_role(team[3])
@@ -1066,33 +1076,35 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                         await channel.set_permissions(guild.get_role(role), read_messages=False)
                         await asyncio.sleep(1)
                 # check if its a match channel
-                if channel.id in [match[4] for match in matches]:
-                    match = [match for match in matches if match[4] == channel.id][0]
+                if channel.id in [match['channel_id'] for match in matches if match['channel_id']]:
+                    match = [match for match in matches if match.get('channel_id') == channel.id][0]
                     all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'APPROVED', 'BOT')
                     no_access = checks._get_role_ids('UNAPPROVED')
                     await channel.set_permissions(guild.default_role, read_messages=False)
                     await asyncio.sleep(1)
-                    team_home = self.db.get_team_by_id(match[2])
-                    team_away = self.db.get_team_by_id(match[3])
-                    await channel.set_permissions(guild.get_role(team_home[3]), read_messages=True, send_messages=True)
-                    await asyncio.sleep(1)
-                    await channel.set_permissions(guild.get_role(team_away[3]), read_messages=True, send_messages=True)
-                    await asyncio.sleep(1)
+                    team_home = self.db.teams.get_by_team_id(match['team_home'])
+                    team_away = self.db.teams.get_by_team_id(match['team_away'])
+                    if team_home:
+                        await channel.set_permissions(guild.get_role(team_home['role_id']), read_messages=True, send_messages=True)
+                        await asyncio.sleep(1)
+                    if team_away:
+                        await channel.set_permissions(guild.get_role(team_away['role_id']), read_messages=True, send_messages=True)
+                        await asyncio.sleep(1)
                     for role in all_access:
                         await channel.set_permissions(guild.get_role(role), read_messages=True, send_messages=True)
                         await asyncio.sleep(1)
                     for role in no_access:
                         await channel.set_permissions(guild.get_role(role), read_messages=False)
-                        await asyncio.sleep(1) 
+                        await asyncio.sleep(1)
         try:
             await interaction.edit_original_response(content='Permissions fixed.')
         except discord.errors.HTTPException as e:
             if e.code == 401:
                 await interaction.channel.send(content='Permissions fixed.')
-        
-        
-                
-        
+
+
+
+
     # @tournament.error
     # async def tournament_error(self, ctx : discord.Interaction, error):
     #     if isinstance(error, discord_commands.errors.MissingPermissions):

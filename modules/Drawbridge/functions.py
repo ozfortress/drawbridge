@@ -27,8 +27,8 @@ class Functions:
         else:
             match = self.db.get_match_details(match_id)
             teamsRoles = []
-            teamsRoles.append(match[2])
-            teamsRoles.append(match[3])
+            teamsRoles.append(match['team_home'])
+            teamsRoles.append(match['team_away'])
             log['match_id'] = match_id
             log['team_id'] = None
 
@@ -50,5 +50,5 @@ class Functions:
             log['log_timestamp'] = after.edited_at
         if log_type == "DELETE":
             log['log_timestamp'] = datetime.datetime.now()
-        self.db.insert_log(log)
+        self.db.logs.insert(log)
         #self.logger.debug(f'new log {message.author.name}#{message.author.discriminator} ({message.author.id}) - {log_type}')
