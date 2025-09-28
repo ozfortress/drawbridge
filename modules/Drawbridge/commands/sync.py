@@ -7,6 +7,7 @@ import os
 from typing import Optional
 from modules import database
 from modules import citadel
+from modules.logging_config import get_logger, log_command_execution
 
 from discord import app_commands
 from discord.ext import commands as discord_commands
@@ -16,15 +17,16 @@ __description__ = "Sync a user on the server to their Citadel Account"
 __version__ = "1.0.0"
 
 checks = Checks()
+logger = get_logger('drawbridge.sync', 'sync.log')
 
 
 @discord.app_commands.guild_only()
 class Sync(discord_commands.Cog):
-    def __init__(self, bot: discord_commands.Bot, db: database.Database, cit: citadel.Citadel, logger) -> None:
+    def __init__(self, bot: discord_commands.Bot, db: database.Database, cit: citadel.Citadel, main_logger) -> None:
         self.bot = bot
         self.cit = cit
         self.db = db
-        self.logger = logger
+        self.logger = logger  # Use the centralized logger instead
         self.logger.info('Loaded Sync Commands.')
         self.functions = Functions(self.db, self.cit)
         self.log_channel = bot.get_channel(int(os.getenv('SYNC_LOG_CHANNEL')))
@@ -36,8 +38,8 @@ class Sync(discord_commands.Cog):
         src = interaction.user
         about_self = target.id == src.id
         forced_log = f" (Forced by <@{src.id}>)" if not about_self else ""
-        user: Optional[User] = self.cit.getUserByDiscordID(target.id)
-        name = target.name + "’s" if not about_self else "Your"
+        user: Optional[citadel.Citadel.User] = self.cit.getUserByDiscordID(target.id)
+        name = target.name + "'s" if not about_self else "Your"
         if user is None:
             extra_intruction = " Be sure to link it with this Discord account at [ozfortress.com](https://ozfortress.com) in `Settings → Connections`." if about_self else ""
             await interaction.response.send_message(content=f"{name} Discord account is not linked to the ozfortress website.{extra_intruction}", ephemeral=True)
@@ -62,11 +64,12 @@ class Sync(discord_commands.Cog):
 
         Add appropriate team captain roles to the user who runs this command.
         """
+        logger.info(f"Sync command executed by {interaction.user} (ID: {interaction.user.id})")
         await self._sync_user(interaction.user, interaction)
 
     @app_commands.command(
         name='force-sync',
-        description='Sync a user’s ozfortress account with their Discord'
+        description='Sync a user\'s ozfortress account with their Discord'
     )
     @checks.has_roles(
         'DIRECTOR',
@@ -80,6 +83,7 @@ class Sync(discord_commands.Cog):
 
         Add appropriate team captain roles to the target Discord user.
         """
+        logger.info(f"Force sync command executed by {interaction.user} (ID: {interaction.user.id}) for target {target} (ID: {target.id})")
         await self._sync_user(target, interaction)
 
 

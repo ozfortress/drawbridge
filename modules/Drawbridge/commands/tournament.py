@@ -8,49 +8,45 @@ import random
 import requests
 from modules import database
 from modules import citadel
+from modules.logging_config import get_logger, log_command_execution
 from typing import Optional
 from discord import app_commands
 from discord.ext import commands as discord_commands
 from discord.ext import tasks as discord_tasks
 import asyncio
-import logging
+import functools
 
 __title__ = 'Tournament Commands'
 __description__ = 'Commands for managing tournaments.'
 __version__ = '0.0.1'
+
 checks = Checks()
-glogger = logging.getLogger('Drawbridge.Tournament')
-glogger.setLevel(logging.INFO)
 
-# Console handler
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-console_formatter = logging.Formatter('[%(asctime)s] %(levelname)s %(name)s: %(message)s')
-console_handler.setFormatter(console_formatter)
-glogger.addHandler(console_handler)
-
-# File handler
-file_handler = logging.FileHandler('logs/drawbridge_tournament.log')
-file_handler.setLevel(logging.INFO)
-file_formatter = logging.Formatter('[%(asctime)s] %(levelname)s %(name)s: %(message)s')
-file_handler.setFormatter(file_formatter)
-glogger.addHandler(file_handler)
+# Use centralized logging
+logger = get_logger('drawbridge.tournament', 'tournament.log')
 
 def log_command(func):
-        @functools.wraps(func)
-        async def wrapper(self, interaction: discord.Interaction, *args, **kwargs):
-            cmd_name = func.__name__
-            glogger.info(f"Command '{cmd_name}' executed by {interaction.user} (ID: {interaction.user.id}) with args: {args}, kwargs: {kwargs}")
-            return await func(self, interaction, *args, **kwargs)
-        return wrapper
+    """Decorator for logging tournament commands - uses centralized logging."""
+    @functools.wraps(func)
+    async def wrapper(self, interaction, *args, **kwargs):
+        cmd_name = func.__name__
+        logger.info(f"Command '{cmd_name}' executed by {interaction.user} (ID: {interaction.user.id}) with args: {args}, kwargs: {kwargs}")
+        try:
+            result = await func(self, interaction, *args, **kwargs)
+            logger.info(f"Command '{cmd_name}' completed successfully")
+            return result
+        except Exception as e:
+            logger.error(f"Command '{cmd_name}' failed: {e}", exc_info=True)
+            raise
+    return wrapper
 
 @discord.app_commands.guild_only()
 class Tournament(discord_commands.GroupCog, group_name='tournament', name='tournamnet', group_description='Commands for managing tournaments. This is a new string',):
-    def __init__(self, bot:discord_commands.Bot, db:database.Database, cit:citadel.Citadel, logger:logging.Logger) -> None:
+    def __init__(self, bot:discord_commands.Bot, db:database.Database, cit:citadel.Citadel, main_logger) -> None:
         self.bot = bot
         self.cit = cit
         self.db = db
-        self.logger = glogger
+        self.logger = logger  # Use the centralized logger
         self.logger.info('Loaded Tournament Commands.')
         self.functions = Functions(self.db, self.cit)
         self.logging = Logging(self.bot, self.db, self.cit)

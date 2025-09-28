@@ -10,6 +10,7 @@ from discord.ext import tasks as discord_tasks
 from modules import citadel
 from modules import database
 from modules import Drawbridge
+from modules.logging_config import get_logger, DiscordEventLogger
 import subprocess
 import datetime
 import socket
@@ -19,9 +20,9 @@ import traceback
 
 load_dotenv()
 
-if not os.path.exists('logs'):
-    os.makedirs('logs')
-logger = logging.getLogger(__name__)
+# Initialize centralized logging
+logger = get_logger('drawbridge.main')
+discord_event_logger = DiscordEventLogger()
 VERSION = '1.0.0'
 
 intents = discord.Intents.all() # TODO: Change this to only the intents we need
@@ -66,22 +67,16 @@ async def healthcheck():
 
 
 def main():
-    logging.basicConfig(filename='logs/drawbridge.log', level='DEBUG', format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging._nameToLevel[os.getenv('LOG_LEVEL', 'INFO')])
-    console_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-    logger.addHandler(console_handler)
+    # The logging system is already configured by logging_config.py
     logger.info(f'Starting OZF Drawbridge v{VERSION}...')
-    # checkPackages()
     logger.info('OZF Drawbridge has started.')
-    # Drawbridge.Drawbridge(client, db, cit, logger)
     client.run(os.getenv('DISCORD_TOKEN'))
 
 @client.event
 async def on_ready():
-    logger.debug(f'token: {os.getenv("DISCORD_TOKEN")}')
     logger.info(f'Logged in as {client.user.name}#{client.user.discriminator} ({client.user.id})')
-    # await Drawbridge.load_all_commands(
+    discord_event_logger.log_event('bot_ready', f'Bot logged in as {client.user.name}')
+    
     await Drawbridge.initialize(client, db, cit, logger)
 
     botmisc= client.get_channel(int(os.getenv('ANNOUNCE_CHANNEL')))
@@ -89,20 +84,26 @@ async def on_ready():
         try:
             latest_commit = subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode().strip()
             return latest_commit
-        except subprocess.CalledProcessError:
+        except subprocess.CalledProcessError as e:
+            logger.error(f'Failed to get latest commit: {e}')
             return None
 
     latest_commit = get_latest_commit()
-    commit_info = subprocess.check_output(['git', 'show', '-s', latest_commit]).decode().strip().split('\n')
-    commit_author = commit_info[1].split(':')[1].strip()
-    commit_message = '\n'.join(commit_info[4:]).strip()
-    commit_date = commit_info[2].split('Date:')[1].strip()
-    now = int(datetime.datetime.now().timestamp())
     if latest_commit:
-        await botmisc.send(f'# Bot has been started\n- time: <t:{now}>\n- `{latest_commit[:6]}` - `{commit_date}` `\n- author: {commit_author}\n```\n{commit_message}```')
-    #Drawbridge.Logging(client, db, cit)
+        try:
+            commit_info = subprocess.check_output(['git', 'show', '-s', latest_commit]).decode().strip().split('\n')
+            commit_author = commit_info[1].split(':')[1].strip()
+            commit_message = '\n'.join(commit_info[4:]).strip()
+            commit_date = commit_info[2].split('Date:')[1].strip()
+            now = int(datetime.datetime.now().timestamp())
+            
+            logger.info(f'Bot started with commit {latest_commit[:6]} by {commit_author}')
+            await botmisc.send(f'# Bot has been started\n- time: <t:{now}>\n- `{latest_commit[:6]}` - `{commit_date}`\n- author: {commit_author}\n```\n{commit_message}```')
+        except Exception as e:
+            logger.error(f'Failed to process commit info: {e}')
+    
     healthstatus['status'] = b"OK"
-    # client.loop.create_task(healthcheck())
+    logger.info('Bot initialization completed successfully')
 
 
 # Catch any error that occurs during the on_ready event

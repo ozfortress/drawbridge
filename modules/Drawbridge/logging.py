@@ -4,6 +4,7 @@ import discord
 from . import functions as Drawbridge
 from . import citadel as Citadel
 import modules.database as database
+from modules.logging_config import get_logger, DiscordEventLogger
 import time
 import threading
 import os
@@ -13,7 +14,8 @@ class Logging(discord_commands.Cog):
     def __init__(self, client : discord_commands.Bot, db : database.Database, cit):
         self.db = db
         self.client = client
-        self.logger = logging.Logger('Drawbridge.Logging')
+        self.logger = get_logger('drawbridge.discord_logging')
+        self.discord_event_logger = DiscordEventLogger()
         self.cit = cit
         self.teamchannel_cache={
             'channels' : {
@@ -27,53 +29,52 @@ class Logging(discord_commands.Cog):
 
     @discord_commands.Cog.listener()
     async def on_message(self,message : discord.Message):
+        # Skip bot messages to avoid logging loops
+        if message.author.bot:
+            return
+            
         match = self.db.matches.get_by_channel_id(message.channel.id)
         if match:
+            self.discord_event_logger.log_message_event("CREATE", message, f"Match channel: {match['match_id']}")
             self.functions.generate_log(message, False, match['match_id'], None, "CREATE")
             return
 
         team = self.db.teams.get_by_channel_id(message.channel.id)
         if team:
+            self.discord_event_logger.log_message_event("CREATE", message, f"Team channel: {team['team_id']}")
             self.functions.generate_log(message, True, None, team['team_id'], "CREATE")
-
-        #else:
-            # Verify cache is up to date
-            # if self.teamchannel_cache['refreshAfter'] < time.time():
-            #     channels = db.get_team_channels()
-            #     for channel in channels:
-            #         self.teamchannel_cache['channels'][channel['team_channel']] = channel['team_id']
-            #     self.teamchannel_cache['refreshAfter'] = time.time() + 3600*24
-            # if message.channel.id in self.teamchannel_cache['channels']:
-            #     Drawbridge.Functions.generate_log(message, True, 0, "CREATE")
 
     @discord_commands.Cog.listener()
     async def on_message_edit(self, before : discord.Message, after : discord.Message):
+        # Skip bot messages to avoid logging loops
+        if after.author.bot:
+            return
+            
         match = self.db.matches.get_by_channel_id(after.channel.id)
         if match:
+            self.discord_event_logger.log_message_event("EDIT", after, f"Match channel: {match['match_id']}")
             self.functions.generate_log(before, False, match['match_id'], None, "EDIT", after)
 
         team = self.db.teams.get_by_channel_id(before.channel.id)
         if team:
+            self.discord_event_logger.log_message_event("EDIT", after, f"Team channel: {team['team_id']}")
             self.functions.generate_log(before, True, None, team['team_id'], "EDIT", after)
-        #else:
-            # Verify cache is up to date
-            # if self.teamchannel_cache['refreshAfter'] < time.time():
-            #     channels = db.get_team_channels()
-            #     for channel in channels:
-            #         self.teamchannel_cache['channels'][channel['team_channel']] = channel['team_id']
-            #     self.teamchannel_cache['refreshAfter'] = time.time() + 3600*24
-            # if after.channel.id in self.teamchannel_cache['channels']:
-            #     Drawbridge.Functions.generate_log(before, True, 0, "EDIT", after)
 
     @discord_commands.Cog.listener()
     async def on_message_delete(self, message : discord.Message):
-        # WARNING - UNRELIABLE - MIGHT MISS OLD MSGS if they arent in cache.
+        # WARNING - UNRELIABLE - MIGHT MISS OLD MSGS if they aren't in cache.
+        # Skip bot messages to avoid logging loops
+        if message.author.bot:
+            return
+            
         match = self.db.matches.get_by_channel_id(message.channel.id)
         if match:
+            self.discord_event_logger.log_message_event("DELETE", message, f"Match channel: {match['match_id']}")
             self.functions.generate_log(message, False, match['match_id'], None, "DELETE")
 
         team = self.db.teams.get_by_channel_id(message.channel.id)
         if team:
+            self.discord_event_logger.log_message_event("DELETE", message, f"Team channel: {team['team_id']}")
             self.functions.generate_log(message, True, None, team['team_id'], "DELETE")
         #else:
             # Verify cache is up to date

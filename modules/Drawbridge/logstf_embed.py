@@ -1,7 +1,9 @@
+import logging
 import discord
 from . import functions as Drawbridge
 from . import citadel as Citadel
 import modules.database as database
+from modules.logging_config import get_logger
 from discord.ext import commands as discord_commands
 import os
 import aiohttp
@@ -10,6 +12,8 @@ import asyncio
 from PIL import Image, ImageDraw, ImageFont
 import io
 from typing import Dict, List, Optional, Tuple
+
+logger = get_logger('drawbridge.logstf_embed')
 
 class LogsTFEmbed(discord_commands.Cog):
     def __init__ (self,client : discord_commands.Bot, db : database.Database, cit : Citadel.Citadel):
@@ -39,8 +43,55 @@ class LogsTFEmbed(discord_commands.Cog):
             if result:
                 if isinstance(result, tuple):
                     # Result includes embed and file
-                    embed, file = result
+                    embed, file, data = result
                     await message.channel.send(embed=embed, file=file)
+                    # Try to determine metadata about these logs
+                    
+                    # is this a match channel?
+                    match = self.db.matches.get_by_channel_id(message.channel.id)
+                    if match:
+                        team_home = self.cit.getTeam(match['team_home'])
+                        team_away = self.cit.getTeam(match['team_away'])
+                        
+                        if team_home and team_away:
+                            # the logs has 12 players
+                            if data and data['players'] and data['info'] and data['info']['map']:
+                                red_players = [p for p in data['players'].keys() if data['players'][p]['team'] == 'Red']
+                                blue_players = [p for p in data['players'].keys() if data['players'][p]['team'] == 'Blue']
+                                # glogger.info(f"logs.tf/{valid} has {len(red_players)} red players and {len(blue_players)} blue players")
+                                # glogger.info(f"Red players: {red_players}")
+                                # glogger.info(f"Blue players: {blue_players}")
+                                # Now to identify which team is the home team
+                                # We assume that the team will have some players from their citadel team in the logs
+                                for player in team_home['players']:
+                                    # logger.debug(f"Checking if home team player {player['name']} ({player['steam_id3']}) is in logs.tf/{valid}")
+                                    if str(f'[{player['steam_id3']}]') in red_players:
+                                        # home team is red
+                                        if data['teams']['Red']['score'] > data['teams']['Blue']['score']:
+                                            logger.info(f"Detected log result: {team_home['name']} (home) defeated {team_away['name']} (away) on {data['info']['map']} ({data['teams']['Red']['score']} - {data['teams']['Blue']['score']}) in logs.tf/{valid}")
+                                            await message.channel.send(f"Detected log result: **{team_home['name']}** (home) defeated **{team_away['name']}** (away) on {data['info']['map']} ({data['teams']['Red']['score']} - {data['teams']['Blue']['score']}) in <[logs.tf/{valid}](https://logs.tf/{valid})>")
+                                            return
+                                        elif data['teams']['Red']['score'] < data['teams']['Blue']['score']:
+                                            logger.info(f"Detected log result: {team_away['name']} (away) defeated {team_home['name']} (home) on {data['info']['map']} ({data['teams']['Blue']['score']} - {data['teams']['Red']['score']}) in logs.tf/{valid}")
+                                            await message.channel.send(f"Detected log result: **{team_away['name']}** (away) defeated **{team_home['name']}** (home) on {data['info']['map']} ({data['teams']['Blue']['score']} - {data['teams']['Red']['score']}) in <[logs.tf/{valid}](https://logs.tf/{valid})>")
+                                            return
+                                    elif str(f'[{player['steam_id3']}]') in blue_players:
+                                        # home team is blue
+                                        if data['teams']['Blue']['score'] > data['teams']['Red']['score']:
+                                            logger.info(f"Detected log result: {team_home['name']} (home) defeated {team_away['name']} (away) on {data['info']['map']} ({data['teams']['Blue']['score']} - {data['teams']['Red']['score']}) in logs.tf/{valid}")
+                                            await message.channel.send(f"Detected log result: **{team_home['name']}** (home) defeated **{team_away['name']}** (away) on {data['info']['map']} ({data['teams']['Blue']['score']} - {data['teams']['Red']['score']}) in <[logs.tf/{valid}](https://logs.tf/{valid})>")
+                                            return
+                                        elif data['teams']['Blue']['score'] < data['teams']['Red']['score']:
+                                            logger.info(f"Detected log result: {team_away['name']} (away) defeated {team_home['name']} (home) on {data['info']['map']} ({data['teams']['Red']['score']} - {data['teams']['Blue']['score']}) in logs.tf/{valid}")
+                                            await message.channel.send(f"Detected log result: **{team_away['name']}** (away) defeated **{team_home['name']}** (home) on {data['info']['map']} ({data['teams']['Red']['score']} - {data['teams']['Blue']['score']}) in <[logs.tf/{valid}](https://logs.tf/{valid})>")
+                                            return
+                                else:
+                                    logger.warning(f"Could not determine player teams for logs.tf/{valid}")
+                            logger.warning(f"Could not determine match result for logs.tf/{valid}")
+                        else:
+                            logger.warning(f"Could not fetch team details for match {match['match_id']} when processing logs.tf/{valid}")
+                    else:
+                        return  # not a match channel, do nothing
                 else:
                     # Result is just embed
                     await message.channel.send(embed=result)
@@ -113,11 +164,11 @@ class LogsTFEmbed(discord_commands.Cog):
                             )
                             embed.set_image(url=f"attachment://logstf_{id}_scoreboard.png")
 
-                            return embed, file
+                            return embed, file, data
 
                         except Exception as e:
                             print(f"Failed to generate scoreboard: {e}")
-                            return embed
+                            return embed, None, data
 
                     return embed
                 else:
@@ -190,7 +241,7 @@ class LogsTFEmbed(discord_commands.Cog):
 
             for icon_path in icon_paths:
                 if os.path.exists(icon_path):
-                    print(f"Loading icon from: {icon_path}")  # Debug output
+                    # print(f"Loading icon from: {icon_path}")  # Debug output
                     return Image.open(icon_path)
 
             print(f"No icon found for {class_name} (tried {len(icon_paths)} paths)")  # Debug output

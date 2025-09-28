@@ -8,11 +8,11 @@ Core database components and base classes.
 """
 
 import mariadb
-import logging
 import os
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Union, Tuple
 from contextlib import contextmanager
+from modules.logging_config import DatabaseLogger
 
 
 class DatabaseError(Exception):
@@ -25,12 +25,14 @@ class DatabaseConnection:
 
     def __init__(self, conn_params: Dict[str, Any]):
         self._validate_config(conn_params)
+        self.db_logger = DatabaseLogger()
 
         if not conn_params.get('pool_name'):
             conn_params['pool_name'] = 'drawbridge'
 
         self.pool = mariadb.ConnectionPool(**conn_params)
-        self.logger = logging.getLogger('drawbridge.database')
+        # Use the database logger from logging_config
+        self.logger = self.db_logger.logger
 
     def _validate_config(self, conn_params: Dict[str, Any]) -> None:
         """Validate database connection parameters."""
@@ -76,25 +78,46 @@ class BaseRepository(ABC):
 
     def _execute_query(self, query: str, params: Tuple = ()) -> int:
         """Execute a query that modifies data (INSERT, UPDATE, DELETE)."""
-        with self.db.get_connection() as conn:
-            cursor = conn.cursor(dictionary=True)
-            cursor.execute(query, params)
-            conn.commit()
-            return cursor.lastrowid or cursor.rowcount or 0
+        self.db.db_logger.log_query(query, params)
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor(dictionary=True)
+                cursor.execute(query, params)
+                conn.commit()
+                result = cursor.lastrowid or cursor.rowcount or 0
+                self.logger.debug(f"Query executed successfully, affected rows/ID: {result}")
+                return result
+        except Exception as e:
+            self.db.db_logger.log_error("_execute_query", e)
+            raise DatabaseError(f"Query execution failed: {e}") from e
 
     def _fetch_one(self, query: str, params: Tuple = ()) -> Optional[Dict[str, Any]]:
         """Execute a query that returns a single result."""
-        with self.db.get_connection() as conn:
-            cursor = conn.cursor(dictionary=True)
-            cursor.execute(query, params)
-            return cursor.fetchone()
+        self.db.db_logger.log_query(query, params)
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor(dictionary=True)
+                cursor.execute(query, params)
+                result = cursor.fetchone()
+                self.logger.debug(f"Fetch one query executed, result: {'found' if result else 'not found'}")
+                return result
+        except Exception as e:
+            self.db.db_logger.log_error("_fetch_one", e)
+            raise DatabaseError(f"Query execution failed: {e}") from e
 
     def _fetch_all(self, query: str, params: Tuple = ()) -> List[Dict[str, Any]]:
         """Execute a query that returns multiple results."""
-        with self.db.get_connection() as conn:
-            cursor = conn.cursor(dictionary=True)
-            cursor.execute(query, params)
-            return cursor.fetchall()
+        self.db.db_logger.log_query(query, params)
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor(dictionary=True)
+                cursor.execute(query, params)
+                results = cursor.fetchall()
+                self.logger.debug(f"Fetch all query executed, returned {len(results)} rows")
+                return results
+        except Exception as e:
+            self.db.db_logger.log_error("_fetch_all", e)
+            raise DatabaseError(f"Query execution failed: {e}") from e
 
     def _fetch_scalar(self, query: str, params: Tuple = ()) -> Any:
         """Execute a query that returns a single value."""
