@@ -4,6 +4,8 @@ import discord
 import logging
 import datetime
 
+__version__ = "1.0.0"
+
 class Functions:
     """
     Drawbridge Helper Functions."""

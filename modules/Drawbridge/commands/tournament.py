@@ -13,26 +13,54 @@ from discord import app_commands
 from discord.ext import commands as discord_commands
 from discord.ext import tasks as discord_tasks
 import asyncio
+import logging
 
 __title__ = 'Tournament Commands'
 __description__ = 'Commands for managing tournaments.'
 __version__ = '0.0.1'
 checks = Checks()
+glogger = logging.getLogger('Drawbridge.Tournament')
+glogger.setLevel(logging.INFO)
+
+# Console handler
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+console_formatter = logging.Formatter('[%(asctime)s] %(levelname)s %(name)s: %(message)s')
+console_handler.setFormatter(console_formatter)
+glogger.addHandler(console_handler)
+
+# File handler
+file_handler = logging.FileHandler('drawbridge_tournament.log')
+file_handler.setLevel(logging.INFO)
+file_formatter = logging.Formatter('[%(asctime)s] %(levelname)s %(name)s: %(message)s')
+file_handler.setFormatter(file_formatter)
+glogger.addHandler(file_handler)
+
+def log_command(func):
+        @functools.wraps(func)
+        async def wrapper(self, interaction: discord.Interaction, *args, **kwargs):
+            cmd_name = func.__name__
+            glogger.info(f"Command '{cmd_name}' executed by {interaction.user} (ID: {interaction.user.id}) with args: {args}, kwargs: {kwargs}")
+            return await func(self, interaction, *args, **kwargs)
+        return wrapper
+
 @discord.app_commands.guild_only()
 class Tournament(discord_commands.GroupCog, group_name='tournament', name='tournamnet', group_description='Commands for managing tournaments. This is a new string',):
     def __init__(self, bot:discord_commands.Bot, db:database.Database, cit:citadel.Citadel, logger:logging.Logger) -> None:
         self.bot = bot
         self.cit = cit
         self.db = db
-        self.logger = logger
+        self.logger = glogger
         self.logger.info('Loaded Tournament Commands.')
         self.functions = Functions(self.db, self.cit)
+        self.logging = Logging(self.bot, self.db, self.cit)
         self.perms_last_fixed = 0.0
         self.guild = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID','')))
-
+        
     @app_commands.command(
         name='launchpad'
     )
+    @log_command
     @checks.has_roles(
         'DIRECTOR',
         'HEAD',
@@ -158,6 +186,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
     @app_commands.command(
         name='start'
     )
+    @log_command
     @checks.has_roles(
         'DIRECTOR',
         'HEAD',
@@ -285,6 +314,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
     @app_commands.command(
         name='assign_roles'
     )
+    @log_command
     @checks.has_roles(
         'DIRECTOR',
         'HEAD',
@@ -311,6 +341,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
     @app_commands.command(
         name='end'
     )
+    @log_command
     @checks.has_roles(
         'DIRECTOR',
         'HEAD',
@@ -525,6 +556,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
     @app_commands.command(
         name='matchgenround'
     )
+    @log_command
     @checks.has_roles(
         'DIRECTOR',
         'HEAD',
@@ -577,6 +609,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
     @app_commands.command(
         name='matchgen'
     )
+    @log_command
     @checks.has_roles(
         'DIRECTOR',
         'HEAD',
@@ -610,6 +643,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
     @app_commands.command(
         name='matchend'
     )
+    @log_command
     @checks.has_roles(
         'DIRECTOR',
         'HEAD',
@@ -670,6 +704,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             name='randomdemocheck',
             description='Initiates a random demo for a specific round. Optional: target specific player'
     )
+    @log_command
     @checks.has_roles(
         'DIRECTOR',
         'HEAD',
@@ -840,6 +875,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
     #         name='randomdemocheck',
     #         description='Announces a truly random demo check, given a League ID. Automatically picks a team in the league, and a match to check'
     # )
+    # @log_command
     # async def randomdemocheck(self, interaction : discord.Interaction, league_id : int, round_number : int=None):
     #     await interaction.response.send_message('Announcing random demo check...', ephemeral=True)
     #     try:
@@ -906,6 +942,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
     #     name='democheck',
     #     description='Announces a random demo check for a given match. At this stage, a team id, a match ID and Player Name must be provided.'
     # )
+    # @log_command
     # async def democheck(self, interaction : discord.Interaction, team_id: int, match_id : int, player_name : str):
     #     """Announces a demo check for a given match
 
@@ -953,77 +990,30 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
     #         await interaction.edit_original_response(content='An error occurred while announcing the demo check.')
 
 
-
-    # @app_commands.command(
-    #     name='launchpad',
-    #     description='Generate a launchpad for all matches and team channels currently active'
-    # )
-    # async def launchpad(self, interaction : discord.Interaction, share : bool=False):
-    #     # self.logger.debug(f'Generating Launchpad. Share: {share}')
-    #     await interaction.response.send_message('Generating Launchpad...', ephemeral=(not share))
-    #     teams = self.db.get_all_teams()
-    #     matches = self.db.get_matches_not_yet_archived()
-    #     leagueids = []
-    #     leagues=[]
-    #     divids=[]
-    #     divs=[]
-    #     for team in teams:
-    #         if team[1] not in leagueids:
-    #             leagueids.append(team[1])
-    #             leagues.append(self.cit.getLeague(team[1]))
-    #         if team[5] not in divids:
-    #             divids.append(team[5])
-    #             divs.append(self.db.get_div_by_id(team[5]))
-
-
-    #     rawlaunchpadmessage = ''
-    #     for leagues in leagues:
-    #         rawlaunchpadmessage += f'# {leagues.name}\n'
-    #         for div in divs:
-    #             if div[2] == leagues.id: ## Does the league_id field match the league we're looking at?
-    #                 rawlaunchpadmessage += f'## {div[1]}\n'
-    #                 rawlaunchpadmessage += f'### Teams\n'
-    #                 for team in teams:
-    #                     if (team[1] == leagues.id) and (team[5] == div[0]):
-    #                         rawlaunchpadmessage += f'- {team[3]} -> <#{team[4]}>\n'
-    #                 rawlaunchpadmessage += f'### Matches\n'
-    #                 for match in matches:
-    #                     # self.logger.debug(f'Match league id {match[6]} == {leagues.id} and match div id {match[1]} == {div[0]}')
-    #                     if (int(match[6]) == int(leagues.id)) and (int(match[1]) == int(div[0])):
-    #                         if match[4] == 0:
-    #                             rawlaunchpadmessage += f'- [{match[0]}](<https://ozfortress.com/matches/{match[0]}>) -> Bye\n'
-    #                         else:
-    #                             rawlaunchpadmessage += f'- [{match[0]}](<https://ozfortress.com/matches/{match[0]}>) -> <#{match[4]}>\n'
-    #                 rawlaunchpadmessage += '\n'
-    #     launchpadmessages = []
-    #     # split on the first \n under 2000 chars
-    #     while len(rawlaunchpadmessage) > 2000:
-    #         index = rawlaunchpadmessage[:2000].rfind('\n')
-    #         launchpadmessages.append(rawlaunchpadmessage[:index])
-    #         rawlaunchpadmessage = rawlaunchpadmessage[index:]
-    #     launchpadmessages.append(rawlaunchpadmessage)
-    #     for message in launchpadmessages:
-    #         await interaction.followup.send(content=message, ephemeral=(not share))
-
     @app_commands.command(
-        name='archive'
+        name='genlogs'
     )
+    @log_command
     @checks.has_roles(
         'DEVELOPER',
+        'HEAD',
+        'ADMIN',
     )
-    async def archive(self, interaction : discord.Interaction, match_id : int):
-        """Archive all channels and roles for a league
+    async def genlogs(self, interaction : discord.Interaction, match_id : int):
+        """Generate logs for a match
 
         Parameters
         -----------
         match_id: int
             The Match ID to archive
         """
-        await Logging.archive_match(match_id,interaction)
+        
+        await self.logging.archive_match(match_id=match_id,ctx=interaction)
 
     @app_commands.command(
         name='fixperms'
     )
+    @log_command
     @checks.has_roles(
         'DEVELOPER',
     )
