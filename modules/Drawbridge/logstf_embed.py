@@ -1,5 +1,7 @@
 import logging
 import discord
+
+from modules import citadel
 from . import functions as Drawbridge
 from . import citadel as Citadel
 import modules.database as database
@@ -53,38 +55,45 @@ class LogsTFEmbed(discord_commands.Cog):
                         team_home = self.cit.getTeam(match['team_home'])
                         team_away = self.cit.getTeam(match['team_away'])
                         
+                        
                         if team_home and team_away:
                             # the logs has 12 players
+                            async def announce_winner(home : citadel.Citadel.Team, away : citadel.Citadel.Team, map_name : str, home_score : int, away_score : int, log_id : int):
+                                result_text = ""
+                                if home_score > away_score:
+                                    result_text = f"**{home['name']}** defeated **{away['name']}** on **{map_name}** ({home_score} - {away_score})"
+                                elif away_score > home_score:
+                                    result_text = f"**{away['name']}** defeated **{home['name']}** on **{map_name}** ({away_score} - {home_score})"
+                                else:
+                                    result_text = f"**{home['name']}** tied with **{away['name']}** on **{map_name}** ({home_score} - {away_score})"
+                                if result_text:
+                                    logger.info(f"Detected log result: {result_text} in logs.tf/{log_id}")
+                                    await message.channel.send(result_text)
+                                return
+                                
+
                             if data and data['players'] and data['info'] and data['info']['map']:
                                 red_players = [p for p in data['players'].keys() if data['players'][p]['team'] == 'Red']
                                 blue_players = [p for p in data['players'].keys() if data['players'][p]['team'] == 'Blue']
-                                # glogger.info(f"logs.tf/{valid} has {len(red_players)} red players and {len(blue_players)} blue players")
-                                # glogger.info(f"Red players: {red_players}")
-                                # glogger.info(f"Blue players: {blue_players}")
-                                # Now to identify which team is the home team
-                                # We assume that the team will have some players from their citadel team in the logs
                                 for player in team_home['players']:
-                                    # logger.debug(f"Checking if home team player {player['name']} ({player['steam_id3']}) is in logs.tf/{valid}")
                                     if str(f'[{player['steam_id3']}]') in red_players:
                                         # home team is red
-                                        if data['teams']['Red']['score'] > data['teams']['Blue']['score']:
-                                            logger.info(f"Detected log result: {team_home['name']} (home) defeated {team_away['name']} (away) on {data['info']['map']} ({data['teams']['Red']['score']} - {data['teams']['Blue']['score']}) in logs.tf/{valid}")
-                                            await message.channel.send(f"Detected log result: **{team_home['name']}** (home) defeated **{team_away['name']}** (away) on {data['info']['map']} ({data['teams']['Red']['score']} - {data['teams']['Blue']['score']}) in <[logs.tf/{valid}](https://logs.tf/{valid})>")
-                                            return
-                                        elif data['teams']['Red']['score'] < data['teams']['Blue']['score']:
-                                            logger.info(f"Detected log result: {team_away['name']} (away) defeated {team_home['name']} (home) on {data['info']['map']} ({data['teams']['Blue']['score']} - {data['teams']['Red']['score']}) in logs.tf/{valid}")
-                                            await message.channel.send(f"Detected log result: **{team_away['name']}** (away) defeated **{team_home['name']}** (home) on {data['info']['map']} ({data['teams']['Blue']['score']} - {data['teams']['Red']['score']}) in <[logs.tf/{valid}](https://logs.tf/{valid})>")
-                                            return
+                                        await announce_winner(team_home, team_away, data['info']['map'], data['teams']['Red']['score'], data['teams']['Blue']['score'], valid)
+                                        return
                                     elif str(f'[{player['steam_id3']}]') in blue_players:
                                         # home team is blue
-                                        if data['teams']['Blue']['score'] > data['teams']['Red']['score']:
-                                            logger.info(f"Detected log result: {team_home['name']} (home) defeated {team_away['name']} (away) on {data['info']['map']} ({data['teams']['Blue']['score']} - {data['teams']['Red']['score']}) in logs.tf/{valid}")
-                                            await message.channel.send(f"Detected log result: **{team_home['name']}** (home) defeated **{team_away['name']}** (away) on {data['info']['map']} ({data['teams']['Blue']['score']} - {data['teams']['Red']['score']}) in <[logs.tf/{valid}](https://logs.tf/{valid})>")
-                                            return
-                                        elif data['teams']['Blue']['score'] < data['teams']['Red']['score']:
-                                            logger.info(f"Detected log result: {team_away['name']} (away) defeated {team_home['name']} (home) on {data['info']['map']} ({data['teams']['Red']['score']} - {data['teams']['Blue']['score']}) in logs.tf/{valid}")
-                                            await message.channel.send(f"Detected log result: **{team_away['name']}** (away) defeated **{team_home['name']}** (home) on {data['info']['map']} ({data['teams']['Red']['score']} - {data['teams']['Blue']['score']}) in <[logs.tf/{valid}](https://logs.tf/{valid})>")
-                                            return
+                                        await announce_winner(team_home, team_away, data['info']['map'], data['teams']['Blue']['score'], data['teams']['Red']['score'], valid)
+                                        return
+                                for player in team_away['players']:
+                                    if str(f'[{player['steam_id3']}]') in red_players:
+                                        # away team is red
+                                        await announce_winner(team_away, team_home, data['info']['map'], data['teams']['Red']['score'], data['teams']['Blue']['score'], valid)
+                                        return
+                                    elif str(f'[{player['steam_id3']}]') in blue_players:
+                                        # away team is blue
+                                        await announce_winner(team_away, team_home, data['info']['map'], data['teams']['Blue']['score'], data['teams']['Red']['score'], valid)
+                                        return
+
                                 else:
                                     logger.warning(f"Could not determine player teams for logs.tf/{valid}")
                             logger.warning(f"Could not determine match result for logs.tf/{valid}")
