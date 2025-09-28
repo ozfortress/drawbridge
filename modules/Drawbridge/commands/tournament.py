@@ -30,7 +30,7 @@ console_handler.setFormatter(console_formatter)
 glogger.addHandler(console_handler)
 
 # File handler
-file_handler = logging.FileHandler('drawbridge_tournament.log')
+file_handler = logging.FileHandler('logs/drawbridge_tournament.log')
 file_handler.setLevel(logging.INFO)
 file_formatter = logging.Formatter('[%(asctime)s] %(levelname)s %(name)s: %(message)s')
 file_handler.setFormatter(file_formatter)
