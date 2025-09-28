@@ -76,8 +76,11 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
 
         try:
             return priority_order.index(div['division_name'])
-        except:
-            return div['division_id']
+        except ValueError:
+            # If not in priority list, sort alphanumerically by division_name
+            return len(priority_order) + hash(str(div['division_name']))
+        except Exception:
+            return div.get('division_id', 9999)
 
     async def update_launchpad(self):
         # purge all messages in the launchpad channel
