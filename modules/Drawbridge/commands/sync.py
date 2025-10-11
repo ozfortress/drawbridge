@@ -87,7 +87,7 @@ class Sync(discord_commands.Cog):
         Returns a list of role names that were assigned.
         """
         assigned_roles = []
-        
+        # logger.debug(citadel_user)
         try:
             guild = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID')))
             member = guild.get_member(discord_user.id) if guild else None
@@ -96,54 +96,35 @@ class Sync(discord_commands.Cog):
                 logger.warning(f"User {citadel_user.name} (Discord ID: {discord_user.id}) is not in the server")
                 return assigned_roles
             
-            # Get all active leagues we're tracking
-            all_leagues = self.db.leagues.get_all()
+            # Get the user's teams from Citadel (this includes captaincy info)
+            user_teams = citadel_user.teams
             
-            for league in all_leagues:
-                league_id = league['league_id']
+            for team_data in user_teams:
+                team_id = team_data['id']  # Extract team ID from dictionary
+                full_team_data = self.cit.getTeam(team_id)
+                users = full_team_data.players if full_team_data else []
                 
-                # Get all divisions and teams for this league
-                divisions = self.db.divisions.get_by_league(league_id)
-                teams = self.db.teams.get_by_league(league_id)
+                # Check if user is captain of this team
+                is_captain = False
+                for u in users:
+                    if u['id'] == citadel_user.id and u.get('is_captain', False):
+                        is_captain = True
+                        break
                 
-                for team_record in teams:
-                    team_id = team_record['team_id']
-                    
-                    try:
-                        # Get team details from Citadel
-                        team: citadel.Citadel.Team = self.cit.getTeam(team_id)
-                        
-                        # Check if this user is a captain of this team
-                        for player in team.players:
-                            if player['id'] == citadel_user.id and player['is_captain']:
-                                logger.info(f"User {citadel_user.name} is captain of team {team.name} (ID: {team_id})")
-                                
-                                # Assign team role
-                                team_role_id = team_record.get('role_id')
-                                if team_role_id:
-                                    team_role = guild.get_role(team_role_id)
-                                    if team_role and team_role not in member.roles:
-                                        await member.add_roles(team_role, reason="Drawbridge sync: Team captain role")
-                                        assigned_roles.append(f"Team: {team_role.name}")
-                                        logger.info(f"Assigned team role {team_role.name} to {citadel_user.name}")
-                                
-                                # Assign division role
-                                # Find the division this team belongs to
-                                for division in divisions:
-                                    if division['division_id'] == team_record.get('division_id'):
-                                        div_role_id = division.get('role_id')
-                                        if div_role_id:
-                                            div_role = guild.get_role(div_role_id)
-                                            if div_role and div_role not in member.roles:
-                                                await member.add_roles(div_role, reason="Drawbridge sync: Division captain role")
-                                                assigned_roles.append(f"Division: {div_role.name}")
-                                                logger.info(f"Assigned division role {div_role.name} to {citadel_user.name}")
-                                        break
-                                
-                    except Exception as e:
-                        logger.error(f"Failed to process team {team_id} for role assignment: {e}")
-                        continue
-        
+                if is_captain:
+                    logger.info(f"User {citadel_user.name} is captain of team ID: {team_id}")   
+                    team_db = self.db.teams.get_by_team_id(team_id)
+                    if team_db:
+                        role_id = team_db.get('role_id')
+                        if role_id:
+                            role = guild.get_role(role_id)
+                            if role and role not in member.roles:
+                                await member.add_roles(role, reason="Drawbridge sync: Team captain role")
+                                assigned_roles.append(f"Team: {role.name}")
+                                logger.info(f"Assigned team role {role.name} to {citadel_user.name}")
+                
+                
+                
         except Exception as e:
             logger.error(f"Error in role assignment for {citadel_user.name}: {e}")
         
