@@ -1,4 +1,3 @@
-from click import Option
 from ..checks import *
 from ..functions import *
 from ..logging import *
