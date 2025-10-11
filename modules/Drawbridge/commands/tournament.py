@@ -161,22 +161,37 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 team_id = team['team_id']
                 team_role_id = team['role_id']
                 team_role = self.guild.get_role(team_role_id)
-                team: citadel.Team = self.cit.getTeam(team_id)
+                team = self.cit.getTeam(team_id)
                 for user in team.players:
                     if user['is_captain']:
-                        if self.db.synced_users.has_synced_citadel(user['id']):
-                            synced_user = self.db.synced_users.get_by_citadel_id(user['id'])
-                            if synced_user:
-                                discord_id = synced_user['discord_id']
-                            discord_user = self.bot.get_user(discord_id)
-                            member: Optional[discord.Member] = self.guild.get_member(discord_id)
+                        # Check what their discord id is
+                        if user['discord_id']:
+                            discord_user = self.bot.get_user(user['discord_id'])
+                            member: Optional[discord.Member] = self.guild.get_member(user['discord_id'])
                             if member is not None:
                                 await member.add_roles(div_role, reason="Drawbridge role assignment")
                                 await member.add_roles(team_role, reason="Drawbridge role assignment")
-                            elif not user['name'] in not_in_server:
-                                not_in_server.append(user['name'])
-                        elif not user['name'] in not_linked:
-                            not_linked.append(user['name'])
+                            else:
+                                if not user['name'] in not_in_server:
+                                    not_in_server.append(user['name'])
+                        else:
+                            if not user['name'] in not_linked:
+                                not_linked.append(user['name'])
+                    else:
+                        continue
+                        # if self.db.synced_users.has_synced_citadel(user['id']):
+                        #     synced_user = self.db.synced_users.get_by_citadel_id(user['id'])
+                        #     if synced_user:
+                        #         discord_id = synced_user['discord_id']
+                        #     discord_user = self.bot.get_user(discord_id)
+                        #     member: Optional[discord.Member] = self.guild.get_member(discord_id)
+                        #     if member is not None:
+                        #         await member.add_roles(div_role, reason="Drawbridge role assignment")
+                        #         await member.add_roles(team_role, reason="Drawbridge role assignment")
+                        #     elif not user['name'] in not_in_server:
+                        #         not_in_server.append(user['name'])
+                        # elif not user['name'] in not_linked:
+                        #     not_linked.append(user['name'])
             not_linked_str = f"## Account Not Linked\n{', '.join(not_linked)}\n" if len(not_linked) > 0 else ""
         not_in_server_str = f"## Not In Server\n{', '.join(not_in_server)}\n" if len(not_in_server) > 0 else ""
         return f"# Role Assignment Errors\n{not_linked_str}\n{not_in_server_str}"
