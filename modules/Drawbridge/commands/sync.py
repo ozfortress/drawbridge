@@ -1,3 +1,4 @@
+from click import Option
 from ..checks import *
 from ..functions import *
 from ..logging import *
@@ -33,18 +34,28 @@ class Sync(discord_commands.Cog):
 
     async def _channel_log(self, message: str):
         await self.log_channel.send(message)
+        
+    @discord_commands.Cog.listener()
+    async def on_member_join(self, member: discord.Member):
+        try:
+            self._sync_user(member)
+        except Exception as e:
+            logger.error(f"Error syncing user on join: {e}", exc_info=True)
+            
 
-    async def _sync_user(self, target: discord.User, interaction: discord.Interaction):
-        src = interaction.user
-        about_self = target.id == src.id
+    async def _sync_user(self, target: discord.User, interaction: Optional[discord.Interaction] = None):
+        src = interaction.user if interaction else None
+        about_self = (src.id == target.id) if src else False
         forced_log = f" (Forced by <@{src.id}>)" if not about_self else ""
+        automated = " (Automated on join)" if src is None else ""
         user: Optional[citadel.Citadel.User] = self.cit.getUserByDiscordID(target.id)
         name = target.name + "'s" if not about_self else "Your"
         
         if user is None:
             extra_intruction = " Be sure to link it with this Discord account at [ozfortress.com](https://ozfortress.com) in `Settings → Connections`." if about_self else ""
-            await interaction.response.send_message(content=f"{name} Discord account is not linked to the ozfortress website.{extra_intruction}", ephemeral=True)
-            await self._channel_log(f"<@{target.id}> tried to link their Discord but did not have a linked ozfortress account.{forced_log}")
+            if interaction:
+                await interaction.response.send_message(content=f"{name} Discord account is not linked to the ozfortress website.{extra_intruction}", ephemeral=True)
+            await self._channel_log(f"<@{target.id}> tried to link their Discord but did not have a linked ozfortress account.{forced_log}{automated}")
         else:
             citadel_acc_link = f"[{user.name}](https://ozfortress.com/users/{user.id})"
             
@@ -58,7 +69,7 @@ class Sync(discord_commands.Cog):
                 self.db.synced_users.update(user.discord_id, user_data)
                 logger.info(f"Updated synced user record for {user.name} (Discord ID: {user.discord_id})")
                 status_message = f"{name} ozfortress account has been updated to {citadel_acc_link}"
-                log_message = f"<@{target.id}> updated their ozfortress account to {citadel_acc_link}.{forced_log}"
+                log_message = f"<@{target.id}> updated their ozfortress account to {citadel_acc_link}.{forced_log}{automated}"
             else:
                 # Insert new synced user
                 user_data = {
@@ -69,7 +80,7 @@ class Sync(discord_commands.Cog):
                 self.db.synced_users.insert(user_data)
                 logger.info(f"Created new synced user record for {user.name} (Discord ID: {user.discord_id})")
                 status_message = f"{name} Discord account has been linked to {citadel_acc_link}"
-                log_message = f"<@{target.id}> linked their ozfortress account to {citadel_acc_link}.{forced_log}"
+                log_message = f"<@{target.id}> linked their ozfortress account to {citadel_acc_link}.{forced_log}{automated}"
             
             # Now assign roles based on team captaincy
             roles_assigned = await self._assign_captain_roles(user, target)
@@ -77,8 +88,8 @@ class Sync(discord_commands.Cog):
             if roles_assigned:
                 status_message += f"\n\nRoles assigned: {', '.join(roles_assigned)}"
                 log_message += f" Roles assigned: {', '.join(roles_assigned)}"
-                
-            await interaction.response.send_message(content=status_message, ephemeral=True)
+            if interaction:
+                await interaction.response.send_message(content=status_message, ephemeral=True)
             await self._channel_log(log_message)
     
     async def _assign_captain_roles(self, citadel_user: citadel.Citadel.User, discord_user: discord.User) -> list[str]:
