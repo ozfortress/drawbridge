@@ -46,12 +46,23 @@ class Sync(discord_commands.Cog):
             await self._channel_log(f"<@{target.id}> tried to link their Discord but did not have a linked ozfortress account.{forced_log}")
         else:
             citadel_acc_link = f"[{user.name}](https://ozfortress.com/users/{user.id})"
-            if self.db.discord_user_has_synced(user.discord_id):
-                self.db.update_user(user.id, user.discord_id, user.steam_64)
+            if self.db.synced_users.has_synced_discord(user.discord_id):
+                # Update existing synced user
+                user_data = {
+                    'citadel_id': user.id,
+                    'steam_id': user.steam_64
+                }
+                self.db.synced_users.update(user.discord_id, user_data)
                 await interaction.response.send_message(content=f"{name} ozfortress account has been updated to {citadel_acc_link}", ephemeral=True)
                 await self._channel_log(f"<@{target.id}> updated their ozfortress account to {citadel_acc_link}.{forced_log}")
             else:
-                self.db.insert_user(user.id, user.discord_id, user.steam_64)
+                # Insert new synced user
+                user_data = {
+                    'citadel_id': user.id,
+                    'discord_id': user.discord_id,
+                    'steam_id': user.steam_64
+                }
+                self.db.synced_users.insert(user_data)
                 await interaction.response.send_message(content=f"{name} Discord account has been linked to {citadel_acc_link}", ephemeral=True)
                 await self._channel_log(f"<@{target.id}> linked their ozfortress account to {citadel_acc_link}.{forced_log}")
 
