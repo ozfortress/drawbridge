@@ -53,7 +53,7 @@ class Sync(discord_commands.Cog):
         if user is None:
             extra_intruction = " Be sure to link it with this Discord account at [ozfortress.com](https://ozfortress.com) in `Settings → Connections`." if about_self else ""
             if interaction:
-                await interaction.response.send_message(content=f"{name} Discord account is not linked to the ozfortress website.{extra_intruction}", ephemeral=True)
+                await interaction.followup.send(content=f"{name} Discord account is not linked to the ozfortress website.{extra_intruction}", ephemeral=True)
             await self._channel_log(f"<@{target.id}> tried to link their Discord but did not have a linked ozfortress account.{forced_log}{automated}")
         else:
             citadel_acc_link = f"[{user.name}](https://ozfortress.com/users/{user.id})"
@@ -88,7 +88,7 @@ class Sync(discord_commands.Cog):
                 status_message += f"\n\nRoles assigned: {', '.join(roles_assigned)}"
                 log_message += f" Roles assigned: {', '.join(roles_assigned)}"
             if interaction:
-                await interaction.response.send_message(content=status_message, ephemeral=True)
+                await interaction.followup.send(content=status_message, ephemeral=True)
             await self._channel_log(log_message)
     
     async def _assign_captain_roles(self, citadel_user: citadel.Citadel.User, discord_user: discord.User) -> list[str]:
@@ -150,6 +150,7 @@ class Sync(discord_commands.Cog):
         Add appropriate team captain roles to the user who runs this command.
         """
         logger.info(f"Sync command executed by {interaction.user} (ID: {interaction.user.id})")
+        await interaction.response.defer(ephemeral=True, thinking=True)
         await self._sync_user(interaction.user, interaction)
 
     @app_commands.command(
@@ -169,6 +170,7 @@ class Sync(discord_commands.Cog):
         Add appropriate team captain roles to the target Discord user.
         """
         logger.info(f"Force sync command executed by {interaction.user} (ID: {interaction.user.id}) for target {target} (ID: {target.id})")
+        await interaction.response.defer(ephemeral=True, thinking=True)
         await self._sync_user(target, interaction)
 
 
