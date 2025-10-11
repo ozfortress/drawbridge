@@ -330,11 +330,12 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         show_missing: bool
             Whether to show the users who could not be assigned roles
         """
+        await interaction.response.defer(ephemeral=True, thinking=True)
         failed_role_assignments = await self._assign_roles(league_id)
         if show_missing:
-            await interaction.response.send_message(failed_role_assignments)
+            await interaction.followup.send(failed_role_assignments)
         else:
-            await interaction.response.send_message("Added roles to all linked users", ephemeral=True)
+            await interaction.followup.send("Added roles to all linked users")
 
 
     @app_commands.command(
