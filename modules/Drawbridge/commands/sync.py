@@ -26,17 +26,26 @@ class SyncButtonView(discord.ui.View):
     def __init__(self, cog: 'Sync'):
         super().__init__(timeout=None)  # Persistent view
         self.cog = cog
+        
+        # Add the link button manually since it can't use the decorator
+        link_button = discord.ui.Button(
+            label="🔗 Link your Discord to ozfortress",
+            style=discord.ButtonStyle.link,
+            url="https://docs.ozfortress.com/guides/discord_linking_for_users/"
+        )
+        self.add_item(link_button)
     
     @discord.ui.button(
-        label='🔗 Sync ozfortress Account',
+        label='⚡ Sync with ozfortress',
         style=discord.ButtonStyle.primary,
-        custom_id='sync_button'
+        custom_id='sync_button',
     )
     async def sync_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Handle sync button clicks"""
         logger.info(f"Sync button clicked by {interaction.user} (ID: {interaction.user.id})")
         await interaction.response.defer(ephemeral=True, thinking=True)
         await self.cog._sync_user(interaction.user, interaction)
+        
 
 
 @discord.app_commands.guild_only()
