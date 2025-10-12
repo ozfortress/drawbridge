@@ -20,6 +20,25 @@ checks = Checks()
 logger = get_logger('drawbridge.sync', 'sync.log')
 
 
+class SyncButtonView(discord.ui.View):
+    """Persistent view for sync buttons"""
+    
+    def __init__(self, cog: 'Sync'):
+        super().__init__(timeout=None)  # Persistent view
+        self.cog = cog
+    
+    @discord.ui.button(
+        label='🔗 Sync ozfortress Account',
+        style=discord.ButtonStyle.primary,
+        custom_id='sync_button'
+    )
+    async def sync_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Handle sync button clicks"""
+        logger.info(f"Sync button clicked by {interaction.user} (ID: {interaction.user.id})")
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.cog._sync_user(interaction.user, interaction)
+
+
 @discord.app_commands.guild_only()
 class Sync(discord_commands.Cog):
     def __init__(self, bot: discord_commands.Bot, db: database.Database, cit: citadel.Citadel, main_logger) -> None:
@@ -30,6 +49,9 @@ class Sync(discord_commands.Cog):
         self.logger.info('Loaded Sync Commands.')
         self.functions = Functions(self.db, self.cit)
         self.log_channel = bot.get_channel(int(os.getenv('SYNC_LOG_CHANNEL')))
+        
+        # Add persistent view for sync buttons
+        self.bot.add_view(SyncButtonView(self))
 
     async def _channel_log(self, message: str):
         await self.log_channel.send(message)
@@ -172,6 +194,79 @@ class Sync(discord_commands.Cog):
         logger.info(f"Force sync command executed by {interaction.user} (ID: {interaction.user.id}) for target {target} (ID: {target.id})")
         await interaction.response.defer(ephemeral=True, thinking=True)
         await self._sync_user(target, interaction)
+
+    @app_commands.command(
+        name='create-sync-button',
+        description='Create an embedded sync button for users to click'
+    )
+    @app_commands.describe(
+        title="Title for the embed (optional)",
+        description="Description for the embed (optional)",
+        channel="Channel to send the button to (optional, defaults to current channel)"
+    )
+    @checks.has_roles(
+        'DIRECTOR',
+        'HEAD',
+        'DEVELOPER',
+        'ADMIN',
+    )
+    async def create_sync_button(
+        self, 
+        interaction: discord.Interaction, 
+        title: Optional[str] = None,
+        description: Optional[str] = None,
+        channel: Optional[discord.TextChannel] = None
+    ):
+        """Create a sync button embed"""
+        target_channel = channel or interaction.channel
+        
+        # Create embed
+        embed_title = title or "🔗 Account Synchronization"
+        embed_description = description or (
+            "Click the button below to sync your Discord account with your ozfortress profile.\n\n"
+            "**Requirements:**\n"
+            "• You must have an ozfortress account\n"
+            "• Your Discord account must be linked in ozfortress Settings → Connections\n\n"
+            "**Benefits:**\n"
+            "• Automatic team captain role assignment\n"
+            "• Access to team-specific channels and features"
+        )
+        
+        embed = discord.Embed(
+            title=embed_title,
+            description=embed_description,
+            color=discord.Color.blue()
+        )
+        embed.set_footer(text="Powered by Drawbridge")
+        
+        # Create view with sync button
+        view = SyncButtonView(self)
+        
+        try:
+            # Send the embed with button to the target channel
+            await target_channel.send(embed=embed, view=view)
+            
+            # Respond to the command
+            response_msg = f"Sync button created successfully in {target_channel.mention}"
+            if target_channel != interaction.channel:
+                await interaction.response.send_message(response_msg, ephemeral=True)
+            else:
+                await interaction.response.send_message(response_msg, ephemeral=True, delete_after=5)
+            
+            logger.info(f"Sync button created by {interaction.user} (ID: {interaction.user.id}) in {target_channel}")
+            await self._channel_log(f"Sync button created by <@{interaction.user.id}> in {target_channel.mention}")
+            
+        except discord.Forbidden:
+            await interaction.response.send_message(
+                f"❌ I don't have permission to send messages in {target_channel.mention}",
+                ephemeral=True
+            )
+        except Exception as e:
+            logger.error(f"Error creating sync button: {e}")
+            await interaction.response.send_message(
+                "❌ An error occurred while creating the sync button.",
+                ephemeral=True
+            )
 
 
 async def initialize(bot: discord_commands.Bot, db, cit, logger):
