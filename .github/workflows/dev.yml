@@ -74,6 +74,7 @@ jobs:
             -v "/opt/ozf-projects/drawbridge/logs/${CONTAINER_NAME}":/app/logs \
             --label "traefik.enable=true" \
             --label "traefik.http.routers.drawbridge-dev.rule=Host(\`drawbridge-dev.ozf.shigbeard.xyz\`)" \
-            --label "traefik.http.routers.drawbridge-dev.tls=true" \            --label "traefik.http.routers.drawbridge-dev.tls.certresolver=le" \
+            --label "traefik.http.routers.drawbridge-dev.tls=true" \
+            --label "traefik.http.routers.drawbridge-dev.tls.certresolver=le" \
             --label "traefik.docker.network=traefik-public" \
             ghcr.io/ozfortress/drawbridge:dev
