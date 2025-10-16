@@ -84,25 +84,44 @@ def main():
         # Start web server task
         try:
             sys.path.insert(0, str(Path(__file__).parent / 'web'))
-            from simple_web_server import app as web_app, set_shared_database
+            import importlib
+            mod = importlib.import_module('simple_web_server')
+            web_app = getattr(mod, 'app', None)
+            set_shared_database = getattr(mod, 'set_shared_database', None)
             
-            # Share the database connection with the web server
-            set_shared_database(db)
+            # Share the database connection with the web server if available
+            if callable(set_shared_database):
+                try:
+                    set_shared_database(db)
+                except Exception as e:
+                    logger.warning(f'Failed to set shared database for web server: {e}')
             
             host = os.getenv('WEB_HOST', '0.0.0.0')
             port = int(os.getenv('WEB_PORT', 8080))
-            web_task = asyncio.create_task(web_app.run_task(host=host, port=port))
-            logger.info(f'Web server will start on {host}:{port} with shared database')
             
-            # Wait for both to complete (or one to fail)
-            done, pending = await asyncio.wait(
-                [bot_task, web_task], 
-                return_when=asyncio.FIRST_COMPLETED
-            )
-            
-            # Cancel any remaining tasks
-            for task in pending:
-                task.cancel()
+            # Only start the web server if the module exposes an async run_task API
+            if web_app is not None and hasattr(web_app, 'run_task'):
+                try:
+                    web_task = asyncio.create_task(web_app.run_task(host=host, port=port))
+                    logger.info(f'Web server will start on {host}:{port} with shared database')
+                    
+                    # Wait for both to complete (or one to fail)
+                    _, pending = await asyncio.wait(
+                        [bot_task, web_task],
+                        return_when=asyncio.FIRST_COMPLETED
+                    )
+                    
+                    # Cancel any remaining tasks
+                    for task in pending:
+                        task.cancel()
+                except Exception as e:
+                    # Catch runtime errors from the web server startup (e.g. framework attribute issues)
+                    logger.error(f'Web server task failed to start: {e}')
+                    await bot_task
+            else:
+                logger.warning('simple_web_server.app does not expose run_task; skipping web server startup')
+                # Just run the bot if the web server exposes no run_task
+                await bot_task
                 
         except ImportError as e:
             logger.warning(f'Web server not available: {e}')
