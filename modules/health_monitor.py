@@ -96,9 +96,12 @@ class HealthMonitor:
         # Check database connection if available
         if self.db:
             try:
-                # Simple database connectivity test
-                await self.db.fetch_one("SELECT 1 as test")
-                self.health_metrics['database_connected'] = True
+                # Simple database connectivity test using the health_check method
+                is_healthy = self.db.health_check()
+                self.health_metrics['database_connected'] = is_healthy
+                if not is_healthy:
+                    health_status['healthy'] = False
+                    health_status['issues'].append('Database health check failed')
             except Exception as e:
                 health_status['healthy'] = False
                 health_status['issues'].append(f'Database connection failed: {str(e)}')
