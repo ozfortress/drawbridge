@@ -30,7 +30,6 @@ try:
     from modules import database
     from modules.citadel import Citadel
     from quart import Quart, render_template, request, jsonify
-    from quart_cors import cors
     import aiofiles
 except ImportError as e:
     print(f"❌ Missing dependency: {e}")
@@ -40,8 +39,26 @@ except ImportError as e:
 # Set template folder to the correct location
 template_folder = Path(__file__).parent / 'templates'
 app = Quart(__name__, template_folder=str(template_folder))
-app = cors(app)
 logger = get_logger('drawbridge.web.simple', 'web.log')
+
+# Manual CORS implementation (more reliable than quart-cors)
+@app.after_request
+async def after_request(response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    return response
+
+@app.before_request
+async def handle_preflight():
+    from quart import request
+    if request.method == "OPTIONS":
+        from quart import Response
+        response = Response()
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        return response
 
 class SimpleLogViewer:
     def __init__(self, shared_db=None):

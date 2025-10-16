@@ -83,11 +83,15 @@ def main():
         
         # Start web server task
         try:
-            sys.path.insert(0, str(Path(__file__).parent / 'web'))
-            import importlib
-            mod = importlib.import_module('simple_web_server')
-            web_app = getattr(mod, 'app', None)
-            set_shared_database = getattr(mod, 'set_shared_database', None)
+            # Add web directory to Python path
+            web_dir = Path(__file__).parent / 'web'
+            if str(web_dir) not in sys.path:
+                sys.path.insert(0, str(web_dir))
+            
+            # Import the web server module
+            import simple_web_server
+            web_app = getattr(simple_web_server, 'app', None)
+            set_shared_database = getattr(simple_web_server, 'set_shared_database', None)
             
             # Share the database connection with the web server if available
             if callable(set_shared_database):
