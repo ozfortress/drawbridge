@@ -67,8 +67,18 @@ jobs:
             docker rm -f ${CONTAINER_NAME}
           fi
           docker pull ghcr.io/ozfortress/drawbridge:main
+          # ensure host log directory exists and has permissive permissions for the container
+          mkdir -p "/opt/ozf-projects/drawbridge/logs/${CONTAINER_NAME}"
+          chmod 755 "/opt/ozf-projects/drawbridge/logs/${CONTAINER_NAME}"
           docker run -d \
             --name ${CONTAINER_NAME} \
+            --network traefik-public \
             --env-file ${{ env.ENV_FILE_PATH }} \
-            --mount type=bind,source=/opt/ozf-projects/drawbridge/logs/${CONTAINER_NAME},target=/app/logs \
+            -v "/opt/ozf-projects/drawbridge/logs/${CONTAINER_NAME}":/app/logs \
+            --label "traefik.enable=true" \
+            --label "traefik.http.routers.drawbridge-prod.rule=Host(\`drawbridge.ozf.shigbeard.xyz\`)" \
+            --label "traefik.http.routers.drawbridge-prod.tls=true" \
+            --label "traefik.http.routers.drawbridge-prod.tls.certresolver=le" \
+            --label "traefik.http.services.drawbridge-prod.loadbalancer.server.port=8080" \
+            --label "traefik.docker.network=traefik-public" \
             ghcr.io/ozfortress/drawbridge:main

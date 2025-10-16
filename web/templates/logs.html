@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drawbridge Logs</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1e1e1e;
+            color: #ffffff;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #5865F2, #3B82F6);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .controls {
+            background-color: #2b2b2b;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .control-group label {
+            font-size: 0.9rem;
+            color: #b0b0b0;
+        }
+
+        select, input, button {
+            padding: 8px 12px;
+            border: 1px solid #444;
+            background-color: #3b3b3b;
+            color: #ffffff;
+            border-radius: 5px;
+            font-size: 0.9rem;
+        }
+
+        button {
+            background: linear-gradient(135deg, #5865F2, #3B82F6);
+            border: none;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(88, 101, 242, 0.3);
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background-color: #2b2b2b;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            border-left: 4px solid #5865F2;
+        }
+
+        .stat-card h3 {
+            font-size: 2rem;
+            margin-bottom: 5px;
+            color: #5865F2;
+        }
+
+        .log-container {
+            background-color: #2b2b2b;
+            border-radius: 8px;
+            padding: 20px;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+
+        .log-entry {
+            background-color: #3b3b3b;
+            border-radius: 5px;
+            padding: 12px;
+            margin-bottom: 8px;
+            border-left: 4px solid;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .log-entry.INFO { border-left-color: #22c55e; }
+        .log-entry.SUCCESS { border-left-color: #22c55e; }
+        .log-entry.WARNING { border-left-color: #f59e0b; }
+        .log-entry.ERROR { border-left-color: #ef4444; }
+        .log-entry.DEBUG { border-left-color: #6b7280; }
+        .log-entry.CREATE { border-left-color: #22c55e; }
+        .log-entry.EDIT { border-left-color: #f59e0b; }
+        .log-entry.DELETE { border-left-color: #ef4444; }
+
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .log-timestamp {
+            color: #9ca3af;
+            font-size: 0.8rem;
+        }
+
+        .log-level {
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+
+        .log-level.INFO { background-color: #22c55e; color: white; }
+        .log-level.SUCCESS { background-color: #22c55e; color: white; }
+        .log-level.WARNING { background-color: #f59e0b; color: white; }
+        .log-level.ERROR { background-color: #ef4444; color: white; }
+        .log-level.DEBUG { background-color: #6b7280; color: white; }
+        .log-level.CREATE { background-color: #22c55e; color: white; }
+        .log-level.EDIT { background-color: #f59e0b; color: white; }
+        .log-level.DELETE { background-color: #ef4444; color: white; }
+
+        .log-module {
+            color: #60a5fa;
+            font-size: 0.8rem;
+        }
+
+        .log-user {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid #444;
+            color: #60a5fa;
+            font-size: 0.9rem;
+        }
+
+        .team-tag {
+            display: inline-block;
+            background: linear-gradient(135deg, #5865F2, #3B82F6);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .team-tag:hover {
+            background: linear-gradient(135deg, #4752C4, #2563EB);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(88, 101, 242, 0.4);
+            color: white;
+            text-decoration: none;
+        }
+
+        /* Match info display */
+        .match-info {
+            background-color: #2b2b2b;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #5865F2;
+        }
+
+        .match-teams {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .team-info {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 15px;
+            border-radius: 8px;
+            min-width: 200px;
+        }
+
+        .team-home {
+            background: linear-gradient(135deg, #3B82F6, #1D4ED8);
+            border: 2px solid #60A5FA;
+        }
+
+        .team-away {
+            background: linear-gradient(135deg, #DC2626, #B91C1C);
+            border: 2px solid #F87171;
+        }
+
+        .vs-indicator {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #9CA3AF;
+        }
+
+        /* User role-based styling */
+        .log-entry.captain-home {
+            border-right: 6px solid #3B82F6;
+            background: linear-gradient(90deg, #3b3b3b, rgba(59, 130, 246, 0.1));
+        }
+
+        .log-entry.captain-away {
+            border-right: 6px solid #DC2626;
+            background: linear-gradient(90deg, #3b3b3b, rgba(220, 38, 38, 0.1));
+        }
+
+        .log-entry.admin-role {
+            border-right: 6px solid #06B6D4;
+            background: linear-gradient(90deg, #3b3b3b, rgba(6, 182, 212, 0.1));
+        }
+
+        .log-entry.caster-role {
+            border-right: 6px solid #F59E0B;
+            background: linear-gradient(90deg, #3b3b3b, rgba(245, 158, 11, 0.1));
+        }
+
+        .log-entry.dev-role {
+            border-right: 6px solid #10B981;
+            background: linear-gradient(90deg, #3b3b3b, rgba(16, 185, 129, 0.1));
+        }
+
+        .log-entry.bot-role {
+            border-right: 6px solid #6B7280;
+            background: linear-gradient(90deg, #3b3b3b, rgba(107, 114, 128, 0.1));
+        }
+
+        .log-entry.staff-role {
+            border-right: 6px solid #8B5CF6;
+            background: linear-gradient(90deg, #3b3b3b, rgba(139, 92, 246, 0.1));
+        }
+
+        .log-entry.user-role {
+            border-right: 6px solid #4B5563;
+        }
+
+        /* Role indicators */
+        .role-indicator {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+
+        .role-indicator.captain-home { background: #3B82F6; color: white; }
+        .role-indicator.captain-away { background: #DC2626; color: white; }
+        .role-indicator.admin-role { background: #06B6D4; color: white; }
+        .role-indicator.caster-role { background: #F59E0B; color: white; }
+        .role-indicator.dev-role { background: #10B981; color: white; }
+        .role-indicator.bot-role { background: #6B7280; color: white; }
+        .role-indicator.staff-role { background: #8B5CF6; color: white; }
+
+        .log-message {
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #9ca3af;
+        }
+
+        .loading::after {
+            content: '';
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #5865F2;
+            border-top: 3px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background-color: #ef4444;
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+
+        .suggestions-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background-color: #3b3b3b;
+            border: 1px solid #444;
+            border-radius: 5px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+        }
+
+        .suggestion-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #444;
+            transition: background-color 0.2s;
+        }
+
+        .suggestion-item:hover,
+        .suggestion-item.active {
+            background-color: #5865F2;
+            color: white;
+        }
+
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+
+        @media (max-width: 768px) {
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 id="pageTitle">💬 Match & Team Communications</h1>
+            <p id="pageSubtitle">View match communications and team logs from Discord channels</p>
+        </div>
+
+        <div class="stats" id="stats">
+            <!-- Stats will be loaded here -->
+        </div>
+
+        <div class="match-info" id="matchInfo" style="display: none;">
+            <h3 id="matchInfoTitle">Match Information</h3>
+            <div class="match-teams" id="matchTeams">
+                <!-- Match team info will be loaded here -->
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="logType">Log Type:</label>
+                <select id="logType">
+                    <option value="all">All Messages</option>
+                    <option value="match">Match Comms</option>
+                    <option value="team">Team Comms</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label for="matchFilter">Match:</label>
+                <div style="position: relative;">
+                    <input type="text" id="matchFilter" placeholder="Search matches..." autocomplete="off" style="width: 200px;">
+                    <div id="matchSuggestions" class="suggestions-dropdown"></div>
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <label for="teamFilter">Team:</label>
+                <div style="position: relative;">
+                    <input type="text" id="teamFilter" placeholder="Search teams..." autocomplete="off" style="width: 200px;">
+                    <div id="teamSuggestions" class="suggestions-dropdown"></div>
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <label for="limit">Limit:</label>
+                <select id="limit">
+                    <option value="50">50 entries</option>
+                    <option value="100" selected>100 entries</option>
+                    <option value="200">200 entries</option>
+                    <option value="500">500 entries</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label for="autoRefresh">Auto-refresh:</label>
+                <input type="checkbox" id="autoRefresh" checked>
+            </div>
+            
+            <button onclick="loadLogs()">🔄 Refresh Logs</button>
+            <button onclick="clearFilters()">🧹 Clear Filters</button>
+            <button onclick="clearLogs()">🗑️ Clear Display</button>
+        </div>
+
+        <div style="background-color: #2b2b2b; border-radius: 8px; padding: 15px; margin-bottom: 20px; font-size: 0.9rem; color: #b0b0b0; border-left: 4px solid #5865F2;">
+            <strong>💡 Pro tip:</strong> You can link directly to specific logs using URLs like 
+            <code style="background: #3b3b3b; padding: 2px 6px; border-radius: 3px;">/match/123</code> or 
+            <code style="background: #3b3b3b; padding: 2px 6px; border-radius: 3px;">/team/456</code> or 
+            <code style="background: #3b3b3b; padding: 2px 6px; border-radius: 3px;">/roster/789</code>
+        </div>
+
+        <div class="log-container" id="logContainer">
+            <div class="loading">Loading logs...</div>
+        </div>
+    </div>
+
+    <script>
+        let autoRefreshInterval = null;
+
+        async function loadLogs() {
+            const logType = document.getElementById('logType').value;
+            const limit = document.getElementById('limit').value;
+            
+            try {
+                let url = `/api/logs?type=${logType}&limit=${limit}`;
+                if (selectedMatchId) url += `&match_id=${selectedMatchId}`;
+                if (selectedTeamId) url += `&team_id=${selectedTeamId}`;
+                
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data.error) {
+                    showError(data.error);
+                    return;
+                }
+                
+                displayLogs(data.logs);
+                
+            } catch (error) {
+                console.error('Error loading logs:', error);
+                showError('Failed to load logs: ' + error.message);
+            }
+        }
+
+        function setupAutocomplete() {
+            const matchInput = document.getElementById('matchFilter');
+            const teamInput = document.getElementById('teamFilter');
+            const matchSuggestions = document.getElementById('matchSuggestions');
+            const teamSuggestions = document.getElementById('teamSuggestions');
+
+            // Match autocomplete
+            matchInput.addEventListener('input', function() {
+                const query = this.value.toLowerCase();
+                if (query.length < 1) {
+                    matchSuggestions.style.display = 'none';
+                    selectedMatchId = '';
+                    loadLogs();
+                    return;
+                }
+
+                const filtered = matchesData.filter(match => 
+                    match.display_name.toLowerCase().includes(query) ||
+                    match.match_id.toString().includes(query)
+                );
+
+                displaySuggestions(matchSuggestions, filtered, (match) => {
+                    matchInput.value = match.display_name;
+                    selectedMatchId = match.match_id;
+                    matchSuggestions.style.display = 'none';
+                    loadLogs();
+                }, 'display_name');
+            });
+
+            // Team autocomplete
+            teamInput.addEventListener('input', function() {
+                const query = this.value.toLowerCase();
+                if (query.length < 1) {
+                    teamSuggestions.style.display = 'none';
+                    selectedTeamId = '';
+                    loadLogs();
+                    return;
+                }
+
+                const filtered = teamsData.filter(team => 
+                    (team.team_name && team.team_name.toLowerCase().includes(query)) ||
+                    team.team_id.toString().includes(query) ||
+                    (team.division && team.division.toString().includes(query))
+                );
+
+                displaySuggestions(teamSuggestions, filtered, (team) => {
+                    const displayName = `${team.team_name || 'Team ' + team.team_id} (Division ${team.division})`;
+                    teamInput.value = displayName;
+                    selectedTeamId = team.team_id;
+                    teamSuggestions.style.display = 'none';
+                    loadLogs();
+                }, (team) => `${team.team_name || 'Team ' + team.team_id} (Division ${team.division})`);
+            });
+
+            // Close suggestions when clicking outside
+            document.addEventListener('click', function(e) {
+                if (!matchInput.contains(e.target) && !matchSuggestions.contains(e.target)) {
+                    matchSuggestions.style.display = 'none';
+                }
+                if (!teamInput.contains(e.target) && !teamSuggestions.contains(e.target)) {
+                    teamSuggestions.style.display = 'none';
+                }
+            });
+        }
+
+        function displaySuggestions(container, items, onSelect, getDisplayText) {
+            if (items.length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+
+            container.innerHTML = '';
+            items.slice(0, 10).forEach(item => {
+                const suggestion = document.createElement('div');
+                suggestion.className = 'suggestion-item';
+                suggestion.textContent = typeof getDisplayText === 'function' ? getDisplayText(item) : item[getDisplayText];
+                suggestion.addEventListener('click', () => onSelect(item));
+                container.appendChild(suggestion);
+            });
+
+            container.style.display = 'block';
+        }
+
+        // Store matches and teams data for autocomplete
+        let matchesData = [];
+        let teamsData = [];
+        let selectedMatchId = '';
+        let selectedTeamId = '';
+
+        async function loadMatches() {
+            try {
+                const response = await fetch('/api/matches');
+                const data = await response.json();
+                
+                if (data.error) {
+                    console.error('Error loading matches:', data.error);
+                    return;
+                }
+                
+                matchesData = data.matches;
+                
+            } catch (error) {
+                console.error('Error loading matches:', error);
+            }
+        }
+
+        async function loadTeams() {
+            try {
+                const response = await fetch('/api/teams');
+                const data = await response.json();
+                
+                if (data.error) {
+                    console.error('Error loading teams:', data.error);
+                    return;
+                }
+                
+                teamsData = data.teams;
+                
+            } catch (error) {
+                console.error('Error loading teams:', error);
+            }
+        }
+
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const data = await response.json();
+                
+                if (data.error) {
+                    console.error('Error loading stats:', data.error);
+                    return;
+                }
+                
+                displayStats(data);
+                
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        async function loadMatchDetails(matchId) {
+            try {
+                const response = await fetch(`/api/match/${matchId}/details`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    console.error('Error loading match details:', data.error);
+                    return;
+                }
+                
+                displayMatchInfo(data);
+                
+            } catch (error) {
+                console.error('Error loading match details:', error);
+            }
+        }
+
+        function displayMatchInfo(matchData) {
+            const matchInfo = document.getElementById('matchInfo');
+            const matchTitle = document.getElementById('matchInfoTitle');
+            const matchTeams = document.getElementById('matchTeams');
+            
+            matchTitle.textContent = matchData.display_name;
+            
+            let teamsHTML = '';
+            
+            if (matchData.home_team && matchData.away_team) {
+                teamsHTML = `
+                    <div class="team-info team-home">
+                        <h4>🏠 Home Team</h4>
+                        <div style="font-size: 1.2rem; font-weight: bold; margin: 5px 0;">
+                            ${escapeHtml(matchData.home_team.team_name)}
+                        </div>
+                        <div style="font-size: 0.9rem; opacity: 0.8;">
+                            Team ID: ${matchData.home_team.team_id}
+                        </div>
+                    </div>
+                    
+                    <div class="vs-indicator">VS</div>
+                    
+                    <div class="team-info team-away">
+                        <h4>✈️ Away Team</h4>
+                        <div style="font-size: 1.2rem; font-weight: bold; margin: 5px 0;">
+                            ${escapeHtml(matchData.away_team.team_name)}
+                        </div>
+                        <div style="font-size: 0.9rem; opacity: 0.8;">
+                            Team ID: ${matchData.away_team.team_id}
+                        </div>
+                    </div>
+                `;
+            } else {
+                teamsHTML = `
+                    <div style="text-align: center; color: #9CA3AF;">
+                        <p>Match teams information not available</p>
+                    </div>
+                `;
+            }
+            
+            matchTeams.innerHTML = teamsHTML;
+            matchInfo.style.display = 'block';
+        }
+
+        function displayLogs(logs) {
+            const container = document.getElementById('logContainer');
+            container.innerHTML = '';
+            
+            if (logs.length === 0) {
+                container.innerHTML = '<div class="loading">No communications found</div>';
+                return;
+            }
+            
+            logs.forEach(log => {
+                const logEntry = document.createElement('div');
+                
+                // Determine log type for color coding (green=create, yellow=edit, red=delete)
+                const logType = getLogTypeClass(log.log_type || log.level || 'INFO');
+                const userRoleClass = log.user_role_class || 'user-role';
+                logEntry.className = `log-entry ${logType} ${userRoleClass}`;
+                
+                // Format the user info
+                const userDisplay = log.user_nick || log.user_name || `User ${log.user_id}`;
+                
+                // Create role indicator
+                let roleIndicator = '';
+                if (log.user_role_type && log.user_role_type !== 'user') {
+                    const roleLabel = getRoleLabel(log.user_role_type);
+                    roleIndicator = `<span class="role-indicator ${userRoleClass}">${roleLabel}</span>`;
+                }
+                
+                // Create clickable match link with display name
+                let matchInfo = '';
+                if (log.match_id) {
+                    const matchData = matchesData.find(m => m.match_id === log.match_id);
+                    const matchDisplayName = matchData ? matchData.display_name : `Match ${log.match_id}`;
+                    matchInfo = `<a href="/match/${log.match_id}" style="color: #60a5fa; text-decoration: none;" title="View all ${escapeHtml(matchDisplayName)} communications">${escapeHtml(matchDisplayName)}</a>`;
+                }
+                
+                // Create pretty team tag with external link + internal link
+                let teamTag = '';
+                if (log.team_id) {
+                    const teamName = log.team_name || `Team ${log.team_id}`;
+                    const teamUrl = `https://ozfortress.com/teams/${log.team_id}`;
+                    const internalUrl = `/team/${log.team_id}`;
+                    // Team tag links to ozfortress, but we'll add a separate internal link
+                    teamTag = `<a href="${internalUrl}" style="color: #60a5fa; text-decoration: none; margin-right: 5px;" title="View all ${escapeHtml(teamName)} communications">📝</a><a href="${teamUrl}" target="_blank" class="team-tag" title="View team on ozfortress.com">${escapeHtml(teamName)}</a>`;
+                }
+                
+                const contextInfo = [matchInfo, teamTag].filter(x => x).join(' • ');
+                
+                // Use processed message content (with resolved role pings)
+                const messageContent = log.processed_message || log.message_content || '';
+                const additionals = log.message_additionals ? ` (${log.message_additionals})` : '';
+                const fullMessage = messageContent + additionals;
+                
+                logEntry.innerHTML = `
+                    <div class="log-header">
+                        <span class="log-timestamp">${formatTimestamp(log.timestamp)}</span>
+                        <div>
+                            <span class="log-level ${logType}">${log.log_type || 'MSG'}</span>
+                            <span class="log-module">${contextInfo}</span>
+                        </div>
+                    </div>
+                    <div class="log-user">
+                        ${log.user_avatar ? `<img src="${log.user_avatar}" width="20" height="20" style="border-radius: 50%; margin-right: 8px;">` : ''}
+                        <strong>${escapeHtml(userDisplay)}</strong>
+                        ${roleIndicator}
+                    </div>
+                    <div class="log-message">${fullMessage}</div>
+                `;
+                
+                container.appendChild(logEntry);
+            });
+        }
+
+        function formatTimestamp(timestamp) {
+            if (!timestamp) return '';
+            const date = new Date(timestamp);
+            return date.toLocaleString();
+        }
+
+        function displayStats(stats) {
+            const container = document.getElementById('stats');
+            container.innerHTML = `
+                <div class="stat-card">
+                    <h3>${stats.total_logs || 0}</h3>
+                    <p>Total Communications</p>
+                </div>
+                <div class="stat-card">
+                    <h3>${stats.total_matches || 0}</h3>
+                    <p>Total Matches</p>
+                </div>
+                <div class="stat-card">
+                    <h3>${stats.total_teams || 0}</h3>
+                    <p>Total Teams</p>
+                </div>
+                <div class="stat-card">
+                    <h3>${stats.recent_activity || 0}</h3>
+                    <p>Recent Activity (24h)</p>
+                </div>
+            `;
+        }
+
+        function showError(message) {
+            const container = document.getElementById('logContainer');
+            container.innerHTML = `<div class="error">Error: ${escapeHtml(message)}</div>`;
+        }
+
+        function clearLogs() {
+            document.getElementById('logContainer').innerHTML = '<div class="loading">Logs cleared</div>';
+        }
+
+        function clearFilters() {
+            document.getElementById('matchFilter').value = '';
+            document.getElementById('teamFilter').value = '';
+            selectedMatchId = '';
+            selectedTeamId = '';
+            document.getElementById('matchSuggestions').style.display = 'none';
+            document.getElementById('teamSuggestions').style.display = 'none';
+            loadLogs();
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function getLogTypeClass(logType) {
+            if (!logType) return 'INFO';
+            const type = logType.toUpperCase();
+            
+            // Color mapping: green=create, yellow=edit, red=delete
+            if (type.includes('CREATE') || type.includes('ADD')) return 'SUCCESS';
+            if (type.includes('EDIT') || type.includes('UPDATE') || type.includes('MODIFY')) return 'WARNING';
+            if (type.includes('DELETE') || type.includes('REMOVE')) return 'ERROR';
+            
+            return type; // INFO, WARNING, ERROR, DEBUG as default
+        }
+
+        function getRoleLabel(roleType) {
+            const labels = {
+                'captain_home': 'HOME',
+                'captain_away': 'AWAY', 
+                'admin': 'ADMIN',
+                'developer': 'DEV',
+                'caster': 'CASTER',
+                'bot': 'BOT',
+                'staff': 'STAFF'
+            };
+            return labels[roleType] || roleType.toUpperCase();
+        }
+
+        function setupAutoRefresh() {
+            const checkbox = document.getElementById('autoRefresh');
+            
+            if (checkbox.checked && !autoRefreshInterval) {
+                autoRefreshInterval = setInterval(() => {
+                    loadLogs();
+                    loadStats();
+                }, 5000); // Refresh every 5 seconds
+            } else if (!checkbox.checked && autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+            }
+        }
+
+        // Event listeners
+        document.getElementById('logType').addEventListener('change', loadLogs);
+        document.getElementById('limit').addEventListener('change', loadLogs);
+        document.getElementById('autoRefresh').addEventListener('change', setupAutoRefresh);
+
+        // Check for preset values from URL routing
+        function checkPresetFilters() {
+            // Check if we have preset match or team from server-side rendering
+            const urlPath = window.location.pathname;
+            
+            // Match routing: /match/123
+            const matchMatch = urlPath.match(/^\/match\/(\d+)$/);
+            if (matchMatch) {
+                const matchId = parseInt(matchMatch[1]);
+                // Update page title
+                document.getElementById('pageTitle').textContent = `🏆 Match ${matchId} Communications`;
+                document.getElementById('pageSubtitle').innerHTML = `<a href="/" style="color: #60a5fa; text-decoration: none;">← Back to all communications</a> | Viewing logs for Match ${matchId}`;
+                
+                // Load match details
+                loadMatchDetails(matchId);
+                
+                // Wait for matches to load, then set the filter
+                setTimeout(() => {
+                    selectedMatchId = matchId;
+                    const matchFilter = document.getElementById('matchFilter');
+                    const matchData = matchesData.find(m => m.match_id === matchId);
+                    if (matchData) {
+                        matchFilter.value = matchData.display_name;
+                    } else {
+                        matchFilter.value = `Match ${matchId}`;
+                    }
+                    loadLogs(); // Reload logs with the filter
+                }, 500);
+            }
+            
+            // Team routing: /team/456 or /roster/456
+            const teamMatch = urlPath.match(/^\/(?:team|roster)\/(\d+)$/);
+            if (teamMatch) {
+                const teamId = parseInt(teamMatch[1]);
+                const routeType = urlPath.includes('/roster/') ? 'roster' : 'team';
+                
+                // Update page title
+                const title = routeType === 'roster' ? `👥 Roster ${teamId} Communications` : `👥 Team ${teamId} Communications`;
+                document.getElementById('pageTitle').textContent = title;
+                document.getElementById('pageSubtitle').innerHTML = `<a href="/" style="color: #60a5fa; text-decoration: none;">← Back to all communications</a> | Viewing logs for ${routeType === 'roster' ? 'Roster' : 'Team'} ${teamId}`;
+                
+                // Wait for teams to load, then set the filter
+                setTimeout(() => {
+                    selectedTeamId = teamId;
+                    const teamFilter = document.getElementById('teamFilter');
+                    const teamData = teamsData.find(t => t.team_id === teamId);
+                    if (teamData) {
+                        teamFilter.value = `${teamData.team_name || 'Team ' + teamData.team_id} (Division ${teamData.division})`;
+                    } else {
+                        teamFilter.value = `Team ${teamId}`;
+                    }
+                    loadLogs(); // Reload logs with the filter
+                }, 500);
+            }
+        }
+
+        // Initialize
+        window.addEventListener('load', async () => {
+            await loadMatches();
+            await loadTeams();
+            setupAutocomplete();
+            loadLogs();
+            loadStats();
+            setupAutoRefresh();
+            checkPresetFilters();
+        });
+    </script>
+</body>
+</html>

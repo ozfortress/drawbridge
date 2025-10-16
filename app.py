@@ -3,6 +3,8 @@ if __name__ != '__main__':
 
 import logging
 import os
+import sys
+from pathlib import Path
 from dotenv import load_dotenv
 import discord
 from discord.ext import commands as discord_commands
@@ -70,7 +72,48 @@ def main():
     # The logging system is already configured by logging_config.py
     logger.info(f'Starting OZF Drawbridge v{VERSION}...')
     logger.info('OZF Drawbridge has started.')
-    client.run(os.getenv('DISCORD_TOKEN'))
+    
+    # Always start both bot and web server
+    logger.info('Starting both Discord bot and web server...')
+    import asyncio
+    
+    async def run_both():
+        # Start bot task
+        bot_task = asyncio.create_task(client.start(os.getenv('DISCORD_TOKEN')))
+        
+        # Start web server task
+        try:
+            sys.path.insert(0, str(Path(__file__).parent / 'web'))
+            from simple_web_server import app as web_app, set_shared_database
+            
+            # Share the database connection with the web server
+            set_shared_database(db)
+            
+            host = os.getenv('WEB_HOST', '0.0.0.0')
+            port = int(os.getenv('WEB_PORT', 8080))
+            web_task = asyncio.create_task(web_app.run_task(host=host, port=port))
+            logger.info(f'Web server will start on {host}:{port} with shared database')
+            
+            # Wait for both to complete (or one to fail)
+            done, pending = await asyncio.wait(
+                [bot_task, web_task], 
+                return_when=asyncio.FIRST_COMPLETED
+            )
+            
+            # Cancel any remaining tasks
+            for task in pending:
+                task.cancel()
+                
+        except ImportError as e:
+            logger.warning(f'Web server not available: {e}')
+            # Just run the bot if web server fails to import
+            await bot_task
+        except Exception as e:
+            logger.error(f'Error starting web server: {e}')
+            # Just run the bot if web server fails to start
+            await bot_task
+    
+    asyncio.run(run_both())
 
 @client.event
 async def on_ready():
@@ -78,6 +121,16 @@ async def on_ready():
     discord_event_logger.log_event('bot_ready', f'Bot logged in as {client.user.name}')
     
     await Drawbridge.initialize(client, db, cit, logger)
+    
+    # Initialize web IPC handler if available
+    try:
+        from modules.Drawbridge.web_ipc import WebIPCHandler
+        await client.add_cog(WebIPCHandler(client))
+        logger.info('Web IPC handler loaded successfully')
+    except ImportError as e:
+        logger.warning(f'Web IPC handler not available (missing dependencies): {e}')
+    except Exception as e:
+        logger.error(f'Failed to load Web IPC handler: {e}')
 
     botmisc= client.get_channel(int(os.getenv('ANNOUNCE_CHANNEL')))
     def get_latest_commit():
