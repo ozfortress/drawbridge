@@ -8,7 +8,7 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 RUN git config --global --add safe.directory /usr/src/app
 COPY . .
-
+EXPOSE 3000
 CMD [ "python", "./app.py" ]
 
 # HEALTHCHECK --interval=15s --timeout=10s --start-period=10s --retries=3 \

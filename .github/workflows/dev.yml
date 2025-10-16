@@ -76,6 +76,6 @@ jobs:
             --label "traefik.http.routers.drawbridge-dev.rule=Host(\`drawbridge-dev.ozf.shigbeard.xyz\`)" \
             --label "traefik.http.routers.drawbridge-dev.tls=true" \
             --label "traefik.http.routers.drawbridge-dev.tls.certresolver=le" \
-            --label "traefik.http.services.drawbridge-dev.loadbalancer.server.port=8080" \
+            --label "traefik.http.services.drawbridge-dev.loadbalancer.server.port=3000" \
             --label "traefik.docker.network=traefik-public" \
             ghcr.io/ozfortress/drawbridge:dev
