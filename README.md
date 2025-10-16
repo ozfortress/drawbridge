@@ -10,6 +10,8 @@ It's features include
 - Assisted Demochecking (in which logs are checked to identify a player who played)
 - Logging of all match communications
 - A launchpad to find your way around
+- **Health Monitoring**: Automated bot monitoring with Discord webhook alerts
+- **Web Interface**: Log viewer with database search and filtering
 
 Still to come
 
@@ -46,6 +48,35 @@ To run the application, after activating the venv as seen above, execute the fol
 ```bash
 python app.py
 ```
+
+## Health Monitoring
+
+Drawbridge includes automated health monitoring that sends Discord webhook alerts when issues are detected.
+
+### Quick Setup
+
+1. **Configure webhook**:
+   ```bash
+   python configure_health_monitoring.py
+   ```
+
+2. **Test configuration**:
+   ```bash
+   python test_health_webhook.py
+   ```
+
+3. **Deploy with monitoring**: The bot will automatically start health monitoring when deployed.
+
+For detailed configuration options, see [HEALTH_MONITORING.md](HEALTH_MONITORING.md).
+
+## Web Interface
+
+Access the web interface at `http://localhost:8080` (or your configured port) for:
+
+- Database log viewing with search and filtering
+- Match and team information lookup
+- Bot health status monitoring
+- Real-time log streaming
 
 ## Contributing
 

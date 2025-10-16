@@ -550,6 +550,40 @@ async def get_stats():
         logger.error(f"Error getting stats: {e}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/health')
+async def get_health_status():
+    """Get bot health status"""
+    try:
+        # Import health monitor here to avoid circular imports
+        from modules.health_monitor import get_health_monitor
+        
+        health_monitor = get_health_monitor()
+        if not health_monitor:
+            return jsonify({
+                'status': 'unknown',
+                'message': 'Health monitoring not initialized'
+            }), 503
+        
+        health_status = health_monitor.get_health_status()
+        
+        # Return appropriate HTTP status code based on health
+        status_code = 200 if health_status['healthy'] else 503
+        
+        return jsonify({
+            'status': 'healthy' if health_status['healthy'] else 'unhealthy',
+            'timestamp': health_status['timestamp'],
+            'uptime_seconds': health_status['uptime_seconds'],
+            'consecutive_failures': health_status['consecutive_failures'],
+            'metrics': health_status['metrics']
+        }), status_code
+        
+    except Exception as e:
+        logger.error(f"Error getting health status: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
 if __name__ == '__main__':
     port = int(os.getenv('WEB_PORT', 8080))
     host = os.getenv('WEB_HOST', '127.0.0.1')

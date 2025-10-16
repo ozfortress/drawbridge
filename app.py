@@ -13,6 +13,7 @@ from modules import citadel
 from modules import database
 from modules import Drawbridge
 from modules.logging_config import get_logger, DiscordEventLogger
+from modules.health_monitor import initialize_health_monitor, get_health_monitor
 import subprocess
 import datetime
 import socket
@@ -143,6 +144,11 @@ async def on_ready():
     logger.info(f'Logged in as {client.user.name}#{client.user.discriminator} ({client.user.id})')
     discord_event_logger.log_event('bot_ready', f'Bot logged in as {client.user.name}')
     
+    # Initialize health monitoring
+    health_monitor = initialize_health_monitor(client, db)
+    health_monitor.start_monitoring()
+    logger.info('Health monitoring system initialized')
+    
     await Drawbridge.initialize(client, db, cit, logger)
     
     # Initialize web IPC handler if available
@@ -179,6 +185,13 @@ async def on_ready():
             logger.error(f'Failed to process commit info: {e}')
     
     healthstatus['status'] = b"OK"
+    
+    # Update health metrics
+    health_monitor = get_health_monitor()
+    if health_monitor:
+        health_monitor.update_metric('bot_ready', True)
+        health_monitor.update_heartbeat()
+    
     logger.info('Bot initialization completed successfully')
 
 
@@ -186,6 +199,12 @@ async def on_ready():
 @client.event
 async def on_error(event, *args, **kwargs):
     logger.error(f'Error in event {event}: {args} {kwargs}', exc_info=True)
+    
+    # Update health metrics to indicate an error occurred
+    health_monitor = get_health_monitor()
+    if health_monitor:
+        health_monitor.consecutive_failures += 1
+        
     # None of the next code may work, so we need to catch any error that occurs here
     # and log it to the console
     try:
@@ -195,6 +214,14 @@ async def on_error(event, *args, **kwargs):
         # await botmisc.send(f'# Unhandled Error\n in event {event}: \n args: {args} \n kwargs: {kwargs}')
     except Exception as e:
         logger.error(f'Error in on_error: {e}', exc_info=True)
+
+@client.event
+async def on_interaction(interaction):
+    """Track interactions for health monitoring."""
+    health_monitor = get_health_monitor()
+    if health_monitor:
+        health_monitor.update_metric('last_command_time', datetime.datetime.now())
+        health_monitor.update_heartbeat()
 
 @discord_tasks.loop(seconds=5)
 async def check_commands():
