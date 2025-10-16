@@ -67,9 +67,6 @@ jobs:
             docker rm -f ${CONTAINER_NAME}
           fi
           docker pull ghcr.io/ozfortress/drawbridge:main
-          # ensure host log directory exists and has permissive permissions for the container
-          mkdir -p "/opt/ozf-projects/drawbridge/logs/${CONTAINER_NAME}"
-          chmod 755 "/opt/ozf-projects/drawbridge/logs/${CONTAINER_NAME}"
           docker run -d \
             --name ${CONTAINER_NAME} \
             --network traefik-public \
