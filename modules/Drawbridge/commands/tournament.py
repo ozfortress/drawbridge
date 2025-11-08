@@ -567,6 +567,44 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
             except Exception as e:
                 self.logger.error(f'Error sending message to team channels: {e}')
             return True
+    
+    async def _delete_match(self, match_id: int):
+        """Delete a match and all associated channels. NOTE: This should not be used typically — the match should be archived instead.
+        """
+        match_nullable = self.db.matches.get_by_id(match_id)
+        if match_nullable is not None:
+            match = match_nullable
+            match_channel = self.bot.get_channel(match['channel_id'])
+            if match_channel is not None:
+                await match_channel.delete()
+            self.db.matches.delete(match_id)
+
+    @app_commands.command(
+        name='force-matchgen'
+    )
+    @checks.has_roles(
+        'DIRECTOR',
+        'HEAD',
+        'DEVELOPER',
+        'ADMIN',
+        'TRIAL'
+    )
+    async def force_matchgen(self, interaction: discord.Interaction, match_id: int, role_overrides : Optional[str]):
+        # Clean up anything existing
+        await interaction.response.send_message('Force regenerating match', ephemeral=True)
+        if self.db.matches.get_by_id(match_id) is not None:
+            await interaction.edit_original_response(content='Deleting existing match')
+            await self._delete_match(match_id)
+        try:
+            match = self.cit.getMatch(match_id)
+            if match is None:
+                await interaction.edit_original_response(content='Match not found.')
+                return
+            await self._generate_match(match, role_overrides)
+            await interaction.edit_original_response(content='Match generated.')
+        except Exception as e:
+            self.logger.error(f'Error generating match: {e}', exc_info=True)
+            await interaction.edit_original_response(content=f'An error occurred while generating matches.\n ```\n{e}\n```')
 
     @app_commands.command(
         name='matchgenround'
