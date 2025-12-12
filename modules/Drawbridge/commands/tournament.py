@@ -244,7 +244,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 interaction.guild.default_role: discord.PermissionOverwrite(view_channel=False)
             }
 
-            all_access = checks._get_role_ids('HEAD', 'ADMIN', '!AC', 'TRIAL', 'DEVELOPER', 'APPROVED', 'BOT')
+            all_access = checks._get_role_ids('HEAD', 'ADMIN', '!AC', 'TRIAL', 'DEVELOPER', 'APPROVED', '!UNAPPROVED', 'BOT')
             for role in all_access:
                 overrides[interaction.guild.get_role(role)] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
             additional_overrides = self.get_role_ids_from_overrides(role_overrides)
@@ -513,7 +513,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 self.guild.get_role(team_home['role_id']): discord.PermissionOverwrite(view_channel=True, send_messages=True),
                 self.guild.get_role(team_away['role_id']): discord.PermissionOverwrite(view_channel=True, send_messages=True),
             }
-            all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'APPROVED', 'BOT', 'STAFF')
+            all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'APPROVED', '!UNAPPROVED', 'BOT', 'STAFF')
             for role in all_access:
                 overrides[self.guild.get_role(role)] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
             for role in self.get_role_ids_from_overrides(role_overrides):
