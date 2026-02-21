@@ -508,16 +508,29 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                     break
             if category_id == 0:
                 raise Exception('Division not found for the match')
+            role_home_obj = self.guild.get_role(team_home['role_id'])
+            role_away_obj = self.guild.get_role(team_away['role_id'])
+            if role_home_obj is None:
+                self.logger.error(f'Could not find Discord role for home team {team_home["team_name"]} (role_id={team_home["role_id"]})')
+                return False
+            if role_away_obj is None:
+                self.logger.error(f'Could not find Discord role for away team {team_away["team_name"]} (role_id={team_away["role_id"]})')
+                return False
             overrides = {
                 self.guild.default_role: discord.PermissionOverwrite(view_channel=False, send_messages=False),
-                self.guild.get_role(team_home['role_id']): discord.PermissionOverwrite(view_channel=True, send_messages=True),
-                self.guild.get_role(team_away['role_id']): discord.PermissionOverwrite(view_channel=True, send_messages=True),
+                role_home_obj: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+                role_away_obj: discord.PermissionOverwrite(view_channel=True, send_messages=True),
             }
             all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'APPROVED', '!UNAPPROVED', 'BOT', 'STAFF')
-            for role in all_access:
-                overrides[self.guild.get_role(role)] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
+            for role_id in all_access:
+                role_obj = self.guild.get_role(role_id)
+                if role_obj is not None:
+                    overrides[role_obj] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
+                else:
+                    self.logger.warning(f'Could not find Discord role for role_id={role_id} in all_access list, skipping')
             for role in self.get_role_ids_from_overrides(role_overrides):
-                overrides[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
+                if role is not None:
+                    overrides[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
             cat = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID'))).get_channel(category_id)
             if cat == None:
                 raise Exception(f'Category not found for division {match.home_team["division"]}')
