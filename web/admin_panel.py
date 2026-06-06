@@ -55,11 +55,50 @@ def require_admin(f):
 
 
 def _check_bot_ready():
-    if not _bot or not _bot.is_ready():
+    if not _bot:
+        logger.warning('_check_bot_ready: _bot is None')
         return False
-    if not _db or not _cit:
+    if not _bot.is_ready():
+        logger.debug('_check_bot_ready: bot not ready yet')
+        return False
+    if not _db:
+        logger.warning('_check_bot_ready: _db is None')
+        return False
+    if not _cit:
+        logger.warning('_check_bot_ready: _cit is None')
         return False
     return True
+
+
+def _get_cog(name: str):
+    """Get a cog by name, with fallback search. Returns None if not found."""
+    if not _bot:
+        return None
+    cog = _bot.get_cog(name)
+    if cog is not None:
+        return cog
+    # Fallback: search all cogs case-insensitively or by class name suffix
+    for cog_name, cog_instance in _bot.cogs.items():
+        if cog_name.lower() == name.lower():
+            return cog_instance
+        if cog_instance.__class__.__name__ == name:
+            return cog_instance
+    logger.warning(f'Cog "{name}" not found. Available cogs: {list(_bot.cogs.keys())}')
+    return None
+
+
+def _get_tournament_cog():
+    global _tournament_cog
+    if _tournament_cog is None:
+        _tournament_cog = _get_cog('Tournament')
+    return _tournament_cog
+
+
+def _get_sync_cog():
+    global _sync_cog
+    if _sync_cog is None:
+        _sync_cog = _get_cog('Sync')
+    return _sync_cog
 
 
 def _get_guild():
@@ -260,10 +299,18 @@ async def api_admin_info():
 @admin_bp.route('/api/tournament/launchpad', methods=['POST'])
 @require_admin
 async def api_tournament_launchpad():
-    if not _check_bot_ready() or not _tournament_cog:
-        return jsonify({'error': 'Bot or tournament cog not ready'}), 503
+    if not _check_bot_ready():
+        logger.warning('api_tournament_launchpad: bot not ready')
+        return jsonify({'error': 'Bot is not ready yet'}), 503
+    cog = _get_tournament_cog()
+    if not cog:
+        logger.warning('api_tournament_launchpad: tournament cog not found')
+        return jsonify({'error': 'Tournament cog not found. Check logs for available cogs.'}), 503
     try:
-        await _tournament_cog.update_launchpad()
+        guild = _get_guild()
+        if not guild:
+            return jsonify({'error': 'Guild not found'}), 500
+        await cog.update_launchpad()
         return jsonify({'success': True, 'message': 'Launchpad generated and sent to launchpad channel.'})
     except Exception as e:
         logger.error(f'Launchpad error: {e}')
@@ -273,7 +320,7 @@ async def api_tournament_launchpad():
 @admin_bp.route('/api/tournament/start', methods=['POST'])
 @require_admin
 async def api_tournament_start():
-    if not _check_bot_ready() or not _tournament_cog:
+    if not _check_bot_ready() or not _get_tournament_cog():
         return jsonify({'error': 'Bot or tournament cog not ready'}), 503
     data = await request.get_json()
     league_id = data.get('league_id')
@@ -306,7 +353,7 @@ async def api_tournament_start():
                 role_obj = guild.get_role(role_id)
                 if role_obj:
                     overrides[role_obj] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
-            extra_overrides = _tournament_cog.get_role_ids_from_overrides(role_overrides)
+            extra_overrides = _get_tournament_cog().get_role_ids_from_overrides(role_overrides)
             for override in extra_overrides:
                 overrides[override] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
 
@@ -365,8 +412,8 @@ async def api_tournament_start():
 
         from modules.Drawbridge.functions import Functions as Funcs
         funcs = Funcs(_db, _cit)
-        err_msg = await _tournament_cog._assign_roles(league_id)
-        await _tournament_cog.update_launchpad()
+        err_msg = await _get_tournament_cog()._assign_roles(league_id)
+        await _get_tournament_cog().update_launchpad()
         return jsonify({'success': True, 'message': f'Tournament started. Divisions: {d}, Teams: {r}.', 'errors': err_msg})
     except Exception as e:
         logger.error(f'Tournament start error: {e}', exc_info=True)
@@ -376,14 +423,14 @@ async def api_tournament_start():
 @admin_bp.route('/api/tournament/assign-roles', methods=['POST'])
 @require_admin
 async def api_tournament_assign_roles():
-    if not _check_bot_ready() or not _tournament_cog:
+    if not _check_bot_ready() or not _get_tournament_cog():
         return jsonify({'error': 'Bot or tournament cog not ready'}), 503
     data = await request.get_json()
     league_id = data.get('league_id')
     if not league_id:
         return jsonify({'error': 'league_id is required'}), 400
     try:
-        err_msg = await _tournament_cog._assign_roles(league_id)
+        err_msg = await _get_tournament_cog()._assign_roles(league_id)
         return jsonify({'success': True, 'message': 'Roles assigned.', 'errors': err_msg})
     except Exception as e:
         logger.error(f'Assign roles error: {e}')
@@ -393,7 +440,7 @@ async def api_tournament_assign_roles():
 @admin_bp.route('/api/tournament/assign-captain-roles', methods=['POST'])
 @require_admin
 async def api_tournament_assign_captain_roles():
-    if not _check_bot_ready() or not _tournament_cog:
+    if not _check_bot_ready() or not _get_tournament_cog():
         return jsonify({'error': 'Bot or tournament cog not ready'}), 503
     data = await request.get_json()
     league_id = data.get('league_id')
@@ -446,7 +493,7 @@ async def api_tournament_assign_captain_roles():
 @admin_bp.route('/api/tournament/end', methods=['POST'])
 @require_admin
 async def api_tournament_end():
-    if not _check_bot_ready() or not _tournament_cog:
+    if not _check_bot_ready() or not _get_tournament_cog():
         return jsonify({'error': 'Bot or tournament cog not ready'}), 503
     data = await request.get_json()
     league_id = data.get('league_id')
@@ -494,7 +541,7 @@ async def api_tournament_end():
         _db.matches.delete_by_league(league_id)
         _db.teams.delete_by_league(league_id)
         _db.divisions.delete_by_league(league_id)
-        await _tournament_cog.update_launchpad()
+        await _get_tournament_cog().update_launchpad()
         return jsonify({'success': True, 'message': 'Tournament ended and all channels/roles archived.'})
     except Exception as e:
         logger.error(f'Tournament end error: {e}', exc_info=True)
@@ -504,7 +551,7 @@ async def api_tournament_end():
 @admin_bp.route('/api/tournament/matchgen', methods=['POST'])
 @require_admin
 async def api_tournament_matchgen():
-    if not _check_bot_ready() or not _tournament_cog:
+    if not _check_bot_ready() or not _get_tournament_cog():
         return jsonify({'error': 'Bot or tournament cog not ready'}), 503
     data = await request.get_json()
     match_id = data.get('match_id')
@@ -515,7 +562,7 @@ async def api_tournament_matchgen():
         match = _cit.getMatch(match_id)
         if not match:
             return jsonify({'error': 'Match not found in Citadel'}), 404
-        result = await _tournament_cog._generate_match(match, role_overrides)
+        result = await _get_tournament_cog()._generate_match(match, role_overrides)
         if result:
             return jsonify({'success': True, 'message': 'Match channel generated.'})
         else:
@@ -528,7 +575,7 @@ async def api_tournament_matchgen():
 @admin_bp.route('/api/tournament/matchgen-round', methods=['POST'])
 @require_admin
 async def api_tournament_matchgen_round():
-    if not _check_bot_ready() or not _tournament_cog:
+    if not _check_bot_ready() or not _get_tournament_cog():
         return jsonify({'error': 'Bot or tournament cog not ready'}), 503
     data = await request.get_json()
     league_id = data.get('league_id')
@@ -560,7 +607,7 @@ async def api_tournament_matchgen_round():
             c += 1
             try:
                 full = _cit.getMatch(pm.id)
-                await _tournament_cog._generate_match(full, role_overrides)
+                await _get_tournament_cog()._generate_match(full, role_overrides)
             except Exception as e:
                 errors.append(f'Match {pm.id}: {e}')
         return jsonify({
@@ -576,7 +623,7 @@ async def api_tournament_matchgen_round():
 @admin_bp.route('/api/tournament/force-matchgen', methods=['POST'])
 @require_admin
 async def api_tournament_force_matchgen():
-    if not _check_bot_ready() or not _tournament_cog:
+    if not _check_bot_ready() or not _get_tournament_cog():
         return jsonify({'error': 'Bot or tournament cog not ready'}), 503
     data = await request.get_json()
     match_id = data.get('match_id')
@@ -586,11 +633,11 @@ async def api_tournament_force_matchgen():
     try:
         existing = _db.matches.get_by_id(match_id)
         if existing:
-            await _tournament_cog._delete_match(match_id)
+            await _get_tournament_cog()._delete_match(match_id)
         match = _cit.getMatch(match_id)
         if not match:
             return jsonify({'error': 'Match not found'}), 404
-        await _tournament_cog._generate_match(match, role_overrides)
+        await _get_tournament_cog()._generate_match(match, role_overrides)
         return jsonify({'success': True, 'message': 'Match forcefully regenerated.'})
     except Exception as e:
         logger.error(f'Force matchgen error: {e}')
@@ -600,7 +647,7 @@ async def api_tournament_force_matchgen():
 @admin_bp.route('/api/tournament/matchend', methods=['POST'])
 @require_admin
 async def api_tournament_matchend():
-    if not _check_bot_ready() or not _tournament_cog:
+    if not _check_bot_ready() or not _get_tournament_cog():
         return jsonify({'error': 'Bot or tournament cog not ready'}), 503
     data = await request.get_json()
     match_id = data.get('match_id')
@@ -624,7 +671,7 @@ async def api_tournament_matchend():
                     overwrites[role] = discord.PermissionOverwrite(read_messages=True, send_messages=False)
             await channel.edit(overwrites=overwrites)
         _db.matches.archive_match(match_id)
-        await _tournament_cog.update_launchpad()
+        await _get_tournament_cog().update_launchpad()
         return jsonify({'success': True, 'message': 'Match ended and archived.'})
     except Exception as e:
         logger.error(f'Matchend error: {e}')
@@ -634,7 +681,7 @@ async def api_tournament_matchend():
 @admin_bp.route('/api/tournament/random-demo-check', methods=['POST'])
 @require_admin
 async def api_tournament_random_demo_check():
-    if not _check_bot_ready() or not _tournament_cog:
+    if not _check_bot_ready() or not _get_tournament_cog():
         return jsonify({'error': 'Bot or tournament cog not ready'}), 503
     data = await request.get_json()
     league_id = data.get('league_id')
@@ -744,7 +791,7 @@ async def api_sync_users():
 @admin_bp.route('/api/sync/force', methods=['POST'])
 @require_admin
 async def api_sync_force():
-    if not _check_bot_ready() or not _sync_cog:
+    if not _check_bot_ready() or not _get_sync_cog():
         return jsonify({'error': 'Bot or sync cog not ready'}), 503
     data = await request.get_json()
     discord_id = data.get('discord_id')
@@ -759,7 +806,7 @@ async def api_sync_force():
             member = await guild.fetch_member(int(discord_id))
         if not member:
             return jsonify({'error': 'Member not found in guild'}), 404
-        await _sync_cog._sync_user(member, None)
+        await _get_sync_cog()._sync_user(member, None)
         return jsonify({'success': True, 'message': f'Force synced user {discord_id}.'})
     except Exception as e:
         logger.error(f'Force sync error: {e}')

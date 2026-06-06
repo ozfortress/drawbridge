@@ -166,6 +166,12 @@ async def on_ready():
         from web import admin_panel
         tournament_cog = client.get_cog('Tournament')
         sync_cog = client.get_cog('Sync')
+        if tournament_cog is None:
+            available = list(client.cogs.keys())
+            logger.warning(f'Tournament cog not found. Available cogs: {available}')
+        if sync_cog is None:
+            available = list(client.cogs.keys())
+            logger.warning(f'Sync cog not found. Available cogs: {available}')
         admin_panel.initialize(client, db, cit, tournament_cog, sync_cog)
         logger.info('Admin panel initialized with bot references')
     except Exception as e:
