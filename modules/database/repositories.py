@@ -504,22 +504,47 @@ class MessageTemplatesRepository(BaseRepository):
     def __init__(self, db_connection):
         super().__init__(db_connection, 'message_templates')
 
-    def get_by_name(self, template_name: str) -> Optional[Dict[str, Any]]:
-        """Get a template by its name."""
+    def get_by_id(self, template_name: str) -> Optional[Dict[str, Any]]:
+        """Get a template by its name (primary key)."""
         query = f"SELECT * FROM {self.table} WHERE template_name = ?"
         return self._fetch_one(query, (template_name,))
+
+    def get_by_name(self, template_name: str) -> Optional[Dict[str, Any]]:
+        """Alias for get_by_id."""
+        return self.get_by_id(template_name)
 
     def get_all(self) -> List[Dict[str, Any]]:
         """Get all templates."""
         query = f"SELECT * FROM {self.table}"
         return self._fetch_all(query)
 
-    def upsert(self, template_name: str, content: str) -> bool:
-        """Insert or update a template."""
+    def insert(self, data: Dict[str, Any]) -> Optional[int]:
+        """Insert a new template."""
         query = f"""
             INSERT INTO {self.table} (template_name, content, updated_at)
             VALUES (?, ?, NOW())
-            ON DUPLICATE KEY UPDATE content = VALUES(content), updated_at = NOW()
         """
-        result = self._execute_query(query, (template_name, content))
+        return self._execute_query(query, (data['template_name'], data['content']))
+
+    def update(self, template_name: str, data: Dict[str, Any]) -> bool:
+        """Update an existing template."""
+        query = f"""
+            UPDATE {self.table}
+            SET content = ?, updated_at = NOW()
+            WHERE template_name = ?
+        """
+        result = self._execute_query(query, (data['content'], template_name))
         return result > 0
+
+    def delete(self, template_name: str) -> bool:
+        """Delete a template by its name."""
+        query = f"DELETE FROM {self.table} WHERE template_name = ?"
+        result = self._execute_query(query, (template_name,))
+        return result > 0
+
+    def upsert(self, template_name: str, content: str) -> bool:
+        """Insert or update a template."""
+        existing = self.get_by_id(template_name)
+        if existing:
+            return self.update(template_name, {'content': content})
+        return bool(self.insert({'template_name': template_name, 'content': content}))
