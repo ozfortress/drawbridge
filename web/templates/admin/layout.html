@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Drawbridge Admin{% endblock %}</title>
+    <link rel="stylesheet" href="/static/admin.css">
+</head>
+<body>
+    <nav class="admin-nav">
+        <div class="nav-brand">
+            <span class="nav-logo">🛡️</span>
+            <span class="nav-title">Drawbridge Admin</span>
+        </div>
+        <div class="nav-links">
+            <a href="/admin/dashboard" class="nav-link">Dashboard</a>
+            <a href="/admin/launchpad" class="nav-link">Launchpad</a>
+            <a href="/admin/tournaments" class="nav-link">Tournaments</a>
+            <a href="/admin/matches" class="nav-link">Matches</a>
+            <a href="/admin/sync" class="nav-link">Sync</a>
+            <a href="/admin/logs" class="nav-link" target="_blank">Logs</a>
+        </div>
+        <div class="nav-user">
+            {% if user %}
+            <span class="nav-username">{{ user.username }}</span>
+            <a href="/admin/auth/logout" class="nav-logout">Logout</a>
+            {% endif %}
+        </div>
+    </nav>
+    <main class="admin-main">
+        {% block content %}{% endblock %}
+    </main>
+    <div id="toast-container"></div>
+    <script src="/static/admin.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

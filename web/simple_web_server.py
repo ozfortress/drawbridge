@@ -38,8 +38,17 @@ except ImportError as e:
 
 # Set template folder to the correct location
 template_folder = Path(__file__).parent / 'templates'
-app = Quart(__name__, template_folder=str(template_folder))
+static_folder = Path(__file__).parent / 'static'
+app = Quart(__name__, template_folder=str(template_folder), static_folder=str(static_folder), static_url_path='/static')
 logger = get_logger('drawbridge.web.simple', 'web.log')
+
+# Register admin panel blueprint
+try:
+    from web.admin_panel import admin_bp
+    app.register_blueprint(admin_bp)
+    logger.info('Admin panel blueprint registered')
+except Exception as e:
+    logger.warning(f'Failed to register admin panel blueprint: {e}')
 
 # Manual CORS implementation (more reliable than quart-cors)
 @app.after_request

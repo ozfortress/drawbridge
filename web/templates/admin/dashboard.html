@@ -1,0 +1,45 @@
+{% extends "admin/layout.html" %}
+{% block title %}Dashboard - Drawbridge Admin{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Dashboard</h1>
+</div>
+<div class="stat-grid" id="stat-grid">
+    <div class="stat-card"><div class="stat-value" id="stat-bot-status">—</div><div class="stat-label">Bot Status</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-latency">—</div><div class="stat-label">Latency</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-members">—</div><div class="stat-label">Guild Members</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-active-leagues">—</div><div class="stat-label">Active Leagues</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-matches">—</div><div class="stat-label">Total Matches</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-teams">—</div><div class="stat-label">Total Teams</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-logs">—</div><div class="stat-label">Total Logs</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-users">—</div><div class="stat-label">Synced Users</div></div>
+</div>
+<div class="card">
+    <h2>Quick Actions</h2>
+    <div class="action-grid">
+        <button class="btn btn-primary" onclick="API.launchpad()">Generate Launchpad</button>
+        <button class="btn btn-secondary" onclick="window.location='/admin/tournaments'">Start Tournament</button>
+        <button class="btn btn-secondary" onclick="window.location='/admin/sync'">Force Sync</button>
+        <button class="btn btn-secondary" onclick="window.location='/admin/matches'">Demo Check</button>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        const info = await API.get('/api/admin/info');
+        document.getElementById('stat-bot-status').textContent = 'Online';
+        document.getElementById('stat-latency').textContent = info.bot?.latency ? info.bot.latency + 'ms' : '—';
+        document.getElementById('stat-members').textContent = info.guild?.member_count ?? '—';
+        document.getElementById('stat-active-leagues').textContent = info.stats?.active_leagues ?? '—';
+        document.getElementById('stat-matches').textContent = info.stats?.total_matches ?? '—';
+        document.getElementById('stat-teams').textContent = info.stats?.total_teams ?? '—';
+        document.getElementById('stat-logs').textContent = info.stats?.total_logs ?? '—';
+        document.getElementById('stat-users').textContent = info.stats?.synced_users ?? '—';
+    } catch (e) {
+        document.getElementById('stat-bot-status').textContent = 'Offline';
+    }
+});
+</script>
+{% endblock %}

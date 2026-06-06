@@ -1,0 +1,170 @@
+{% extends "admin/layout.html" %}
+{% block title %}Matches - Drawbridge Admin{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Match Management</h1>
+</div>
+
+<div class="card">
+    <h2>Generate Match Channel</h2>
+    <div class="form-group">
+        <label>Match ID</label>
+        <input type="number" id="mg-match-id" class="form-input" placeholder="e.g. 12345">
+    </div>
+    <div class="form-group">
+        <label>Role Overrides (optional)</label>
+        <input type="text" id="mg-overrides" class="form-input" placeholder="e.g. Caster, Staff">
+    </div>
+    <button class="btn btn-primary" id="btn-matchgen">Generate Match</button>
+    <div id="mg-result" class="result-box" style="display:none;"></div>
+</div>
+
+<div class="card">
+    <h2>Generate Round Matches</h2>
+    <div class="form-group">
+        <label>League ID</label>
+        <input type="number" id="mgr-league-id" class="form-input" placeholder="e.g. 27">
+    </div>
+    <div class="form-group">
+        <label>Round Number (optional, leave blank for all)</label>
+        <input type="number" id="mgr-round" class="form-input" placeholder="Leave blank for all rounds">
+    </div>
+    <div class="form-group">
+        <label>Role Overrides (optional)</label>
+        <input type="text" id="mgr-overrides" class="form-input" placeholder="e.g. Caster, Staff">
+    </div>
+    <button class="btn btn-primary" id="btn-matchgen-round">Generate Round Matches</button>
+    <div id="mgr-result" class="result-box" style="display:none;"></div>
+</div>
+
+<div class="card">
+    <h2>Force Regenerate Match</h2>
+    <p class="text-warning">Deletes the existing match channel and creates a new one.</p>
+    <div class="form-group">
+        <label>Match ID</label>
+        <input type="number" id="fmg-match-id" class="form-input" placeholder="e.g. 12345">
+    </div>
+    <div class="form-group">
+        <label>Role Overrides (optional)</label>
+        <input type="text" id="fmg-overrides" class="form-input" placeholder="e.g. Caster, Staff">
+    </div>
+    <button class="btn btn-warning" id="btn-force-matchgen">Force Regenerate</button>
+    <div id="fmg-result" class="result-box" style="display:none;"></div>
+</div>
+
+<div class="card">
+    <h2>End Match</h2>
+    <p>Archive a match channel (sets it to read-only).</p>
+    <div class="form-group">
+        <label>Match ID</label>
+        <input type="number" id="me-match-id" class="form-input" placeholder="e.g. 12345">
+    </div>
+    <button class="btn btn-secondary" id="btn-matchend">End Match</button>
+    <div id="me-result" class="result-box" style="display:none;"></div>
+</div>
+
+<div class="card">
+    <h2>Random Demo Check</h2>
+    <div class="form-group">
+        <label>League ID</label>
+        <input type="number" id="dc-league-id" class="form-input" placeholder="e.g. 27">
+    </div>
+    <div class="form-group">
+        <label>Round Number (optional, 0 for random)</label>
+        <input type="number" id="dc-round" class="form-input" placeholder="0">
+    </div>
+    <div class="form-group">
+        <label>Target User Citadel ID (optional, 0 for random)</label>
+        <input type="number" id="dc-user" class="form-input" placeholder="0">
+    </div>
+    <button class="btn btn-primary" id="btn-democheck">Run Demo Check</button>
+    <div id="dc-result" class="result-box" style="display:none;"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('btn-matchgen').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-matchgen');
+    const result = document.getElementById('mg-result');
+    btn.disabled = true; result.style.display = 'none';
+    try {
+        const resp = await API.post('/api/admin/tournament/matchgen', {
+            match_id: parseInt(document.getElementById('mg-match-id').value),
+            role_overrides: document.getElementById('mg-overrides').value || null,
+        });
+        result.textContent = resp.message || (resp.success ? 'Generated' : 'Failed');
+        result.className = 'result-box ' + (resp.success ? 'result-success' : (resp.error ? 'result-error' : 'result-info'));
+    } catch (e) { result.textContent = e.message; result.className = 'result-box result-error'; }
+    result.style.display = 'block'; btn.disabled = false;
+});
+
+document.getElementById('btn-matchgen-round').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-matchgen-round');
+    const result = document.getElementById('mgr-result');
+    btn.disabled = true; result.style.display = 'none';
+    try {
+        const resp = await API.post('/api/admin/tournament/matchgen-round', {
+            league_id: parseInt(document.getElementById('mgr-league-id').value),
+            round_number: document.getElementById('mgr-round').value ? parseInt(document.getElementById('mgr-round').value) : null,
+            role_overrides: document.getElementById('mgr-overrides').value || null,
+        });
+        result.textContent = resp.message || `Generated ${resp.generated || 0} matches`;
+        result.className = 'result-box ' + (resp.success ? 'result-success' : 'result-error');
+    } catch (e) { result.textContent = e.message; result.className = 'result-box result-error'; }
+    result.style.display = 'block'; btn.disabled = false;
+});
+
+document.getElementById('btn-force-matchgen').addEventListener('click', async () => {
+    if (!confirm('This will delete the existing match channel and create a new one. Continue?')) return;
+    const btn = document.getElementById('btn-force-matchgen');
+    const result = document.getElementById('fmg-result');
+    btn.disabled = true; result.style.display = 'none';
+    try {
+        const resp = await API.post('/api/admin/tournament/force-matchgen', {
+            match_id: parseInt(document.getElementById('fmg-match-id').value),
+            role_overrides: document.getElementById('fmg-overrides').value || null,
+        });
+        result.textContent = resp.message || 'Done';
+        result.className = 'result-box ' + (resp.success ? 'result-success' : 'result-error');
+    } catch (e) { result.textContent = e.message; result.className = 'result-box result-error'; }
+    result.style.display = 'block'; btn.disabled = false;
+});
+
+document.getElementById('btn-matchend').addEventListener('click', async () => {
+    if (!confirm('Archive this match channel (set to read-only)?')) return;
+    const btn = document.getElementById('btn-matchend');
+    const result = document.getElementById('me-result');
+    btn.disabled = true; result.style.display = 'none';
+    try {
+        const resp = await API.post('/api/admin/tournament/matchend', {
+            match_id: parseInt(document.getElementById('me-match-id').value),
+        });
+        result.textContent = resp.message || 'Done';
+        result.className = 'result-box ' + (resp.success ? 'result-success' : 'result-error');
+    } catch (e) { result.textContent = e.message; result.className = 'result-box result-error'; }
+    result.style.display = 'block'; btn.disabled = false;
+});
+
+document.getElementById('btn-democheck').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-democheck');
+    const result = document.getElementById('dc-result');
+    btn.disabled = true; result.style.display = 'none';
+    try {
+        const resp = await API.post('/api/admin/tournament/random-demo-check', {
+            league_id: parseInt(document.getElementById('dc-league-id').value),
+            round_no: parseInt(document.getElementById('dc-round').value) || 0,
+            target_user: parseInt(document.getElementById('dc-user').value) || 0,
+        });
+        if (resp.success) {
+            result.textContent = resp.message;
+            result.className = 'result-box result-success';
+            API.toast(`Demo check: ${resp.player} (${resp.team})`, 'success');
+        } else {
+            result.textContent = resp.error || 'Failed';
+            result.className = 'result-box result-error';
+        }
+    } catch (e) { result.textContent = e.message; result.className = 'result-box result-error'; }
+    result.style.display = 'block'; btn.disabled = false;
+});
+</script>
+{% endblock %}

@@ -161,6 +161,16 @@ async def on_ready():
     except Exception as e:
         logger.error(f'Failed to load Web IPC handler: {e}')
 
+    # Initialize admin panel with bot references
+    try:
+        from web import admin_panel
+        tournament_cog = client.get_cog('Tournament')
+        sync_cog = client.get_cog('Sync')
+        admin_panel.initialize(client, db, cit, tournament_cog, sync_cog)
+        logger.info('Admin panel initialized with bot references')
+    except Exception as e:
+        logger.error(f'Failed to initialize admin panel: {e}')
+
     botmisc= client.get_channel(int(os.getenv('ANNOUNCE_CHANNEL')))
     def get_latest_commit():
         try:

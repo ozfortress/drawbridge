@@ -1,0 +1,168 @@
+{% extends "admin/layout.html" %}
+{% block title %}Tournaments - Drawbridge Admin{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Tournament Management</h1>
+</div>
+
+<div class="card">
+    <h2>Start Tournament</h2>
+    <div class="form-group">
+        <label>League ID</label>
+        <input type="number" id="start-league-id" class="form-input" placeholder="e.g. 27">
+    </div>
+    <div class="form-group">
+        <label>League Shortcode</label>
+        <input type="text" id="start-shortcode" class="form-input" placeholder="e.g. 6s 30">
+    </div>
+    <div class="form-group">
+        <label>Role Overrides (optional, comma-separated role names)</label>
+        <input type="text" id="start-overrides" class="form-input" placeholder="e.g. Caster, Staff">
+    </div>
+    <button class="btn btn-primary" id="btn-start">Start Tournament</button>
+    <div id="start-result" class="result-box" style="display:none;"></div>
+</div>
+
+<div class="card">
+    <h2>Assign Roles</h2>
+    <div class="form-group">
+        <label>League ID</label>
+        <input type="number" id="roles-league-id" class="form-input" placeholder="e.g. 27">
+    </div>
+    <button class="btn btn-secondary" id="btn-assign-roles">Assign Division & Team Roles</button>
+    <button class="btn btn-secondary" id="btn-assign-captain-roles">Assign Captain Roles Only</button>
+    <div id="roles-result" class="result-box" style="display:none;"></div>
+</div>
+
+<div class="card card-danger">
+    <h2>End Tournament</h2>
+    <p class="text-warning">This will archive ALL channels, categories, and roles for the league.</p>
+    <div class="form-group">
+        <label>League ID</label>
+        <input type="number" id="end-league-id" class="form-input" placeholder="e.g. 27">
+    </div>
+    <button class="btn btn-danger" id="btn-end">End Tournament</button>
+    <div id="end-result" class="result-box" style="display:none;"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('btn-start').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-start');
+    const result = document.getElementById('start-result');
+    btn.disabled = true;
+    btn.textContent = 'Starting...';
+    result.style.display = 'none';
+    try {
+        const resp = await API.post('/api/admin/tournament/start', {
+            league_id: parseInt(document.getElementById('start-league-id').value),
+            league_shortcode: document.getElementById('start-shortcode').value,
+            role_overrides: document.getElementById('start-overrides').value || null,
+        });
+        if (resp.success) {
+            API.toast(resp.message, 'success');
+            result.textContent = resp.message;
+            result.className = 'result-box result-success';
+        } else {
+            result.textContent = resp.error || 'Failed';
+            result.className = 'result-box result-error';
+        }
+    } catch (e) {
+        result.textContent = e.message;
+        result.className = 'result-box result-error';
+    }
+    result.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Start Tournament';
+});
+
+document.getElementById('btn-assign-roles').addEventListener('click', async () => {
+    const result = document.getElementById('roles-result');
+    result.style.display = 'none';
+    try {
+        const resp = await API.post('/api/admin/tournament/assign-roles', {
+            league_id: parseInt(document.getElementById('roles-league-id').value),
+        });
+        if (resp.success) {
+            API.toast(resp.message, 'success');
+            result.textContent = resp.errors || resp.message;
+            result.className = 'result-box result-info';
+        } else {
+            result.textContent = resp.error || 'Failed';
+            result.className = 'result-box result-error';
+        }
+    } catch (e) {
+        result.textContent = e.message;
+        result.className = 'result-box result-error';
+    }
+    result.style.display = 'block';
+});
+
+document.getElementById('btn-assign-captain-roles').addEventListener('click', async () => {
+    const result = document.getElementById('roles-result');
+    result.style.display = 'none';
+    try {
+        const resp = await API.post('/api/admin/tournament/assign-captain-roles', {
+            league_id: parseInt(document.getElementById('roles-league-id').value),
+        });
+        if (resp.success) {
+            API.toast('Captain roles assigned', 'success');
+            let msg = `Assigned: ${resp.assigned?.length || 0}`;
+            if (resp.not_in_server?.length) msg += `\nNot in server: ${resp.not_in_server.join(', ')}`;
+            if (resp.not_linked?.length) msg += `\nNot linked: ${resp.not_linked.join(', ')}`;
+            result.textContent = msg;
+            result.className = 'result-box result-info';
+        } else {
+            result.textContent = resp.error || 'Failed';
+            result.className = 'result-box result-error';
+        }
+    } catch (e) {
+        result.textContent = e.message;
+        result.className = 'result-box result-error';
+    }
+    result.style.display = 'block';
+});
+
+let endWarned = false;
+document.getElementById('btn-end').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-end');
+    const result = document.getElementById('end-result');
+    result.style.display = 'none';
+    const leagueId = parseInt(document.getElementById('end-league-id').value);
+    if (!endWarned) {
+        if (!confirm('Are you sure? This will delete ALL channels, categories, and roles for this league. Click OK to send warning request.')) return;
+    }
+    btn.disabled = true;
+    btn.textContent = endWarned ? 'Ending...' : 'Warning...';
+    try {
+        const resp = await API.post('/api/admin/tournament/end', { league_id: leagueId });
+        if (resp.warned) {
+            endWarned = true;
+            API.toast('Warning sent. Re-submit within 5 minutes to execute.', 'warning');
+            result.textContent = 'Warning sent. Click "End Tournament" again within 5 minutes to proceed.';
+            result.className = 'result-box result-warning';
+            btn.textContent = 'Confirm End Tournament';
+            btn.disabled = false;
+        } else if (resp.success) {
+            endWarned = false;
+            API.toast(resp.message, 'success');
+            result.textContent = resp.message;
+            result.className = 'result-box result-success';
+            btn.textContent = 'End Tournament';
+            btn.disabled = false;
+        } else {
+            btn.textContent = 'End Tournament';
+            btn.disabled = false;
+            result.textContent = resp.error || 'Failed';
+            result.className = 'result-box result-error';
+        }
+    } catch (e) {
+        btn.textContent = 'End Tournament';
+        btn.disabled = false;
+        result.textContent = e.message;
+        result.className = 'result-box result-error';
+    }
+    result.style.display = 'block';
+});
+</script>
+{% endblock %}
