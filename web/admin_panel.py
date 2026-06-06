@@ -87,15 +87,6 @@ def _start_task(coro_factory):
     return task_id
 
 
-@admin_bp.route('/api/tasks/<task_id>')
-@require_admin
-async def api_task_status(task_id):
-    task = _tasks.get(task_id)
-    if not task:
-        return jsonify({'error': 'Task not found'}), 404
-    return jsonify(task)
-
-
 def initialize(bot, db, cit, tournament_cog, sync_cog):
     global _bot, _db, _cit, _tournament_cog, _sync_cog
     _bot = bot
@@ -124,6 +115,15 @@ def require_admin(f):
         return await f(*args, **kwargs)
     wrapper.__name__ = f.__name__
     return wrapper
+
+
+@admin_bp.route('/api/tasks/<task_id>')
+@require_admin
+async def api_task_status(task_id):
+    task = _tasks.get(task_id)
+    if not task:
+        return jsonify({'error': 'Task not found'}), 404
+    return jsonify(task)
 
 
 def _check_bot_ready():
