@@ -1110,8 +1110,11 @@ async def api_templates_list():
         templates = _db.message_templates.get_all()
         return jsonify({'templates': templates or []})
     except Exception as e:
+        err = str(e)
+        if "doesn't exist" in err:
+            return jsonify({'templates': [], 'note': 'message_templates table not available — run migration 2'})
         logger.error(f'Templates list error: {e}')
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': err}), 500
 
 
 @admin_bp.route('/api/templates/<name>')
@@ -1125,8 +1128,11 @@ async def api_template_get(name: str):
             return jsonify({'error': 'Template not found'}), 404
         return jsonify(template)
     except Exception as e:
+        err = str(e)
+        if "doesn't exist" in err:
+            return jsonify({'error': 'Table not available'}), 404
         logger.error(f'Template get error: {e}')
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': err}), 500
 
 
 @admin_bp.route('/api/templates/<name>', methods=['PUT'])
@@ -1143,5 +1149,8 @@ async def api_template_update(name: str):
         logger.info(f'Template "{name}" updated via admin panel')
         return jsonify({'success': True, 'message': f'Template "{name}" updated.'})
     except Exception as e:
+        err = str(e)
+        if "doesn't exist" in err:
+            return jsonify({'error': 'Table not available — run migration 2 to enable'}), 503
         logger.error(f'Template update error: {e}')
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': err}), 500
