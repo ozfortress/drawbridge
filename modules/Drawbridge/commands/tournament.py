@@ -169,8 +169,10 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                             discord_user = self.bot.get_user(user['discord_id'])
                             member: Optional[discord.Member] = self.guild.get_member(user['discord_id'])
                             if member is not None:
-                                await member.add_roles(div_role, reason="Drawbridge role assignment")
-                                await member.add_roles(team_role, reason="Drawbridge role assignment")
+                                if div_role is not None:
+                                    await member.add_roles(div_role, reason="Drawbridge role assignment")
+                                if team_role is not None:
+                                    await member.add_roles(team_role, reason="Drawbridge role assignment")
                             else:
                                 if not user['name'] in not_in_server:
                                     not_in_server.append(user['name'])
