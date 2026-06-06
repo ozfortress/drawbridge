@@ -23,6 +23,35 @@
         </div>
     </div>
 
+    <div class="card" id="matchgen-section" style="margin-top:1rem;">
+        <h2>Generate Matches</h2>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+            <div>
+                <label style="font-size:0.85rem;color:var(--text-secondary);">Generate by Round</label>
+                <div style="display:flex;gap:0.5rem;margin-top:0.3rem;">
+                    <input type="number" id="mg-round" class="form-input" placeholder="Round number" style="flex:1;min-width:0;">
+                    <button class="btn btn-primary" id="btn-gen-round">Generate</button>
+                </div>
+                <div style="margin-top:0.4rem;">
+                    <button class="btn btn-secondary" id="btn-gen-all" style="width:100%;">Generate All Remaining</button>
+                </div>
+            </div>
+            <div>
+                <label style="font-size:0.85rem;color:var(--text-secondary);">Generate by Match ID</label>
+                <div style="display:flex;gap:0.5rem;margin-top:0.3rem;">
+                    <input type="number" id="mg-match-id" class="form-input" placeholder="Match ID" style="flex:1;min-width:0;">
+                    <button class="btn btn-primary" id="btn-gen-match">Generate</button>
+                </div>
+                <div style="margin-top:0.4rem;">
+                    <input type="number" id="fmg-match-id" class="form-input" placeholder="Match ID to force-regenerate">
+                    <button class="btn btn-warning" id="btn-force-gen" style="width:100%;margin-top:0.3rem;">Force Regenerate</button>
+                </div>
+            </div>
+        </div>
+        <div id="mg-progress" class="progress-container" style="margin-top:0.75rem;"></div>
+        <div id="mg-result" class="result-box" style="display:none;margin-top:0.5rem;"></div>
+    </div>
+
     <div id="divisions-container"></div>
 </div>
 
@@ -185,6 +214,107 @@ document.getElementById('btn-end-tournament').addEventListener('click', async ()
         }
     } catch (e) { API.toast(e.message, 'error'); }
     btn.disabled = false; btn.textContent = 'End Tournament';
+});
+
+// --- Match Generation ---
+document.getElementById('btn-gen-round').addEventListener('click', async () => {
+    const roundInput = document.getElementById('mg-round');
+    const round = roundInput.value ? parseInt(roundInput.value) : null;
+    if (!round) { API.toast('Enter a round number', 'warning'); return; }
+    const btn = document.getElementById('btn-gen-round');
+    btn.disabled = true;
+    try {
+        const taskResult = await API.runTask('/admin/api/tournament/matchgen-round', {
+            league_id: LEAGUE_ID,
+            round_number: round,
+        }, 'mg-progress');
+        const msg = taskResult.message || `Generated ${taskResult.generated || 0} matches`;
+        document.getElementById('mg-result').textContent = msg;
+        document.getElementById('mg-result').className = 'result-box result-success';
+        document.getElementById('mg-result').style.display = 'block';
+        API.toast(msg, 'success');
+        if (taskResult.errors && taskResult.errors.length) {
+            document.getElementById('mg-result').textContent += '\nErrors: ' + taskResult.errors.join('; ');
+        }
+        loadDetail();
+    } catch (e) {
+        document.getElementById('mg-result').textContent = e.message;
+        document.getElementById('mg-result').className = 'result-box result-error';
+        document.getElementById('mg-result').style.display = 'block';
+        API.toast(e.message, 'error');
+    }
+    btn.disabled = false;
+});
+
+document.getElementById('btn-gen-all').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-gen-all');
+    btn.disabled = true;
+    try {
+        const taskResult = await API.runTask('/admin/api/tournament/matchgen-round', {
+            league_id: LEAGUE_ID,
+            round_number: null,
+        }, 'mg-progress');
+        const msg = taskResult.message || `Generated ${taskResult.generated || 0} matches`;
+        document.getElementById('mg-result').textContent = msg;
+        document.getElementById('mg-result').className = 'result-box result-success';
+        document.getElementById('mg-result').style.display = 'block';
+        API.toast(msg, 'success');
+        if (taskResult.errors && taskResult.errors.length) {
+            document.getElementById('mg-result').textContent += '\nErrors: ' + taskResult.errors.join('; ');
+        }
+        loadDetail();
+    } catch (e) {
+        document.getElementById('mg-result').textContent = e.message;
+        document.getElementById('mg-result').className = 'result-box result-error';
+        document.getElementById('mg-result').style.display = 'block';
+        API.toast(e.message, 'error');
+    }
+    btn.disabled = false;
+});
+
+document.getElementById('btn-gen-match').addEventListener('click', async () => {
+    const matchId = parseInt(document.getElementById('mg-match-id').value);
+    if (!matchId) { API.toast('Enter a match ID', 'warning'); return; }
+    const btn = document.getElementById('btn-gen-match');
+    const result = document.getElementById('mg-result');
+    btn.disabled = true; result.style.display = 'none';
+    try {
+        const resp = await API.post('/admin/api/tournament/matchgen', {
+            match_id: matchId,
+        });
+        result.textContent = resp.message || (resp.success ? 'Generated' : 'Failed');
+        result.className = 'result-box ' + (resp.success ? 'result-success' : 'result-error');
+        API.toast(resp.message || 'Done', resp.success ? 'success' : 'error');
+        if (resp.success) loadDetail();
+    } catch (e) {
+        result.textContent = e.message;
+        result.className = 'result-box result-error';
+        API.toast(e.message, 'error');
+    }
+    result.style.display = 'block'; btn.disabled = false;
+});
+
+document.getElementById('btn-force-gen').addEventListener('click', async () => {
+    if (!confirm('This will delete the existing match channel and create a new one. Continue?')) return;
+    const matchId = parseInt(document.getElementById('fmg-match-id').value);
+    if (!matchId) { API.toast('Enter a match ID', 'warning'); return; }
+    const btn = document.getElementById('btn-force-gen');
+    const result = document.getElementById('mg-result');
+    btn.disabled = true; result.style.display = 'none';
+    try {
+        const resp = await API.post('/admin/api/tournament/force-matchgen', {
+            match_id: matchId,
+        });
+        result.textContent = resp.message || 'Done';
+        result.className = 'result-box ' + (resp.success ? 'result-success' : 'result-error');
+        API.toast(resp.message || 'Done', resp.success ? 'success' : 'error');
+        if (resp.success) loadDetail();
+    } catch (e) {
+        result.textContent = e.message;
+        result.className = 'result-box result-error';
+        API.toast(e.message, 'error');
+    }
+    result.style.display = 'block'; btn.disabled = false;
 });
 
 document.addEventListener('DOMContentLoaded', loadDetail);

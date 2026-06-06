@@ -9,7 +9,15 @@ _db_templates = None
 
 def set_db(db):
     global _db_templates
-    _db_templates = db
+    if db and hasattr(db, 'message_templates'):
+        try:
+            # Verify the table exists — otherwise skip DB to avoid noisy errors
+            db.message_templates.get_all()
+            _db_templates = db
+            return
+        except Exception:
+            pass
+    _db_templates = None
 
 
 def get_template(template_name: str) -> str:
