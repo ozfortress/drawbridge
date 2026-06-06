@@ -19,7 +19,7 @@ document.getElementById('btn-launchpad').addEventListener('click', async () => {
     btn.textContent = 'Generating...';
     result.style.display = 'none';
     try {
-        const resp = await API.post('/api/admin/tournament/launchpad', {});
+        const resp = await API.post('/admin/api/tournament/launchpad', {});
         if (resp.success) {
             API.toast('Launchpad generated successfully', 'success');
             result.textContent = resp.message;

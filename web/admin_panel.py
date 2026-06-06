@@ -215,7 +215,7 @@ async def sync_page():
 
 # ── API endpoints ────────────────────────────────────────────
 
-@admin_bp.route('/api/admin/info')
+@admin_bp.route('/api/info')
 @require_admin
 async def api_admin_info():
     if not _check_bot_ready():
@@ -257,7 +257,7 @@ async def api_admin_info():
 
 # Tournament API
 
-@admin_bp.route('/api/admin/tournament/launchpad', methods=['POST'])
+@admin_bp.route('/api/tournament/launchpad', methods=['POST'])
 @require_admin
 async def api_tournament_launchpad():
     if not _check_bot_ready() or not _tournament_cog:
@@ -270,7 +270,7 @@ async def api_tournament_launchpad():
         return jsonify({'error': str(e)}), 500
 
 
-@admin_bp.route('/api/admin/tournament/start', methods=['POST'])
+@admin_bp.route('/api/tournament/start', methods=['POST'])
 @require_admin
 async def api_tournament_start():
     if not _check_bot_ready() or not _tournament_cog:
@@ -373,7 +373,7 @@ async def api_tournament_start():
         return jsonify({'error': str(e)}), 500
 
 
-@admin_bp.route('/api/admin/tournament/assign-roles', methods=['POST'])
+@admin_bp.route('/api/tournament/assign-roles', methods=['POST'])
 @require_admin
 async def api_tournament_assign_roles():
     if not _check_bot_ready() or not _tournament_cog:
@@ -390,7 +390,7 @@ async def api_tournament_assign_roles():
         return jsonify({'error': str(e)}), 500
 
 
-@admin_bp.route('/api/admin/tournament/assign-captain-roles', methods=['POST'])
+@admin_bp.route('/api/tournament/assign-captain-roles', methods=['POST'])
 @require_admin
 async def api_tournament_assign_captain_roles():
     if not _check_bot_ready() or not _tournament_cog:
@@ -443,7 +443,7 @@ async def api_tournament_assign_captain_roles():
         return jsonify({'error': str(e)}), 500
 
 
-@admin_bp.route('/api/admin/tournament/end', methods=['POST'])
+@admin_bp.route('/api/tournament/end', methods=['POST'])
 @require_admin
 async def api_tournament_end():
     if not _check_bot_ready() or not _tournament_cog:
@@ -501,7 +501,7 @@ async def api_tournament_end():
         return jsonify({'error': str(e)}), 500
 
 
-@admin_bp.route('/api/admin/tournament/matchgen', methods=['POST'])
+@admin_bp.route('/api/tournament/matchgen', methods=['POST'])
 @require_admin
 async def api_tournament_matchgen():
     if not _check_bot_ready() or not _tournament_cog:
@@ -525,7 +525,7 @@ async def api_tournament_matchgen():
         return jsonify({'error': str(e)}), 500
 
 
-@admin_bp.route('/api/admin/tournament/matchgen-round', methods=['POST'])
+@admin_bp.route('/api/tournament/matchgen-round', methods=['POST'])
 @require_admin
 async def api_tournament_matchgen_round():
     if not _check_bot_ready() or not _tournament_cog:
@@ -573,7 +573,7 @@ async def api_tournament_matchgen_round():
         return jsonify({'error': str(e)}), 500
 
 
-@admin_bp.route('/api/admin/tournament/force-matchgen', methods=['POST'])
+@admin_bp.route('/api/tournament/force-matchgen', methods=['POST'])
 @require_admin
 async def api_tournament_force_matchgen():
     if not _check_bot_ready() or not _tournament_cog:
@@ -597,7 +597,7 @@ async def api_tournament_force_matchgen():
         return jsonify({'error': str(e)}), 500
 
 
-@admin_bp.route('/api/admin/tournament/matchend', methods=['POST'])
+@admin_bp.route('/api/tournament/matchend', methods=['POST'])
 @require_admin
 async def api_tournament_matchend():
     if not _check_bot_ready() or not _tournament_cog:
@@ -631,7 +631,7 @@ async def api_tournament_matchend():
         return jsonify({'error': str(e)}), 500
 
 
-@admin_bp.route('/api/admin/tournament/random-demo-check', methods=['POST'])
+@admin_bp.route('/api/tournament/random-demo-check', methods=['POST'])
 @require_admin
 async def api_tournament_random_demo_check():
     if not _check_bot_ready() or not _tournament_cog:
@@ -718,7 +718,7 @@ async def api_tournament_random_demo_check():
 
 # Sync API
 
-@admin_bp.route('/api/admin/sync/users')
+@admin_bp.route('/api/sync/users')
 @require_admin
 async def api_sync_users():
     if not _check_bot_ready() or not _db:
@@ -741,7 +741,7 @@ async def api_sync_users():
         return jsonify({'error': str(e)}), 500
 
 
-@admin_bp.route('/api/admin/sync/force', methods=['POST'])
+@admin_bp.route('/api/sync/force', methods=['POST'])
 @require_admin
 async def api_sync_force():
     if not _check_bot_ready() or not _sync_cog:
@@ -768,7 +768,7 @@ async def api_sync_force():
 
 # Leagues list (Citadel)
 
-@admin_bp.route('/api/admin/leagues')
+@admin_bp.route('/api/leagues')
 @require_admin
 async def api_admin_leagues():
     if not _cit:

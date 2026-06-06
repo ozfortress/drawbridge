@@ -28,7 +28,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', async () => {
     try {
-        const info = await API.get('/api/admin/info');
+        const info = await API.get('/admin/api/info');
         document.getElementById('stat-bot-status').textContent = 'Online';
         document.getElementById('stat-latency').textContent = info.bot?.latency ? info.bot.latency + 'ms' : '—';
         document.getElementById('stat-members').textContent = info.guild?.member_count ?? '—';

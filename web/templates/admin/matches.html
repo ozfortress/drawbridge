@@ -88,7 +88,7 @@ document.getElementById('btn-matchgen').addEventListener('click', async () => {
     const result = document.getElementById('mg-result');
     btn.disabled = true; result.style.display = 'none';
     try {
-        const resp = await API.post('/api/admin/tournament/matchgen', {
+        const resp = await API.post('/admin/api/tournament/matchgen', {
             match_id: parseInt(document.getElementById('mg-match-id').value),
             role_overrides: document.getElementById('mg-overrides').value || null,
         });
@@ -103,7 +103,7 @@ document.getElementById('btn-matchgen-round').addEventListener('click', async ()
     const result = document.getElementById('mgr-result');
     btn.disabled = true; result.style.display = 'none';
     try {
-        const resp = await API.post('/api/admin/tournament/matchgen-round', {
+        const resp = await API.post('/admin/api/tournament/matchgen-round', {
             league_id: parseInt(document.getElementById('mgr-league-id').value),
             round_number: document.getElementById('mgr-round').value ? parseInt(document.getElementById('mgr-round').value) : null,
             role_overrides: document.getElementById('mgr-overrides').value || null,
@@ -120,7 +120,7 @@ document.getElementById('btn-force-matchgen').addEventListener('click', async ()
     const result = document.getElementById('fmg-result');
     btn.disabled = true; result.style.display = 'none';
     try {
-        const resp = await API.post('/api/admin/tournament/force-matchgen', {
+        const resp = await API.post('/admin/api/tournament/force-matchgen', {
             match_id: parseInt(document.getElementById('fmg-match-id').value),
             role_overrides: document.getElementById('fmg-overrides').value || null,
         });
@@ -136,7 +136,7 @@ document.getElementById('btn-matchend').addEventListener('click', async () => {
     const result = document.getElementById('me-result');
     btn.disabled = true; result.style.display = 'none';
     try {
-        const resp = await API.post('/api/admin/tournament/matchend', {
+        const resp = await API.post('/admin/api/tournament/matchend', {
             match_id: parseInt(document.getElementById('me-match-id').value),
         });
         result.textContent = resp.message || 'Done';
@@ -150,7 +150,7 @@ document.getElementById('btn-democheck').addEventListener('click', async () => {
     const result = document.getElementById('dc-result');
     btn.disabled = true; result.style.display = 'none';
     try {
-        const resp = await API.post('/api/admin/tournament/random-demo-check', {
+        const resp = await API.post('/admin/api/tournament/random-demo-check', {
             league_id: parseInt(document.getElementById('dc-league-id').value),
             round_no: parseInt(document.getElementById('dc-round').value) || 0,
             target_user: parseInt(document.getElementById('dc-user').value) || 0,

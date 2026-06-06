@@ -54,7 +54,7 @@ document.getElementById('btn-start').addEventListener('click', async () => {
     btn.textContent = 'Starting...';
     result.style.display = 'none';
     try {
-        const resp = await API.post('/api/admin/tournament/start', {
+        const resp = await API.post('/admin/api/tournament/start', {
             league_id: parseInt(document.getElementById('start-league-id').value),
             league_shortcode: document.getElementById('start-shortcode').value,
             role_overrides: document.getElementById('start-overrides').value || null,
@@ -80,7 +80,7 @@ document.getElementById('btn-assign-roles').addEventListener('click', async () =
     const result = document.getElementById('roles-result');
     result.style.display = 'none';
     try {
-        const resp = await API.post('/api/admin/tournament/assign-roles', {
+        const resp = await API.post('/admin/api/tournament/assign-roles', {
             league_id: parseInt(document.getElementById('roles-league-id').value),
         });
         if (resp.success) {
@@ -102,7 +102,7 @@ document.getElementById('btn-assign-captain-roles').addEventListener('click', as
     const result = document.getElementById('roles-result');
     result.style.display = 'none';
     try {
-        const resp = await API.post('/api/admin/tournament/assign-captain-roles', {
+        const resp = await API.post('/admin/api/tournament/assign-captain-roles', {
             league_id: parseInt(document.getElementById('roles-league-id').value),
         });
         if (resp.success) {
@@ -135,7 +135,7 @@ document.getElementById('btn-end').addEventListener('click', async () => {
     btn.disabled = true;
     btn.textContent = endWarned ? 'Ending...' : 'Warning...';
     try {
-        const resp = await API.post('/api/admin/tournament/end', { league_id: leagueId });
+        const resp = await API.post('/admin/api/tournament/end', { league_id: leagueId });
         if (resp.warned) {
             endWarned = true;
             API.toast('Warning sent. Re-submit within 5 minutes to execute.', 'warning');
