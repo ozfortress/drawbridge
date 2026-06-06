@@ -3,12 +3,12 @@
 import os
 import time
 import json
-import urllib.request
 import urllib.parse
 import hashlib
 import hmac
 import base64
 import logging
+import requests
 
 logger = logging.getLogger('drawbridge.web.admin_auth')
 
@@ -74,6 +74,7 @@ def verify_session(token: str) -> dict | None:
 # Discord OAuth2 helpers
 DISCORD_API_BASE = 'https://discord.com/api'
 
+
 def get_oauth2_url() -> str:
     client_id = os.getenv('DISCORD_CLIENT_ID', '')
     redirect_uri = os.getenv('DISCORD_REDIRECT_URI', '')
@@ -90,35 +91,39 @@ def exchange_code(code: str) -> dict | None:
     client_id = os.getenv('DISCORD_CLIENT_ID', '')
     client_secret = os.getenv('DISCORD_CLIENT_SECRET', '')
     redirect_uri = os.getenv('DISCORD_REDIRECT_URI', '')
-    data = urllib.parse.urlencode({
-        'client_id': client_id,
-        'client_secret': client_secret,
-        'grant_type': 'authorization_code',
-        'code': code,
-        'redirect_uri': redirect_uri,
-    }).encode()
-    req = urllib.request.Request(
-        f'{DISCORD_API_BASE}/oauth2/token',
-        data=data,
-        headers={'Content-Type': 'application/x-www-form-urlencoded'},
-        method='POST'
-    )
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            return json.loads(resp.read())
+        resp = requests.post(
+            f'{DISCORD_API_BASE}/oauth2/token',
+            data={
+                'client_id': client_id,
+                'client_secret': client_secret,
+                'grant_type': 'authorization_code',
+                'code': code,
+                'redirect_uri': redirect_uri,
+            },
+            headers={'Content-Type': 'application/x-www-form-urlencoded'},
+            timeout=10,
+        )
+        if not resp.ok:
+            logger.error(f'OAuth2 token exchange failed: {resp.status_code} {resp.text}')
+            return None
+        return resp.json()
     except Exception as e:
-        logger.error(f'OAuth2 token exchange failed: {e}')
+        logger.error(f'OAuth2 token exchange exception: {e}')
         return None
 
 
 def fetch_discord_user(access_token: str) -> dict | None:
-    req = urllib.request.Request(
-        f'{DISCORD_API_BASE}/users/@me',
-        headers={'Authorization': f'Bearer {access_token}'}
-    )
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            return json.loads(resp.read())
+        resp = requests.get(
+            f'{DISCORD_API_BASE}/users/@me',
+            headers={'Authorization': f'Bearer {access_token}'},
+            timeout=10,
+        )
+        if not resp.ok:
+            logger.error(f'Failed to fetch Discord user: {resp.status_code} {resp.text}')
+            return None
+        return resp.json()
     except Exception as e:
         logger.error(f'Failed to fetch Discord user: {e}')
         return None
