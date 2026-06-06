@@ -29,19 +29,18 @@ class LeaguesRepository(BaseRepository):
 
     def insert(self, league: Dict[str, Any]) -> Optional[int]:
         """Insert a new league."""
-        required_fields = ['league_id', 'league_name']
-        for field in required_fields:
-            if field not in league:
-                raise ValueError(f"Missing required field: {field}")
+        if 'league_id' not in league:
+            raise ValueError("Missing required field: league_id")
+        if 'league_name' not in league:
+            raise ValueError("Missing required field: league_name")
 
         query = f"""
-            INSERT INTO {self.table} (league_id, league_name, league_shortcode, status)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO {self.table} (league_id, league_name, league_shortcode)
+            VALUES (?, ?, ?)
         """
         return self._execute_query(query, (
             league['league_id'], league['league_name'],
             league.get('league_shortcode', ''),
-            league.get('status', 'active'),
         ))
 
     def update(self, league_id: int, league: Dict[str, Any]) -> bool:
@@ -56,13 +55,12 @@ class LeaguesRepository(BaseRepository):
 
         query = f"""
             UPDATE {self.table}
-            SET league_name = ?, league_shortcode = ?, status = ?
+            SET league_name = ?, league_shortcode = ?
             WHERE league_id = ?
         """
         result = self._execute_query(query, (
             updated_data.get('league_name', ''),
             updated_data.get('league_shortcode', ''),
-            updated_data.get('status', 'active'),
             league_id
         ))
         return result > 0

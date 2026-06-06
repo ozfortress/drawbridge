@@ -432,13 +432,12 @@ async def api_tournament_start():
         try:
             existing = _db.leagues.get_by_id(league_id)
             if existing:
-                _db.leagues.update(league_id, {'status': 'active', 'league_name': league.name, 'league_shortcode': league_shortcode})
+                _db.leagues.update(league_id, {'league_name': league.name, 'league_shortcode': league_shortcode})
             else:
                 _db.leagues.insert({
                     'league_id': league_id,
                     'league_name': league.name,
                     'league_shortcode': league_shortcode,
-                    'status': 'active',
                 })
         except Exception as e:
             logger.warning(f'Failed to seed league {league_id}: {e}')
@@ -978,7 +977,7 @@ async def api_admin_leagues():
                 'id': lid,
                 'name': name,
                 'shortcode': shortcode,
-                'status': db_league.get('status', 'unknown'),
+                'status': 'active',
                 'divisions': _db.divisions.count_by_league(lid),
                 'teams': _db.teams.count_by_league(lid),
                 'matches': _db.matches.count_by_league(lid),
@@ -999,8 +998,6 @@ async def api_admin_leagues_active():
         db_leagues = _db.leagues.get_all()
         result = []
         for db_league in db_leagues:
-            if db_league.get('status') != 'active':
-                continue
             lid = db_league['league_id']
             name = db_league.get('league_name') or f'League {lid}'
             shortcode = db_league.get('league_shortcode') or ''

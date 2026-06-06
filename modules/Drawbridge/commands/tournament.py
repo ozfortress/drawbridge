@@ -230,16 +230,15 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         try:
             existing = self.db.leagues.get_by_id(league_id)
             if existing:
-                self.db.leagues.update(league_id, {'status': 'active', 'league_name': league.name, 'league_shortcode': league_shortcode})
+                self.db.leagues.update(league_id, {'league_name': league.name, 'league_shortcode': league_shortcode})
             else:
                 self.db.leagues.insert({
                     'league_id': league_id,
                     'league_name': league.name,
                     'league_shortcode': league_shortcode,
-                    'status': 'active',
                 })
-        except Exception:
-            pass
+        except Exception as e:
+            self.logger.warning(f"Failed to seed league {league_id}: {e}")
 
         template_set_db(self.db)
         rawteammessage = get_template('teams.json')
