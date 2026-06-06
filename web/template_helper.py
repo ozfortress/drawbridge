@@ -9,15 +9,17 @@ _db_templates = None
 
 def set_db(db):
     global _db_templates
-    if db and hasattr(db, 'message_templates'):
-        try:
-            # Verify the table exists — otherwise skip DB to avoid noisy errors
-            db.message_templates.get_all()
-            _db_templates = db
-            return
-        except Exception:
-            pass
     _db_templates = None
+    if not db or not hasattr(db, 'message_templates'):
+        return
+    try:
+        with db.connection.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SHOW TABLES LIKE 'message_templates'")
+            if cursor.fetchone():
+                _db_templates = db
+    except Exception:
+        pass
 
 
 def get_template(template_name: str) -> str:

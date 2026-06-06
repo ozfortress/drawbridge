@@ -527,7 +527,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         self.db.matches.delete_by_league(league_id)
         self.db.teams.delete_by_league(league_id)
         self.db.divisions.delete_by_league(league_id)
-
+        self.db.leagues.delete(league_id)
 
         await interaction.edit_original_response(content='Tournament ended. All channels, categories and roles have been archived.')
         await self.update_launchpad()

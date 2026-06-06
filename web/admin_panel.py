@@ -668,6 +668,7 @@ async def api_tournament_end():
         _db.matches.delete_by_league(league_id)
         _db.teams.delete_by_league(league_id)
         _db.divisions.delete_by_league(league_id)
+        _db.leagues.delete(league_id)
         p(95, 'Updating launchpad...')
         await _get_tournament_cog().update_launchpad()
         return {'success': True, 'message': 'Tournament ended and all channels/roles archived.'}
