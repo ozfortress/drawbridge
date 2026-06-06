@@ -34,6 +34,7 @@
         <input type="text" id="mgr-overrides" class="form-input" placeholder="e.g. Caster, Staff">
     </div>
     <button class="btn btn-primary" id="btn-matchgen-round">Generate Round Matches</button>
+    <div id="mgr-progress" class="progress-container"></div>
     <div id="mgr-result" class="result-box" style="display:none;"></div>
 </div>
 
@@ -103,14 +104,23 @@ document.getElementById('btn-matchgen-round').addEventListener('click', async ()
     const result = document.getElementById('mgr-result');
     btn.disabled = true; result.style.display = 'none';
     try {
-        const resp = await API.post('/admin/api/tournament/matchgen-round', {
+        const taskResult = await API.runTask('/admin/api/tournament/matchgen-round', {
             league_id: parseInt(document.getElementById('mgr-league-id').value),
             round_number: document.getElementById('mgr-round').value ? parseInt(document.getElementById('mgr-round').value) : null,
             role_overrides: document.getElementById('mgr-overrides').value || null,
-        });
-        result.textContent = resp.message || `Generated ${resp.generated || 0} matches`;
-        result.className = 'result-box ' + (resp.success ? 'result-success' : 'result-error');
-    } catch (e) { result.textContent = e.message; result.className = 'result-box result-error'; }
+        }, 'mgr-progress');
+        const msg = taskResult.message || `Generated ${taskResult.generated || 0} matches`;
+        result.textContent = msg;
+        result.className = 'result-box result-success';
+        API.toast(msg, 'success');
+        if (taskResult.errors && taskResult.errors.length) {
+            result.textContent += '\nErrors: ' + taskResult.errors.join('; ');
+        }
+    } catch (e) {
+        result.textContent = e.message;
+        result.className = 'result-box result-error';
+        API.toast(e.message, 'error');
+    }
     result.style.display = 'block'; btn.disabled = false;
 });
 

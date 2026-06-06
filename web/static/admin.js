@@ -40,6 +40,80 @@ const API = {
         }, 4000);
     },
 
+    createProgressBar(containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) return null;
+        container.style.display = 'block';
+        container.innerHTML = `
+            <div class="progress-bar-track">
+                <div class="progress-bar-fill" id="${containerId}-fill"></div>
+            </div>
+            <div class="progress-message">
+                <span id="${containerId}-msg">Initializing...</span>
+                <span class="progress-percent" id="${containerId}-pct">0%</span>
+            </div>
+        `;
+        return {
+            update(pct, msg) {
+                const fill = document.getElementById(`${containerId}-fill`);
+                const msgEl = document.getElementById(`${containerId}-msg`);
+                const pctEl = document.getElementById(`${containerId}-pct`);
+                if (fill) fill.style.width = `${Math.min(100, Math.max(0, pct))}%`;
+                if (msgEl) msgEl.textContent = msg || '';
+                if (pctEl) pctEl.textContent = `${pct}%`;
+            },
+            setStatus(type) {
+                const fill = document.getElementById(`${containerId}-fill`);
+                if (fill) {
+                    fill.className = 'progress-bar-fill' + (type ? ` ${type}` : '');
+                }
+            },
+            remove() {
+                container.style.display = 'none';
+                container.innerHTML = '';
+            },
+        };
+    },
+
+    /**
+     * Run a background task with a progress bar.
+     * @param {string} endpoint - POST endpoint to start the task
+     * @param {object} payload - JSON body
+     * @param {string} progressContainerId - ID of the progress container element
+     * @returns {Promise<object>} - The task result on completion
+     */
+    async runTask(endpoint, payload, progressContainerId) {
+        const bar = this.createProgressBar(progressContainerId);
+        try {
+            const resp = await this.post(endpoint, payload);
+            if (!resp.task_id) {
+                bar.setStatus('error');
+                bar.update(100, resp.error || 'Unexpected response');
+                throw new Error(resp.error || 'No task_id returned');
+            }
+            const taskId = resp.task_id;
+            for (;;) {
+                await new Promise(r => setTimeout(r, 1200));
+                const status = await this.get(`/admin/api/tasks/${taskId}`);
+                if (status.status === 'completed') {
+                    bar.setStatus('success');
+                    bar.update(100, status.message || 'Complete');
+                    return status.result || status;
+                }
+                if (status.status === 'failed') {
+                    bar.setStatus('error');
+                    bar.update(100, status.error || 'Task failed');
+                    throw new Error(status.error || 'Task failed');
+                }
+                bar.update(status.progress || 0, status.message || 'Working...');
+            }
+        } catch (e) {
+            bar.setStatus('error');
+            bar.update(100, e.message);
+            throw e;
+        }
+    },
+
     async checkAuth() {
         try {
             const resp = await this.get('/admin/api/auth/me');

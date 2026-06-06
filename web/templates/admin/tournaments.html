@@ -20,6 +20,7 @@
         <input type="text" id="start-overrides" class="form-input" placeholder="e.g. Caster, Staff">
     </div>
     <button class="btn btn-primary" id="btn-start">Start Tournament</button>
+    <div id="start-progress" class="progress-container"></div>
     <div id="start-result" class="result-box" style="display:none;"></div>
 </div>
 
@@ -31,6 +32,7 @@
     </div>
     <button class="btn btn-secondary" id="btn-assign-roles">Assign Division & Team Roles</button>
     <button class="btn btn-secondary" id="btn-assign-captain-roles">Assign Captain Roles Only</button>
+    <div id="roles-progress" class="progress-container"></div>
     <div id="roles-result" class="result-box" style="display:none;"></div>
 </div>
 
@@ -42,6 +44,7 @@
         <input type="number" id="end-league-id" class="form-input" placeholder="e.g. 27">
     </div>
     <button class="btn btn-danger" id="btn-end">End Tournament</button>
+    <div id="end-progress" class="progress-container"></div>
     <div id="end-result" class="result-box" style="display:none;"></div>
 </div>
 {% endblock %}
@@ -54,22 +57,21 @@ document.getElementById('btn-start').addEventListener('click', async () => {
     btn.textContent = 'Starting...';
     result.style.display = 'none';
     try {
-        const resp = await API.post('/admin/api/tournament/start', {
+        const taskResult = await API.runTask('/admin/api/tournament/start', {
             league_id: parseInt(document.getElementById('start-league-id').value),
             league_shortcode: document.getElementById('start-shortcode').value,
             role_overrides: document.getElementById('start-overrides').value || null,
-        });
-        if (resp.success) {
-            API.toast(resp.message, 'success');
-            result.textContent = resp.message;
-            result.className = 'result-box result-success';
-        } else {
-            result.textContent = resp.error || 'Failed';
-            result.className = 'result-box result-error';
+        }, 'start-progress');
+        API.toast(taskResult.message, 'success');
+        result.textContent = taskResult.message;
+        result.className = 'result-box result-success';
+        if (taskResult.errors) {
+            result.textContent += '\n' + taskResult.errors;
         }
     } catch (e) {
         result.textContent = e.message;
         result.className = 'result-box result-error';
+        API.toast(e.message, 'error');
     }
     result.style.display = 'block';
     btn.disabled = false;
@@ -77,25 +79,24 @@ document.getElementById('btn-start').addEventListener('click', async () => {
 });
 
 document.getElementById('btn-assign-roles').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-assign-roles');
     const result = document.getElementById('roles-result');
+    btn.disabled = true;
     result.style.display = 'none';
     try {
-        const resp = await API.post('/admin/api/tournament/assign-roles', {
+        const taskResult = await API.runTask('/admin/api/tournament/assign-roles', {
             league_id: parseInt(document.getElementById('roles-league-id').value),
-        });
-        if (resp.success) {
-            API.toast(resp.message, 'success');
-            result.textContent = resp.errors || resp.message;
-            result.className = 'result-box result-info';
-        } else {
-            result.textContent = resp.error || 'Failed';
-            result.className = 'result-box result-error';
-        }
+        }, 'roles-progress');
+        API.toast(taskResult.message, 'success');
+        result.textContent = taskResult.errors || taskResult.message;
+        result.className = 'result-box result-info';
     } catch (e) {
         result.textContent = e.message;
         result.className = 'result-box result-error';
+        API.toast(e.message, 'error');
     }
     result.style.display = 'block';
+    btn.disabled = false;
 });
 
 document.getElementById('btn-assign-captain-roles').addEventListener('click', async () => {
@@ -143,26 +144,52 @@ document.getElementById('btn-end').addEventListener('click', async () => {
             result.className = 'result-box result-warning';
             btn.textContent = 'Confirm End Tournament';
             btn.disabled = false;
-        } else if (resp.success) {
+            result.style.display = 'block';
+            return;
+        }
+        if (!resp.task_id) {
+            throw new Error(resp.error || 'No task_id returned');
+        }
+        btn.textContent = 'Ending...';
+        const bar = API.createProgressBar('end-progress');
+        const taskId = resp.task_id;
+        let taskResult = null;
+        try {
+            for (;;) {
+                await new Promise(r => setTimeout(r, 1200));
+                const status = await API.get(`/admin/api/tasks/${taskId}`);
+                if (status.status === 'completed') {
+                    bar.setStatus('success');
+                    bar.update(100, status.message || 'Complete');
+                    taskResult = status.result || status;
+                    break;
+                }
+                if (status.status === 'failed') {
+                    bar.setStatus('error');
+                    bar.update(100, status.error || 'Task failed');
+                    throw new Error(status.error || 'Task failed');
+                }
+                bar.update(status.progress || 0, status.message || 'Working...');
+            }
             endWarned = false;
-            API.toast(resp.message, 'success');
-            result.textContent = resp.message;
+            API.toast(taskResult.message, 'success');
+            result.textContent = taskResult.message;
             result.className = 'result-box result-success';
-            btn.textContent = 'End Tournament';
-            btn.disabled = false;
-        } else {
-            btn.textContent = 'End Tournament';
-            btn.disabled = false;
-            result.textContent = resp.error || 'Failed';
+        } catch (e) {
+            bar.setStatus('error');
+            bar.update(100, e.message);
+            result.textContent = e.message;
             result.className = 'result-box result-error';
+            API.toast(e.message, 'error');
         }
     } catch (e) {
-        btn.textContent = 'End Tournament';
-        btn.disabled = false;
         result.textContent = e.message;
         result.className = 'result-box result-error';
+        API.toast(e.message, 'error');
     }
     result.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'End Tournament';
 });
 </script>
 {% endblock %}

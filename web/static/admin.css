@@ -334,6 +334,42 @@ body {
     margin-bottom: 1rem;
 }
 
+/* Progress bar */
+.progress-container {
+    margin-top: 1rem;
+    display: none;
+}
+.progress-bar-track {
+    width: 100%;
+    height: 8px;
+    background: var(--bg-input);
+    border-radius: 4px;
+    overflow: hidden;
+}
+.progress-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--accent);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+.progress-bar-fill.error {
+    background: var(--danger);
+}
+.progress-bar-fill.success {
+    background: var(--success);
+}
+.progress-message {
+    margin-top: 0.35rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+.progress-percent {
+    float: right;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
 /* Toast container */
 #toast-container {
     position: fixed;

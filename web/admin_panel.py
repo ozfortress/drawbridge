@@ -3,6 +3,8 @@
 import os
 import time
 import json
+import uuid
+import asyncio
 import discord
 from quart import Blueprint, render_template, request, jsonify, redirect, make_response
 from modules.logging_config import get_logger
@@ -22,6 +24,76 @@ _sync_cog = None
 
 # Warned users tracking for tournament end
 _warned_users: dict[str, float] = {}
+
+# ── Discord API rate-limit helpers ────────────────────────────
+_DISCORD_OP_DELAY = 0.75  # seconds between Discord API writes
+
+
+async def _discord_safe(coro, retries=3):
+    """Execute a Discord API call with rate-limit awareness.
+    Automatically sleeps ``_DISCORD_OP_DELAY`` after success,
+    and retries on 429 with ``retry_after`` respect.
+    """
+    for attempt in range(retries):
+        try:
+            result = await coro
+            await asyncio.sleep(_DISCORD_OP_DELAY)
+            return result
+        except discord.HTTPException as e:
+            if e.status == 429:
+                retry_after = getattr(e, 'retry_after', 1.0)
+                logger.warning(f'Discord 429 on attempt {attempt + 1}, retrying in {retry_after}s')
+                await asyncio.sleep(retry_after + 0.5)
+                continue
+            raise
+    raise RuntimeError(f'Discord API call failed after {retries} retries (rate limited)')
+
+
+# ── Background task tracking ──────────────────────────────────
+_tasks: dict[str, dict] = {}
+
+
+def _start_task(coro_factory):
+    """Start ``coro_factory(progress_cb)`` as a background asyncio task.
+    Returns a task ID string.  The factory receives a callable with
+    signature ``(progress: int, message: str) -> None``.
+    """
+    task_id = str(uuid.uuid4())
+    _tasks[task_id] = {
+        'id': task_id,
+        'status': 'running',
+        'progress': 0,
+        'message': 'Starting...',
+        'result': None,
+        'error': None,
+    }
+
+    async def _run():
+        try:
+            def progress_cb(p, m):
+                t = _tasks.get(task_id)
+                if t:
+                    if p is not None:
+                        t['progress'] = p
+                    if m is not None:
+                        t['message'] = m
+            result = await coro_factory(progress_cb)
+            _tasks[task_id].update({'status': 'completed', 'progress': 100, 'message': 'Complete', 'result': result})
+        except Exception as e:
+            _tasks[task_id].update({'status': 'failed', 'error': str(e)})
+            logger.error(f'Task {task_id} failed: {e}', exc_info=True)
+
+    asyncio.ensure_future(_run())
+    return task_id
+
+
+@admin_bp.route('/api/tasks/<task_id>')
+@require_admin
+async def api_task_status(task_id):
+    task = _tasks.get(task_id)
+    if not task:
+        return jsonify({'error': 'Task not found'}), 404
+    return jsonify(task)
 
 
 def initialize(bot, db, cit, tournament_cog, sync_cog):
@@ -328,7 +400,9 @@ async def api_tournament_start():
     role_overrides = data.get('role_overrides')
     if not league_id or not league_shortcode:
         return jsonify({'error': 'league_id and league_shortcode are required'}), 400
-    try:
+
+    async def _run(p):
+        p(0, 'Starting tournament creation...')
         guild = _get_guild()
         league = _cit.getLeague(league_id)
         rosters = league.rosters
@@ -343,8 +417,10 @@ async def api_tournament_start():
 
         r = 0
         d = 0
+        total_divs = len(divs)
         for div in divs:
             d += 1
+            p(int(10 + (d / total_divs) * 55), f'Creating division {d}/{total_divs}: {div}...')
             overrides = {
                 guild.default_role: discord.PermissionOverwrite(view_channel=False)
             }
@@ -357,8 +433,8 @@ async def api_tournament_start():
             for override in extra_overrides:
                 overrides[override] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
 
-            category = await guild.create_category(f'{div} - {league_shortcode}', overwrites=overrides)
-            role = await guild.create_role(name=f'{div} - {league_shortcode}')
+            category = await _discord_safe(guild.create_category(f'{div} - {league_shortcode}', overwrites=overrides))
+            role = await _discord_safe(guild.create_role(name=f'{div} - {league_shortcode}'))
             dbdiv = {
                 'league_id': league_id,
                 'division_name': div,
@@ -367,57 +443,61 @@ async def api_tournament_start():
             }
             divid = _db.divisions.insert(dbdiv)
 
-            for roster in rosters:
-                if roster['division'] == div:
-                    r += 1
-                    roster_name = roster['name'][:50]
-                    role = await guild.create_role(name=f'{roster_name[:20]} ({league_shortcode})', mentionable=True)
-                    overwrites = {
-                        guild.default_role: discord.PermissionOverwrite(view_channel=False, send_messages=False),
-                        role: discord.PermissionOverwrite(view_channel=True, send_messages=True),
-                    }
-                    for role_id in all_access:
-                        role_obj = guild.get_role(role_id)
-                        if role_obj:
-                            overwrites[role_obj] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
-                    for override in extra_overrides:
-                        overwrites[override] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
-                    channel_name = f'🛡️{roster_name[:20]} ({league_shortcode})'
-                    team_channel = await guild.create_text_channel(channel_name, category=category, overwrites=overwrites)
-                    subs = {
-                        '{TEAM_MENTION}': f'<@&{role.id}>',
-                        '{TEAM_NAME}': roster_name,
-                        '{TEAM_ID}': str(roster['team_id']),
-                        '{DIVISION}': div,
-                        '{LEAGUE_NAME}': league.name,
-                        '{LEAGUE_SHORTCODE}': league_shortcode,
-                        '{CHANNEL_ID}': str(team_channel.id),
-                        '{CHANNEL_LINK}': f'<#{team_channel.id}>',
-                    }
-                    from modules.Drawbridge.functions import Functions
-                    funcs = Functions(_db, _cit)
-                    team_msg = json.loads(funcs.substitute_strings_in_embed(str(rawteammessage), subs))
-                    team_msg['embed'] = discord.Embed(**team_msg['embeds'][0])
-                    del team_msg['embeds']
-                    await team_channel.send(**team_msg)
-                    _db.teams.insert({
-                        'roster_id': roster['id'],
-                        'team_id': roster['team_id'],
-                        'league_id': league_id,
-                        'role_id': role.id,
-                        'team_channel': team_channel.id,
-                        'division': divid,
-                        'team_name': roster_name,
-                    })
+            teams_in_div = [ros for ros in rosters if ros['division'] == div]
+            total_teams = len(teams_in_div)
+            for idx, roster in enumerate(teams_in_div):
+                r += 1
+                p(int(10 + (d - 1) / total_divs * 55 + (idx + 1) / total_teams * (55 / total_divs)),
+                  f'Creating team {r} ({roster["name"][:20]})...')
+                roster_name = roster['name'][:50]
+                role = await _discord_safe(guild.create_role(name=f'{roster_name[:20]} ({league_shortcode})', mentionable=True))
+                overwrites = {
+                    guild.default_role: discord.PermissionOverwrite(view_channel=False, send_messages=False),
+                    role: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+                }
+                for role_id in all_access:
+                    role_obj = guild.get_role(role_id)
+                    if role_obj:
+                        overwrites[role_obj] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
+                for override in extra_overrides:
+                    overwrites[override] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
+                channel_name = f'🛡️{roster_name[:20]} ({league_shortcode})'
+                team_channel = await _discord_safe(guild.create_text_channel(channel_name, category=category, overwrites=overwrites))
+                subs = {
+                    '{TEAM_MENTION}': f'<@&{role.id}>',
+                    '{TEAM_NAME}': roster_name,
+                    '{TEAM_ID}': str(roster['team_id']),
+                    '{DIVISION}': div,
+                    '{LEAGUE_NAME}': league.name,
+                    '{LEAGUE_SHORTCODE}': league_shortcode,
+                    '{CHANNEL_ID}': str(team_channel.id),
+                    '{CHANNEL_LINK}': f'<#{team_channel.id}>',
+                }
+                from modules.Drawbridge.functions import Functions
+                funcs = Functions(_db, _cit)
+                team_msg = json.loads(funcs.substitute_strings_in_embed(str(rawteammessage), subs))
+                team_msg['embed'] = discord.Embed(**team_msg['embeds'][0])
+                del team_msg['embeds']
+                await _discord_safe(team_channel.send(**team_msg))
+                _db.teams.insert({
+                    'roster_id': roster['id'],
+                    'team_id': roster['team_id'],
+                    'league_id': league_id,
+                    'role_id': role.id,
+                    'team_channel': team_channel.id,
+                    'division': divid,
+                    'team_name': roster_name,
+                })
 
+        p(75, 'Assigning roles...')
         from modules.Drawbridge.functions import Functions as Funcs
-        funcs = Funcs(_db, _cit)
         err_msg = await _get_tournament_cog()._assign_roles(league_id)
+        p(90, 'Updating launchpad...')
         await _get_tournament_cog().update_launchpad()
-        return jsonify({'success': True, 'message': f'Tournament started. Divisions: {d}, Teams: {r}.', 'errors': err_msg})
-    except Exception as e:
-        logger.error(f'Tournament start error: {e}', exc_info=True)
-        return jsonify({'error': str(e)}), 500
+        return {'success': True, 'message': f'Tournament started. Divisions: {d}, Teams: {r}.', 'errors': err_msg}
+
+    task_id = _start_task(_run)
+    return jsonify({'task_id': task_id}), 202
 
 
 @admin_bp.route('/api/tournament/assign-roles', methods=['POST'])
@@ -429,12 +509,14 @@ async def api_tournament_assign_roles():
     league_id = data.get('league_id')
     if not league_id:
         return jsonify({'error': 'league_id is required'}), 400
-    try:
+
+    async def _run(p):
+        p(10, 'Assigning roles...')
         err_msg = await _get_tournament_cog()._assign_roles(league_id)
-        return jsonify({'success': True, 'message': 'Roles assigned.', 'errors': err_msg})
-    except Exception as e:
-        logger.error(f'Assign roles error: {e}')
-        return jsonify({'error': str(e)}), 500
+        return {'success': True, 'message': 'Roles assigned.', 'errors': err_msg}
+
+    task_id = _start_task(_run)
+    return jsonify({'task_id': task_id}), 202
 
 
 @admin_bp.route('/api/tournament/assign-captain-roles', methods=['POST'])
@@ -509,43 +591,60 @@ async def api_tournament_end():
             'message': 'This will archive ALL channels, categories, and roles. Re-submit within 5 minutes to proceed.'
         }), 202
     del _warned_users[user_id]
-    try:
+
+    async def _run(p):
+        p(0, 'Deleting team channels...')
         guild = _get_guild()
         divs = _db.divisions.get_by_league(league_id)
         teams = _db.teams.get_by_league(league_id)
         league_matches = _db.matches.get_by_league(league_id)
         match_channels = [m['channel_id'] for m in league_matches if m.get('channel_id')]
+
+        total = len(teams) + len(match_channels) + len(divs) + len(teams) * 2 or 1
+        done = 0
         for channel in guild.channels:
             for team in teams:
                 if channel.id == team['team_channel']:
-                    await channel.delete(reason='Tournament ended (web panel)')
+                    await _discord_safe(channel.delete(reason='Tournament ended (web panel)'))
+                    done += 1
+                    p(int(done / total * 100), 'Deleting channels...')
                     break
             for mcid in match_channels:
                 if channel.id == mcid:
-                    await channel.delete(reason='Tournament ended (web panel)')
+                    await _discord_safe(channel.delete(reason='Tournament ended (web panel)'))
+                    done += 1
+                    p(int(done / total * 100), 'Deleting channels...')
                     break
+        p(40, 'Deleting categories...')
         for div in divs:
             for category in guild.categories:
                 if category.id == div['category_id']:
-                    await category.delete()
+                    await _discord_safe(category.delete())
+                    done += 1
+                    p(int(done / total * 100), 'Deleting categories...')
                     break
+        p(60, 'Deleting roles...')
         for role in guild.roles:
             for team in teams:
                 if role.id == team['role_id']:
-                    await role.delete()
+                    await _discord_safe(role.delete())
+                    done += 1
                     break
             for div in divs:
                 if role.id == div['role_id']:
-                    await role.delete()
+                    await _discord_safe(role.delete())
+                    done += 1
                     break
+        p(85, 'Cleaning up database...')
         _db.matches.delete_by_league(league_id)
         _db.teams.delete_by_league(league_id)
         _db.divisions.delete_by_league(league_id)
+        p(95, 'Updating launchpad...')
         await _get_tournament_cog().update_launchpad()
-        return jsonify({'success': True, 'message': 'Tournament ended and all channels/roles archived.'})
-    except Exception as e:
-        logger.error(f'Tournament end error: {e}', exc_info=True)
-        return jsonify({'error': str(e)}), 500
+        return {'success': True, 'message': 'Tournament ended and all channels/roles archived.'}
+
+    task_id = _start_task(_run)
+    return jsonify({'task_id': task_id}), 202
 
 
 @admin_bp.route('/api/tournament/matchgen', methods=['POST'])
@@ -583,7 +682,9 @@ async def api_tournament_matchgen_round():
     role_overrides = data.get('role_overrides')
     if not league_id:
         return jsonify({'error': 'league_id is required'}), 400
-    try:
+
+    async def _run(p):
+        p(0, 'Loading matches...')
         league = _cit.getLeague(league_id)
         matches = league.matches
         filtered = []
@@ -597,27 +698,38 @@ async def api_tournament_matchgen_round():
             if _db.matches.get_by_id(pm.id) is not None:
                 continue
             filtered.append(m)
-        if not filtered:
-            return jsonify({'success': True, 'message': 'No matches to generate (all already generated or completed).'})
+        total = len(filtered)
+        if total == 0:
+            return {'success': True, 'message': 'No matches to generate (all already generated or completed).', 'generated': 0, 'errors': []}
         c = 0
         errors = []
-        for m in filtered:
+        for idx, m in enumerate(filtered):
             import modules.citadel as citadel_module2
             pm = citadel_module2.Citadel.PartialMatch(m)
+            p(int((idx + 1) / total * 95), f'Generating match {idx + 1}/{total} (ID: {pm.id})...')
             c += 1
             try:
                 full = _cit.getMatch(pm.id)
                 await _get_tournament_cog()._generate_match(full, role_overrides)
+            except discord.HTTPException as e:
+                if e.status == 429:
+                    retry_after = getattr(e, 'retry_after', 2.0)
+                    p(int((idx + 1) / total * 95), f'Rate limited, waiting {retry_after}s before match {pm.id}...')
+                    await asyncio.sleep(retry_after + 1.0)
+                    try:
+                        full = _cit.getMatch(pm.id)
+                        await _get_tournament_cog()._generate_match(full, role_overrides)
+                    except Exception as e2:
+                        errors.append(f'Match {pm.id} (retry): {e2}')
+                else:
+                    errors.append(f'Match {pm.id}: {e}')
             except Exception as e:
                 errors.append(f'Match {pm.id}: {e}')
-        return jsonify({
-            'success': True,
-            'generated': c,
-            'errors': errors,
-        })
-    except Exception as e:
-        logger.error(f'Matchgen round error: {e}')
-        return jsonify({'error': str(e)}), 500
+            await asyncio.sleep(_DISCORD_OP_DELAY)
+        return {'success': True, 'generated': c, 'errors': errors}
+
+    task_id = _start_task(_run)
+    return jsonify({'task_id': task_id}), 202
 
 
 @admin_bp.route('/api/tournament/force-matchgen', methods=['POST'])
