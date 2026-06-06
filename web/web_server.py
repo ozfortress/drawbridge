@@ -27,10 +27,11 @@ except ImportError:
     REDIS_AVAILABLE = False
     aioredis = None
 
-from quart import Quart, render_template, request, jsonify
+from quart import Quart, render_template, request, jsonify, redirect
 from quart_cors import cors
 import os
 from pathlib import Path
+from web.admin_auth import verify_session
 
 # Import your modules
 from modules.logging_config import get_logger
@@ -42,6 +43,21 @@ app = Quart(__name__, template_folder=str(template_folder))
 app = cors(app)
 
 logger = get_logger('drawbridge.web', 'web.log')
+
+SESSION_COOKIE = 'drawbridge_admin_session'
+
+
+def require_auth(f):
+    async def wrapper(*args, **kwargs):
+        token = request.cookies.get(SESSION_COOKIE, '')
+        session_user = verify_session(token)
+        if not session_user or not session_user.get('is_admin'):
+            if request.path.startswith('/api/'):
+                return jsonify({'error': 'Unauthorized'}), 401
+            return redirect('/admin/login')
+        return await f(*args, **kwargs)
+    wrapper.__name__ = f.__name__
+    return wrapper
 
 class LogWebServer:
     def __init__(self):
@@ -124,11 +140,13 @@ async def startup():
     await web_server.init_redis()
 
 @app.route('/')
+@require_auth
 async def index():
     """Main log viewer page"""
     return await render_template('logs.html')
 
 @app.route('/api/logs')
+@require_auth
 async def get_logs():
     """API endpoint to get logs with Discord user resolution"""
     try:
@@ -253,6 +271,7 @@ async def resolve_discord_users(logs: list) -> list:
     return logs
 
 @app.route('/api/stats')
+@require_auth
 async def get_stats():
     """Get log statistics"""
     try:

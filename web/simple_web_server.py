@@ -29,7 +29,8 @@ try:
     from modules.logging_config import get_logger
     from modules import database
     from modules.citadel import Citadel
-    from quart import Quart, render_template, request, jsonify
+    from quart import Quart, render_template, request, jsonify, redirect
+    from web.admin_auth import verify_session
     import aiofiles
 except ImportError as e:
     print(f"❌ Missing dependency: {e}")
@@ -41,6 +42,21 @@ template_folder = Path(__file__).parent / 'templates'
 static_folder = Path(__file__).parent / 'static'
 app = Quart(__name__, template_folder=str(template_folder), static_folder=str(static_folder), static_url_path='/static')
 logger = get_logger('drawbridge.web.simple', 'web.log')
+
+SESSION_COOKIE = 'drawbridge_admin_session'
+
+
+def require_auth(f):
+    async def wrapper(*args, **kwargs):
+        token = request.cookies.get(SESSION_COOKIE, '')
+        session_user = verify_session(token)
+        if not session_user or not session_user.get('is_admin'):
+            if request.path.startswith('/api/'):
+                return jsonify({'error': 'Unauthorized'}), 401
+            return redirect('/admin/login')
+        return await f(*args, **kwargs)
+    wrapper.__name__ = f.__name__
+    return wrapper
 
 # Register admin panel blueprint
 try:
@@ -209,21 +225,25 @@ async def startup():
     logger.info("Simple web log viewer started")
 
 @app.route('/')
+@require_auth
 async def index():
     """Main log viewer page"""
     return await render_template('logs.html')
 
 @app.route('/match/<int:match_id>')
+@require_auth
 async def match_logs(match_id):
     """View logs for a specific match"""
     return await render_template('logs.html', preset_match_id=match_id)
 
 @app.route('/team/<int:team_id>')
+@require_auth
 async def team_logs(team_id):
     """View logs for a specific team by team_id"""
     return await render_template('logs.html', preset_team_id=team_id)
 
 @app.route('/roster/<int:roster_id>')
+@require_auth
 async def roster_logs(roster_id):
     """View logs for a specific team by roster_id (converts to team_id)"""
     try:
@@ -249,6 +269,7 @@ async def roster_logs(roster_id):
         return await render_template('logs.html', preset_team_id=roster_id)
 
 @app.route('/api/logs')
+@require_auth
 async def get_logs():
     """API endpoint to get match/team communication logs from database"""
     try:
@@ -399,6 +420,7 @@ async def process_message_content(message_content: str, db) -> str:
     return processed
 
 @app.route('/api/matches')
+@require_auth
 async def get_matches():
     """Get list of matches for filtering"""
     try:
@@ -431,6 +453,7 @@ async def get_matches():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/teams')
+@require_auth
 async def get_teams():
     """Get list of teams for filtering"""
     try:
@@ -457,6 +480,7 @@ async def get_teams():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/match/<int:match_id>/details')
+@require_auth
 async def get_match_details(match_id):
     """Get detailed match information including team details"""
     try:
@@ -516,6 +540,7 @@ async def get_match_details(match_id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/stats')
+@require_auth
 async def get_stats():
     """Get database statistics"""
     try:
