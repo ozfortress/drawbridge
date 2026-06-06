@@ -15,6 +15,7 @@ from discord.ext import commands as discord_commands
 from discord.ext import tasks as discord_tasks
 import asyncio
 import functools
+from web.template_helper import get_template, set_db as template_set_db
 
 __title__ = 'Tournament Commands'
 __description__ = 'Commands for managing tournaments.'
@@ -225,9 +226,25 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         rosters = league.rosters
         divs = []
 
-        rawteammessage = ''
-        with open('embeds/teams.json', 'r') as file:
-            rawteammessage = file.read()
+        # Seed league info into the database
+        try:
+            existing = self.db.leagues.get_by_id(league_id)
+            if existing:
+                self.db.leagues.update(league_id, {'status': 'active', 'league_name': league.name, 'league_short': league_shortcode})
+            else:
+                self.db.leagues.insert({
+                    'league_id': league_id,
+                    'league_name': league.name,
+                    'league_short': league_shortcode,
+                    'league_description': getattr(league, 'description', ''),
+                    'league_icon': '',
+                    'status': 'active',
+                })
+        except Exception:
+            pass
+
+        template_set_db(self.db)
+        rawteammessage = get_template('teams.json')
 
         for roster in rosters:
             if roster['division'] not in divs:
@@ -611,10 +628,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 channel_name = f'🗡️{match.id}-{trimmed_home_team}-vs-{trimmed_away_team}-{match.round_name}'
                 self.logger.warning(f'Channel name too long when generating match {match.round_number} {team_home['team_name']} vs {team_away['team_name']}, trimming to {channel_name}')
             match_channel = await self.guild.create_text_channel(channel_name, category=cat, overwrites=overrides)
-            # Load the message
-            rawmatchmessage = ''
-            with open('embeds/match.json', 'r') as file:
-                rawmatchmessage = file.read()
+            rawmatchmessage = get_template('match.json')
             matchmessage = json.loads(self.functions.substitute_strings_in_embed(rawmatchmessage, {
                 '{TEAM_HOME}': f'<@&{team_home['role_id']}>', # team role as a mention
                 '{TEAM_AWAY}': f'<@&{team_away['role_id']}>', # team role as a mention
@@ -925,9 +939,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
                 part_match = matches[random.randint(0, len(matches)-1)]
                 match_chosen = self.cit.getMatch(part_match['id'])
             round = match_chosen.round_number
-            messageraw = ''
-            with open('embeds/democheck.json', 'r') as file:
-                messageraw = file.read()
+            messageraw = get_template('democheck.json')
             tempmsg = str(messageraw)
 
             demochkmsg = json.loads(self.functions.substitute_strings_in_embed(tempmsg, {

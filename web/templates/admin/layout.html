@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Drawbridge Admin{% endblock %}</title>
-    <link rel="stylesheet" href="/static/admin.css">
+    <link rel="stylesheet" href="/static/admin.css?v=20260606">
 </head>
 <body>
     <nav class="admin-nav">
@@ -18,6 +18,7 @@
             <a href="/admin/tournaments" class="nav-link">Tournaments</a>
             <a href="/admin/matches" class="nav-link">Matches</a>
             <a href="/admin/sync" class="nav-link">Sync</a>
+            <a href="/admin/templates" class="nav-link">Templates</a>
             <a href="/admin/logs" class="nav-link" target="_blank">Logs</a>
         </div>
         <div class="nav-user">
@@ -31,7 +32,7 @@
         {% block content %}{% endblock %}
     </main>
     <div id="toast-container"></div>
-    <script src="/static/admin.js"></script>
+    <script src="/static/admin.js?v=20260606"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

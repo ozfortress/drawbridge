@@ -1,0 +1,192 @@
+{% extends "admin/layout.html" %}
+{% block title %}Tournament #{{ league_id }} - Drawbridge Admin{% endblock %}
+{% block content %}
+<div class="page-header">
+    <a href="/admin/dashboard" style="color:var(--text-secondary);font-size:0.85rem;text-decoration:none;">← Dashboard</a>
+    <h1 id="tournament-title" style="margin-top:0.25rem;">Tournament #{{ league_id }}</h1>
+</div>
+
+<div id="detail-progress" class="progress-container"></div>
+
+<div id="detail-content" style="display:none;">
+    <div class="card" id="tournament-actions">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;">
+            <div>
+                <h2 id="tournament-name" style="margin-bottom:0.25rem;"></h2>
+                <span id="tournament-status" class="result-info" style="display:inline-block;padding:0.2rem 0.6rem;border-radius:4px;font-size:0.8rem;"></span>
+            </div>
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                <button class="btn btn-secondary" id="btn-gen-launchpad">Update Launchpad</button>
+                <button class="btn btn-secondary" id="btn-assign-roles">Assign Roles</button>
+                <button class="btn btn-danger" id="btn-end-tournament">End Tournament</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="divisions-container"></div>
+</div>
+
+<div id="division-template" style="display:none;">
+    <div class="card division-card">
+        <h2 class="division-name"></h2>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:0.5rem;">
+            <div>
+                <h3 style="font-size:0.9rem;color:var(--text-secondary);margin-bottom:0.5rem;">Teams</h3>
+                <div class="team-list"></div>
+            </div>
+            <div>
+                <h3 style="font-size:0.9rem;color:var(--text-secondary);margin-bottom:0.5rem;">Matches</h3>
+                <div class="match-list"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const LEAGUE_ID = {{ league_id }};
+
+async function loadDetail() {
+    const bar = API.createProgressBar('detail-progress');
+    try {
+        const resp = await API.get(`/admin/api/tournament/${LEAGUE_ID}/detail`);
+        bar.setStatus('success');
+        bar.update(100, 'Loaded');
+        document.getElementById('detail-content').style.display = 'block';
+        renderDetail(resp);
+    } catch (e) {
+        bar.setStatus('error');
+        bar.update(100, e.message);
+        document.getElementById('detail-content').innerHTML = `<div class="result-box result-error">${e.message}</div>`;
+    }
+}
+
+function renderDetail(data) {
+    document.getElementById('tournament-title').textContent = `${data.name} (${data.shortcode || 'No shortcode'})`;
+    document.getElementById('tournament-name').textContent = data.name;
+    const statusEl = document.getElementById('tournament-status');
+    statusEl.textContent = data.status || 'unknown';
+    statusEl.className = data.status === 'active' ? 'result-info' : 'result-warning';
+
+    const container = document.getElementById('divisions-container');
+    const template = document.getElementById('division-template');
+    container.innerHTML = '';
+
+    (data.divisions || []).forEach(d => {
+        const clone = template.cloneNode(true);
+        clone.style.display = 'block';
+        clone.id = '';
+        clone.querySelector('.division-name').textContent = d.name;
+
+        const teamList = clone.querySelector('.team-list');
+        (d.teams || []).forEach(t => {
+            const el = document.createElement('div');
+            el.style.cssText = 'padding:0.35rem 0;font-size:0.85rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;';
+            el.innerHTML = `
+                <span>${t.name}</span>
+                <span style="color:var(--text-muted);font-size:0.75rem;">
+                    ${t.channel_id ? `<a href="https://discord.com/channels/@me/${t.channel_id}" target="_blank" style="color:var(--accent);">Channel</a>` : '—'}
+                </span>
+            `;
+            teamList.appendChild(el);
+        });
+        if (!d.teams.length) {
+            teamList.innerHTML = '<div style="font-size:0.85rem;color:var(--text-muted);padding:0.5rem 0;">No teams.</div>';
+        }
+
+        const matchList = clone.querySelector('.match-list');
+        (d.matches || []).forEach(m => {
+            const el = document.createElement('div');
+            el.style.cssText = 'padding:0.35rem 0;font-size:0.85rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;';
+            const isBye = m.away_team === 'Bye';
+            const icon = isBye ? '🔄' : (m.archived ? '📁' : '⚔️');
+            el.innerHTML = `
+                <span>
+                    ${icon} ${m.home_team} vs ${m.away_team}
+                    ${m.archived ? '<span style="color:var(--text-muted);font-size:0.75rem;"> (archived)</span>' : ''}
+                </span>
+                <span style="font-size:0.75rem;">
+                    ${m.channel_id && m.channel_id !== 0 ? `<a href="https://discord.com/channels/@me/${m.channel_id}" target="_blank" style="color:var(--accent);">Channel</a> · ` : ''}
+                    <a href="https://ozfortress.com/matches/${m.match_id}" target="_blank" style="color:var(--accent);">OZF</a>
+                </span>
+            `;
+            matchList.appendChild(el);
+        });
+        if (!d.matches.length) {
+            matchList.innerHTML = '<div style="font-size:0.85rem;color:var(--text-muted);padding:0.5rem 0;">No matches.</div>';
+        }
+
+        container.appendChild(clone);
+    });
+
+    if (!data.divisions.length) {
+        container.innerHTML = '<div class="card"><p style="color:var(--text-secondary);">This tournament has no divisions set up yet. Start the tournament from the <a href="/admin/tournaments" style="color:var(--accent);">Tournaments page</a>.</p></div>';
+    }
+}
+
+document.getElementById('btn-gen-launchpad').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-gen-launchpad');
+    btn.disabled = true; btn.textContent = 'Generating...';
+    try {
+        await API.post('/admin/api/tournament/launchpad', {});
+        API.toast('Launchpad updated', 'success');
+    } catch (e) { API.toast(e.message, 'error'); }
+    btn.disabled = false; btn.textContent = 'Update Launchpad';
+});
+
+document.getElementById('btn-assign-roles').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-assign-roles');
+    btn.disabled = true; btn.textContent = 'Assigning...';
+    try {
+        const taskResult = await API.runTask('/admin/api/tournament/assign-roles', { league_id: LEAGUE_ID }, 'detail-progress');
+        API.toast(taskResult.message || 'Roles assigned', 'success');
+    } catch (e) { API.toast(e.message, 'error'); }
+    btn.disabled = false; btn.textContent = 'Assign Roles';
+});
+
+let endWarned = false;
+document.getElementById('btn-end-tournament').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-end-tournament');
+    if (!endWarned) {
+        if (!confirm('Are you sure? This will delete ALL channels, categories, and roles for this tournament. Click OK to send warning request.')) return;
+    }
+    btn.disabled = true;
+    btn.textContent = endWarned ? 'Ending...' : 'Warning...';
+    try {
+        const resp = await API.post('/admin/api/tournament/end', { league_id: LEAGUE_ID });
+        if (resp.warned) {
+            endWarned = true;
+            API.toast('Warning sent. Re-submit to confirm.', 'warning');
+            btn.textContent = 'Confirm End Tournament';
+            btn.disabled = false;
+            return;
+        }
+        if (!resp.task_id) throw new Error(resp.error || 'No task_id');
+        btn.textContent = 'Ending...';
+        const bar = API.createProgressBar('detail-progress');
+        const taskId = resp.task_id;
+        for (;;) {
+            await new Promise(r => setTimeout(r, 1200));
+            const status = await API.get(`/admin/api/tasks/${taskId}`);
+            if (status.status === 'completed') {
+                bar.setStatus('success');
+                bar.update(100, 'Complete');
+                endWarned = false;
+                API.toast('Tournament ended', 'success');
+                loadDetail();
+                break;
+            }
+            if (status.status === 'failed') {
+                bar.setStatus('error');
+                bar.update(100, status.error || 'Failed');
+                throw new Error(status.error || 'Task failed');
+            }
+            bar.update(status.progress || 0, status.message || 'Working...');
+        }
+    } catch (e) { API.toast(e.message, 'error'); }
+    btn.disabled = false; btn.textContent = 'End Tournament';
+});
+
+document.addEventListener('DOMContentLoaded', loadDetail);
+</script>
+{% endblock %}

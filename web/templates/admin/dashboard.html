@@ -4,39 +4,89 @@
 <div class="page-header">
     <h1>Dashboard</h1>
 </div>
-<div class="stat-grid" id="stat-grid">
-    <div class="stat-card"><div class="stat-value" id="stat-bot-status">—</div><div class="stat-label">Bot Status</div></div>
-    <div class="stat-card"><div class="stat-value" id="stat-latency">—</div><div class="stat-label">Latency</div></div>
-    <div class="stat-card"><div class="stat-value" id="stat-members">—</div><div class="stat-label">Guild Members</div></div>
-    <div class="stat-card"><div class="stat-value" id="stat-active-leagues">—</div><div class="stat-label">Active Leagues</div></div>
-    <div class="stat-card"><div class="stat-value" id="stat-matches">—</div><div class="stat-label">Total Matches</div></div>
-    <div class="stat-card"><div class="stat-value" id="stat-teams">—</div><div class="stat-label">Total Teams</div></div>
-    <div class="stat-card"><div class="stat-value" id="stat-logs">—</div><div class="stat-label">Total Logs</div></div>
-    <div class="stat-card"><div class="stat-value" id="stat-users">—</div><div class="stat-label">Synced Users</div></div>
-</div>
-<div class="card">
-    <h2>Quick Actions</h2>
-    <div class="action-grid">
-        <button class="btn btn-primary" onclick="API.launchpad()">Generate Launchpad</button>
-        <button class="btn btn-secondary" onclick="window.location='/admin/tournaments'">Start Tournament</button>
-        <button class="btn btn-secondary" onclick="window.location='/admin/sync'">Force Sync</button>
-        <button class="btn btn-secondary" onclick="window.location='/admin/matches'">Demo Check</button>
+
+<div id="tournaments-section">
+    <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+            <h2>🏆 Running Tournaments</h2>
+            <a href="/admin/tournaments" class="btn btn-secondary" style="text-decoration:none;">New Tournament</a>
+        </div>
+        <div id="tournaments-loading" style="padding:1rem 0;color:var(--text-secondary);">Loading...</div>
+        <div id="tournaments-container"></div>
     </div>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:0.75rem;margin-top:1.5rem;">
+    <div class="stat-card"><div class="stat-value" id="stat-total-matches">—</div><div class="stat-label">Total Matches</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-total-teams">—</div><div class="stat-label">Total Teams</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-total-logs">—</div><div class="stat-label">Log Entries</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-synced-users">—</div><div class="stat-label">Synced Users</div></div>
+    <div class="stat-card" style="opacity:0.7;"><div class="stat-value" id="stat-latency" style="font-size:1.2rem;">—</div><div class="stat-label">Bot Latency</div></div>
+    <div class="stat-card" style="opacity:0.7;"><div class="stat-value" id="stat-bot-status" style="font-size:1.2rem;">—</div><div class="stat-label">Bot Status</div></div>
 </div>
 {% endblock %}
 {% block scripts %}
 <script>
+async function renderTournaments() {
+    const container = document.getElementById('tournaments-container');
+    const loading = document.getElementById('tournaments-loading');
+    try {
+        const resp = await API.get('/admin/api/leagues/active');
+        const leagues = resp.leagues || [];
+        loading.style.display = 'none';
+        if (!leagues.length) {
+            container.innerHTML = '<div style="padding:2rem 0;text-align:center;color:var(--text-muted);">No active tournaments. <a href="/admin/tournaments" style="color:var(--accent);">Start one →</a></div>';
+            return;
+        }
+        container.innerHTML = leagues.map(l => `
+            <div class="tournament-card" style="border:1px solid var(--border);border-radius:10px;margin-bottom:1rem;overflow:hidden;">
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:1rem 1.25rem;background:var(--bg-secondary);border-bottom:1px solid var(--border);">
+                    <div>
+                        <strong style="font-size:1.1rem;color:var(--accent);">${l.name}</strong>
+                        <span style="color:var(--text-muted);font-size:0.85rem;margin-left:0.75rem;">${l.shortcode || ''}</span>
+                        <span style="color:var(--text-secondary);font-size:0.85rem;margin-left:0.75rem;">
+                            ${l.division_count} div · ${l.team_count} teams · ${l.match_count} matches
+                        </span>
+                    </div>
+                    <a href="/admin/tournament/${l.id}" class="btn btn-secondary" style="text-decoration:none;font-size:0.85rem;">Manage</a>
+                </div>
+                ${(l.divisions || []).map(d => `
+                    <div style="padding:0.75rem 1.25rem;border-bottom:1px solid var(--border);">
+                        <div style="font-weight:600;color:var(--text-primary);margin-bottom:0.4rem;">${d.name}</div>
+                        <div style="font-size:0.85rem;color:var(--text-secondary);">
+                            <span>${d.teams.length} teams</span>
+                            <span style="margin:0 0.5rem;">·</span>
+                            <span>${d.matches.length} matches</span>
+                        </div>
+                        ${d.matches.length > 0 ? `
+                        <div style="margin-top:0.4rem;font-size:0.8rem;">
+                            ${d.matches.slice(0, 5).map(m => `
+                                <span style="display:inline-block;margin-right:0.75rem;color:${m.archived ? 'var(--text-muted)' : 'var(--text-secondary)'};">
+                                    ${m.away_team === 'Bye' ? '🔄' : '⚔️'} ${m.home_team} vs ${m.away_team}
+                                </span>
+                            `).join('')}
+                            ${d.matches.length > 5 ? `<span style="color:var(--text-muted);">+${d.matches.length - 5} more</span>` : ''}
+                        </div>` : ''}
+                    </div>
+                `).join('')}
+            </div>
+        `).join('');
+    } catch (e) {
+        loading.textContent = 'Failed to load tournaments.';
+        loading.style.color = 'var(--danger)';
+    }
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
+    renderTournaments();
     try {
         const info = await API.get('/admin/api/info');
-        document.getElementById('stat-bot-status').textContent = 'Online';
+        document.getElementById('stat-total-matches').textContent = info.stats?.total_matches ?? '—';
+        document.getElementById('stat-total-teams').textContent = info.stats?.total_teams ?? '—';
+        document.getElementById('stat-total-logs').textContent = info.stats?.total_logs ?? '—';
+        document.getElementById('stat-synced-users').textContent = info.stats?.synced_users ?? '—';
         document.getElementById('stat-latency').textContent = info.bot?.latency ? info.bot.latency + 'ms' : '—';
-        document.getElementById('stat-members').textContent = info.guild?.member_count ?? '—';
-        document.getElementById('stat-active-leagues').textContent = info.stats?.active_leagues ?? '—';
-        document.getElementById('stat-matches').textContent = info.stats?.total_matches ?? '—';
-        document.getElementById('stat-teams').textContent = info.stats?.total_teams ?? '—';
-        document.getElementById('stat-logs').textContent = info.stats?.total_logs ?? '—';
-        document.getElementById('stat-users').textContent = info.stats?.synced_users ?? '—';
+        document.getElementById('stat-bot-status').textContent = info.bot?.latency ? 'Online' : 'Offline';
     } catch (e) {
         document.getElementById('stat-bot-status').textContent = 'Offline';
     }

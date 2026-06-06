@@ -496,3 +496,30 @@ class SyncedUsersRepository(BaseRepository):
         query = f"DELETE FROM {self.table} WHERE discord_id = ?"
         result = self._execute_query(query, (discord_id,))
         return result > 0
+
+
+class MessageTemplatesRepository(BaseRepository):
+    """Repository for message_templates table."""
+
+    def __init__(self, db_connection):
+        super().__init__(db_connection, 'message_templates')
+
+    def get_by_name(self, template_name: str) -> Optional[Dict[str, Any]]:
+        """Get a template by its name."""
+        query = f"SELECT * FROM {self.table} WHERE template_name = ?"
+        return self._fetch_one(query, (template_name,))
+
+    def get_all(self) -> List[Dict[str, Any]]:
+        """Get all templates."""
+        query = f"SELECT * FROM {self.table}"
+        return self._fetch_all(query)
+
+    def upsert(self, template_name: str, content: str) -> bool:
+        """Insert or update a template."""
+        query = f"""
+            INSERT INTO {self.table} (template_name, content, updated_at)
+            VALUES (?, ?, NOW())
+            ON DUPLICATE KEY UPDATE content = VALUES(content), updated_at = NOW()
+        """
+        result = self._execute_query(query, (template_name, content))
+        return result > 0

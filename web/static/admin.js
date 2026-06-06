@@ -26,6 +26,10 @@ const API = {
         return this.request('POST', path, body);
     },
 
+    put(path, body) {
+        return this.request('PUT', path, body);
+    },
+
     toast(message, type = 'info') {
         const container = document.getElementById('toast-container');
         if (!container) return;

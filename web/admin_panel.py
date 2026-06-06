@@ -94,10 +94,12 @@ def initialize(bot, db, cit, tournament_cog, sync_cog):
     _cit = cit
     _tournament_cog = tournament_cog
     _sync_cog = sync_cog
+    template_set_db(db)
 
 
 # ── Session helpers ──────────────────────────────────────────
 from web.admin_auth import create_session, verify_session, get_oauth2_url, exchange_code, fetch_discord_user
+from web.template_helper import get_template, set_db as template_set_db
 
 SESSION_COOKIE = 'drawbridge_admin_session'
 
@@ -303,6 +305,14 @@ async def tournaments_page():
     return await render_template('admin/tournaments.html', user=session_user)
 
 
+@admin_bp.route('/tournament/<int:league_id>')
+async def tournament_detail_page(league_id: int):
+    session_user = get_session_user()
+    if not session_user or not session_user.get('is_admin'):
+        return redirect('/admin/login')
+    return await render_template('admin/tournament_detail.html', user=session_user, league_id=league_id)
+
+
 @admin_bp.route('/matches')
 async def matches_page():
     session_user = get_session_user()
@@ -322,6 +332,14 @@ async def sync_page():
     if not session_user or not session_user.get('is_admin'):
         return redirect('/admin/login')
     return await render_template('admin/sync.html', user=session_user)
+
+
+@admin_bp.route('/templates')
+async def templates_page():
+    session_user = get_session_user()
+    if not session_user or not session_user.get('is_admin'):
+        return redirect('/admin/login')
+    return await render_template('admin/templates.html', user=session_user)
 
 
 # ── API endpoints ────────────────────────────────────────────
@@ -411,9 +429,7 @@ async def api_tournament_start():
             if roster['division'] not in divs:
                 divs.append(roster['division'])
 
-        rawteammessage = ''
-        with open('embeds/teams.json', 'r') as f:
-            rawteammessage = f.read()
+        rawteammessage = get_template('teams.json')
 
         r = 0
         d = 0
@@ -844,9 +860,7 @@ async def api_tournament_random_demo_check():
             part = all_matches[random.randint(0, len(all_matches) - 1)]
             match_chosen = _cit.getMatch(part['id'])
         round_str = str(match_chosen.round_number)
-        raw_msg = ''
-        with open('embeds/democheck.json', 'r') as f:
-            raw_msg = f.read()
+        raw_msg = get_template('democheck.json')
         from modules.Drawbridge.functions import Functions as Funcs
         funcs = Funcs(_db, _cit)
         demo_msg = json.loads(funcs.substitute_strings_in_embed(str(raw_msg), {
@@ -925,7 +939,7 @@ async def api_sync_force():
         return jsonify({'error': str(e)}), 500
 
 
-# Leagues list (Citadel)
+# Leagues list (Citadel + DB status)
 
 @admin_bp.route('/api/leagues')
 @require_admin
@@ -933,15 +947,176 @@ async def api_admin_leagues():
     if not _cit:
         return jsonify({'error': 'Citadel API not available'}), 503
     try:
-        leagues = _cit.getLeagues()
+        cit_leagues = _cit.getLeagues()
         league_list = []
-        for league in leagues:
-            league_list.append({
+        for league in cit_leagues:
+            entry = {
                 'id': league.id,
                 'name': league.name,
                 'shortcode': league.shortcode if hasattr(league, 'shortcode') else '',
-            })
+                'status': 'unknown',
+            }
+            if _db:
+                try:
+                    db_league = _db.leagues.get_by_id(league.id)
+                    if db_league:
+                        entry['status'] = db_league.get('status', 'active')
+                        entry['divisions'] = _db.divisions.count_by_league(league.id)
+                        entry['teams'] = _db.teams.count_by_league(league.id)
+                        entry['matches'] = _db.matches.count_by_league(league.id)
+                except Exception:
+                    pass
+            league_list.append(entry)
         return jsonify({'leagues': league_list})
     except Exception as e:
         logger.error(f'Leagues error: {e}')
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_bp.route('/api/leagues/active')
+@require_admin
+async def api_admin_leagues_active():
+    if not _cit or not _db:
+        return jsonify({'error': 'Not ready'}), 503
+    try:
+        cit_leagues = _cit.getLeagues()
+        result = []
+        for league in cit_leagues:
+            db_league = _db.leagues.get_by_id(league.id)
+            if not db_league or db_league.get('status') != 'active':
+                continue
+            divisions = _db.divisions.get_by_league(league.id)
+            div_list = []
+            for d in divisions:
+                teams = _db.teams.get_by_division(d['id'])
+                unarchived_matches = [m for m in _db.matches.get_by_division(d['id']) if not m.get('archived')]
+                matches_rich = []
+                for m in unarchived_matches:
+                    home_team = _db.teams.get_by_team_id(m['team_home']) if m['team_home'] else None
+                    away_team = _db.teams.get_by_team_id(m['team_away']) if m.get('team_away') else None
+                    matches_rich.append({
+                        'match_id': m['match_id'],
+                        'home_team': home_team['team_name'] if home_team else f"Team {m['team_home']}",
+                        'away_team': away_team['team_name'] if away_team else 'Bye',
+                        'channel_id': m['channel_id'],
+                        'archived': m['archived'],
+                    })
+                team_list = [{'roster_id': t['roster_id'], 'team_id': t['team_id'], 'name': t['team_name'], 'channel_id': t['team_channel']} for t in teams]
+                div_list.append({
+                    'id': d['id'],
+                    'name': d['division_name'],
+                    'role_id': d['role_id'],
+                    'category_id': d['category_id'],
+                    'teams': team_list,
+                    'matches': matches_rich,
+                })
+            result.append({
+                'id': league.id,
+                'name': league.name,
+                'shortcode': league.shortcode if hasattr(league, 'shortcode') else '',
+                'divisions': div_list,
+                'team_count': sum(len(d['teams']) for d in div_list),
+                'match_count': sum(len(d['matches']) for d in div_list),
+                'division_count': len(div_list),
+            })
+        return jsonify({'leagues': result})
+    except Exception as e:
+        logger.error(f'Active leagues error: {e}', exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_bp.route('/api/tournament/<int:league_id>/detail')
+@require_admin
+async def api_tournament_detail(league_id: int):
+    if not _cit or not _db:
+        return jsonify({'error': 'Not ready'}), 503
+    try:
+        league = _cit.getLeague(league_id)
+        if not league:
+            return jsonify({'error': 'League not found in Citadel'}), 404
+        db_league = _db.leagues.get_by_id(league_id)
+        divisions = _db.divisions.get_by_league(league_id)
+        div_list = []
+        for d in divisions:
+            teams = _db.teams.get_by_division(d['id'])
+            matches = _db.matches.get_by_division(d['id'])
+            matches_rich = []
+            for m in matches:
+                home_team = _db.teams.get_by_team_id(m['team_home']) if m['team_home'] else None
+                away_team = _db.teams.get_by_team_id(m['team_away']) if m.get('team_away') else None
+                matches_rich.append({
+                    'match_id': m['match_id'],
+                    'home_team': home_team['team_name'] if home_team else f"Team {m['team_home']}",
+                    'away_team': away_team['team_name'] if away_team else 'Bye',
+                    'home_team_id': m['team_home'],
+                    'away_team_id': m.get('team_away'),
+                    'channel_id': m['channel_id'],
+                    'archived': m['archived'],
+                })
+            team_list = [{'roster_id': t['roster_id'], 'team_id': t['team_id'], 'name': t['team_name'], 'channel_id': t['team_channel'], 'role_id': t['role_id']} for t in teams]
+            div_list.append({
+                'id': d['id'],
+                'name': d['division_name'],
+                'role_id': d['role_id'],
+                'category_id': d['category_id'],
+                'teams': team_list,
+                'matches': matches_rich,
+            })
+        return jsonify({
+            'id': league.id,
+            'name': league.name,
+            'shortcode': league.shortcode if hasattr(league, 'shortcode') else '',
+            'status': db_league.get('status', 'active') if db_league else 'unknown',
+            'divisions': div_list,
+        })
+    except Exception as e:
+        logger.error(f'Tournament detail error: {e}', exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+# Message templates
+
+@admin_bp.route('/api/templates')
+@require_admin
+async def api_templates_list():
+    if not _db:
+        return jsonify({'error': 'Database not ready'}), 503
+    try:
+        templates = _db.message_templates.get_all()
+        return jsonify({'templates': templates or []})
+    except Exception as e:
+        logger.error(f'Templates list error: {e}')
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_bp.route('/api/templates/<name>')
+@require_admin
+async def api_template_get(name: str):
+    if not _db:
+        return jsonify({'error': 'Database not ready'}), 503
+    try:
+        template = _db.message_templates.get_by_name(name)
+        if not template:
+            return jsonify({'error': 'Template not found'}), 404
+        return jsonify(template)
+    except Exception as e:
+        logger.error(f'Template get error: {e}')
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_bp.route('/api/templates/<name>', methods=['PUT'])
+@require_admin
+async def api_template_update(name: str):
+    if not _db:
+        return jsonify({'error': 'Database not ready'}), 503
+    data = await request.get_json()
+    content = data.get('content', '')
+    if not content:
+        return jsonify({'error': 'Content is required'}), 400
+    try:
+        _db.message_templates.upsert(name, content)
+        logger.info(f'Template "{name}" updated via admin panel')
+        return jsonify({'success': True, 'message': f'Template "{name}" updated.'})
+    except Exception as e:
+        logger.error(f'Template update error: {e}')
         return jsonify({'error': str(e)}), 500

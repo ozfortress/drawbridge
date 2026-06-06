@@ -11,7 +11,8 @@ from typing import Dict, Any, Optional, List
 from .base import DatabaseConnection, MigrationManager
 from .repositories import (
     LeaguesRepository, DivisionsRepository, TeamsRepository,
-    MatchesRepository, LogsRepository, SyncedUsersRepository
+    MatchesRepository, LogsRepository, SyncedUsersRepository,
+    MessageTemplatesRepository
 )
 
 
@@ -54,6 +55,7 @@ class Database:
         self.matches = MatchesRepository(self.connection)
         self.logs = LogsRepository(self.connection)
         self.synced_users = SyncedUsersRepository(self.connection)
+        self.message_templates = MessageTemplatesRepository(self.connection)
 
         # Initialize migration manager
         self.migrations = MigrationManager(self.connection)

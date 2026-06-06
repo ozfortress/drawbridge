@@ -1,0 +1,179 @@
+{% extends "admin/layout.html" %}
+{% block title %}Message Templates - Drawbridge Admin{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Message Templates</h1>
+    <p class="text-muted" style="font-size:0.9rem;color:var(--text-muted);margin-top:0.25rem;">
+        Edit the JSON embed templates sent to team and match channels.
+    </p>
+</div>
+
+<div id="template-list">
+    <p>Loading templates...</p>
+</div>
+
+<div id="template-editor" style="display:none;">
+    <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+            <h2 id="editor-title">Edit Template</h2>
+            <button class="btn btn-secondary" id="btn-back">← Back</button>
+        </div>
+        <div class="form-group">
+            <label>Template Content (JSON)</label>
+            <textarea id="editor-content" class="form-input code-editor"
+                style="font-family:'Courier New',monospace;font-size:0.8rem;min-height:400px;tab-size:2;white-space:pre;overflow:auto;"
+                spellcheck="false"></textarea>
+        </div>
+        <div style="display:flex;gap:0.75rem;align-items:center;">
+            <button class="btn btn-primary" id="btn-save">Save Template</button>
+            <button class="btn btn-secondary" id="btn-validate">Validate JSON</button>
+            <span id="editor-status" style="font-size:0.85rem;margin-left:0.5rem;"></span>
+        </div>
+        <div id="editor-result" class="result-box" style="display:none;margin-top:1rem;"></div>
+    </div>
+    <div class="card">
+        <h2>Substitution Variables</h2>
+        <table class="data-table">
+            <thead><tr><th>Variable</th><th>Description</th><th>Available In</th></tr></thead>
+            <tbody>
+                <tr><td><code>{TEAM_MENTION}</code></td><td>Team role mention</td><td>teams.json</td></tr>
+                <tr><td><code>{TEAM_NAME}</code></td><td>Team name</td><td>teams.json, democheck.json</td></tr>
+                <tr><td><code>{TEAM_ID}</code></td><td>OZF team ID</td><td>teams.json</td></tr>
+                <tr><td><code>{DIVISION}</code></td><td>Division name</td><td>teams.json</td></tr>
+                <tr><td><code>{LEAGUE_NAME}</code></td><td>League name</td><td>teams.json</td></tr>
+                <tr><td><code>{LEAGUE_SHORTCODE}</code></td><td>League shortcode</td><td>teams.json</td></tr>
+                <tr><td><code>{CHANNEL_ID}</code></td><td>Discord channel ID</td><td>teams.json, democheck.json</td></tr>
+                <tr><td><code>{CHANNEL_LINK}</code></td><td>Discord channel mention</td><td>teams.json</td></tr>
+                <tr><td><code>{TEAM_HOME}</code></td><td>Home team role mention</td><td>match.json</td></tr>
+                <tr><td><code>{TEAM_AWAY}</code></td><td>Away team role mention</td><td>match.json</td></tr>
+                <tr><td><code>{ROUND_NAME}</code></td><td>Round name</td><td>match.json</td></tr>
+                <tr><td><code>{MATCH_ID}</code></td><td>OZF match ID</td><td>match.json, democheck.json</td></tr>
+                <tr><td><code>{TARGET_NAME}</code></td><td>Selected player name</td><td>democheck.json</td></tr>
+                <tr><td><code>{TARGET_ID}</code></td><td>Selected player ID</td><td>democheck.json</td></tr>
+                <tr><td><code>{ROUND_NO}</code></td><td>Round number</td><td>democheck.json</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let currentTemplate = null;
+
+function showList() {
+    document.getElementById('template-list').style.display = 'block';
+    document.getElementById('template-editor').style.display = 'none';
+}
+
+function showEditor(name) {
+    document.getElementById('template-list').style.display = 'none';
+    document.getElementById('template-editor').style.display = 'block';
+}
+
+document.getElementById('btn-back').addEventListener('click', () => {
+    currentTemplate = null;
+    showList();
+    loadTemplates();
+});
+
+document.getElementById('btn-validate').addEventListener('click', () => {
+    const content = document.getElementById('editor-content').value;
+    const status = document.getElementById('editor-status');
+    try {
+        JSON.parse(content);
+        status.textContent = '✅ Valid JSON';
+        status.style.color = 'var(--success)';
+    } catch (e) {
+        status.textContent = `❌ ${e.message}`;
+        status.style.color = 'var(--danger)';
+    }
+});
+
+document.getElementById('btn-save').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-save');
+    const status = document.getElementById('editor-status');
+    const result = document.getElementById('editor-result');
+    const content = document.getElementById('editor-content').value;
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+    result.style.display = 'none';
+    status.textContent = '';
+    try {
+        // Validate first
+        JSON.parse(content);
+        const resp = await API.put(`/admin/api/templates/${currentTemplate}`, { content });
+        if (resp.success) {
+            result.textContent = resp.message;
+            result.className = 'result-box result-success';
+            API.toast('Template saved', 'success');
+        } else {
+            throw new Error(resp.error || 'Save failed');
+        }
+    } catch (e) {
+        result.textContent = e.message;
+        result.className = 'result-box result-error';
+        API.toast(e.message, 'error');
+    }
+    result.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Save Template';
+});
+
+async function loadTemplates() {
+    const container = document.getElementById('template-list');
+    container.innerHTML = '<p>Loading templates...</p>';
+    try {
+        const resp = await API.get('/admin/api/templates');
+        if (!resp.templates || !resp.templates.length) {
+            container.innerHTML = '<p>No templates found.</p>';
+            return;
+        }
+        container.innerHTML = '<div class="card" style="cursor:pointer;">' +
+            resp.templates.map(t => `
+                <div class="template-card" data-name="${t.template_name}" style="padding:1rem;border:1px solid var(--border);border-radius:8px;margin-bottom:0.5rem;cursor:pointer;transition:background 0.2s;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <strong style="color:var(--accent);font-family:monospace;">${t.template_name}</strong>
+                        <span style="font-size:0.8rem;color:var(--text-muted);">Updated: ${t.updated_at || 'unknown'}</span>
+                    </div>
+                    <div style="font-size:0.8rem;color:var(--text-secondary);margin-top:0.3rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                        ${(t.content || '').substring(0, 120)}${(t.content || '').length > 120 ? '...' : ''}
+                    </div>
+                </div>
+            `).join('') +
+        '</div>';
+        container.querySelectorAll('.template-card').forEach(el => {
+            el.addEventListener('click', () => openTemplate(el.dataset.name));
+            el.addEventListener('mouseenter', () => el.style.background = 'var(--bg-input)');
+            el.addEventListener('mouseleave', () => el.style.background = 'transparent');
+        });
+    } catch (e) {
+        container.innerHTML = `<p class="result-box result-error">Error loading templates: ${e.message}</p>`;
+    }
+}
+
+async function openTemplate(name) {
+    currentTemplate = name;
+    document.getElementById('editor-title').textContent = `Edit: ${name}`;
+    document.getElementById('editor-content').value = 'Loading...';
+    document.getElementById('editor-status').textContent = '';
+    showEditor(name);
+    try {
+        const resp = await API.get(`/admin/api/templates/${name}`);
+        if (resp.content) {
+            try {
+                const pretty = JSON.stringify(JSON.parse(resp.content), null, 2);
+                document.getElementById('editor-content').value = pretty;
+            } catch {
+                document.getElementById('editor-content').value = resp.content;
+            }
+        } else {
+            document.getElementById('editor-content').value = '// Template not found';
+        }
+    } catch (e) {
+        document.getElementById('editor-content').value = `// Error: ${e.message}`;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', loadTemplates);
+</script>
+{% endblock %}

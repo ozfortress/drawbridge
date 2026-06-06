@@ -428,3 +428,17 @@ body {
 .data-table tbody tr:hover {
     background: rgba(137, 180, 250, 0.05);
 }
+
+/* Tournament cards */
+.tournament-card {
+    transition: border-color 0.2s;
+}
+.tournament-card:hover {
+    border-color: var(--accent);
+}
+
+/* Code editor area */
+.code-editor:focus {
+    border-color: var(--accent);
+    outline: none;
+}
