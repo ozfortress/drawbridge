@@ -354,6 +354,71 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', name='tourn
         else:
             await interaction.followup.send("Added roles to all linked users")
 
+    @app_commands.command(
+        name='assign_captain_roles'
+    )
+    @log_command
+    @checks.has_roles(
+        'DIRECTOR',
+        'HEAD',
+        'ADMIN',
+        'TRIAL',
+        'DEVELOPER',
+    )
+    async def assign_captain_roles(self, interaction: discord.Interaction, league_id: int):
+        """Find all team captains in a league and assign them their team role in Discord.
+
+        Parameters
+        ----------
+        league_id: int
+            The League ID to assign captain roles for.
+        """
+        await interaction.response.defer(ephemeral=True, thinking=True)
+
+        assigned: list[str] = []
+        not_in_server: list[str] = []
+        not_linked: list[str] = []
+        missing_role: list[str] = []
+
+        for team in self.db.teams.get_by_league(league_id):
+            team_id = team['team_id']
+            team_role_id = team['role_id']
+            team_role = self.guild.get_role(team_role_id)
+            cit_team = self.cit.getTeam(team_id)
+            if not cit_team:
+                continue
+            for user in cit_team.players:
+                if not user.get('is_captain'):
+                    continue
+                if not user.get('discord_id'):
+                    if user['name'] not in not_linked:
+                        not_linked.append(user['name'])
+                    continue
+                member: Optional[discord.Member] = self.guild.get_member(user['discord_id'])
+                if member is None:
+                    if user['name'] not in not_in_server:
+                        not_in_server.append(user['name'])
+                    continue
+                if team_role is None:
+                    if user['name'] not in missing_role:
+                        missing_role.append(f"{user['name']} (team {team_id})")
+                    continue
+                if team_role not in member.roles:
+                    await member.add_roles(team_role, reason="Drawbridge: assign_captain_roles")
+                    assigned.append(f"{user['name']} → {team_role.name}")
+
+        lines = [f"## Captain Role Assignment — League {league_id}"]
+        if assigned:
+            lines.append(f"### Assigned ({len(assigned)})\n" + "\n".join(f"• {e}" for e in assigned))
+        else:
+            lines.append("No new roles were assigned.")
+        if not_in_server:
+            lines.append(f"### Not in server\n" + ", ".join(not_in_server))
+        if not_linked:
+            lines.append(f"### No Discord linked\n" + ", ".join(not_linked))
+        if missing_role:
+            lines.append(f"### Team role not found\n" + ", ".join(missing_role))
+        await interaction.followup.send("\n".join(lines), ephemeral=True)
 
     @app_commands.command(
         name='end'
