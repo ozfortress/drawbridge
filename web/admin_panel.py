@@ -429,6 +429,20 @@ async def api_tournament_start():
             if roster['division'] not in divs:
                 divs.append(roster['division'])
 
+        try:
+            existing = _db.leagues.get_by_id(league_id)
+            if existing:
+                _db.leagues.update(league_id, {'status': 'active', 'league_name': league.name, 'league_shortcode': league_shortcode})
+            else:
+                _db.leagues.insert({
+                    'league_id': league_id,
+                    'league_name': league.name,
+                    'league_shortcode': league_shortcode,
+                    'status': 'active',
+                })
+        except Exception as e:
+            logger.warning(f'Failed to seed league {league_id}: {e}')
+
         rawteammessage = get_template('teams.json')
 
         r = 0
@@ -952,7 +966,7 @@ async def api_admin_leagues():
         for db_league in db_leagues:
             lid = db_league['league_id']
             name = db_league.get('league_name') or f'League {lid}'
-            shortcode = db_league.get('league_short') or ''
+            shortcode = db_league.get('league_shortcode') or ''
             if _cit:
                 try:
                     cit_league = _cit.getLeague(lid)
@@ -989,7 +1003,7 @@ async def api_admin_leagues_active():
                 continue
             lid = db_league['league_id']
             name = db_league.get('league_name') or f'League {lid}'
-            shortcode = db_league.get('league_short') or ''
+            shortcode = db_league.get('league_shortcode') or ''
             # Try to enrich with Citadel data
             if _cit:
                 try:

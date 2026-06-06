@@ -29,18 +29,19 @@ class LeaguesRepository(BaseRepository):
 
     def insert(self, league: Dict[str, Any]) -> Optional[int]:
         """Insert a new league."""
-        required_fields = ['league_id', 'league_name', 'league_short', 'league_description', 'league_icon']
-
-        if not all(field in league for field in required_fields):
-            raise ValueError(f"Missing required fields: {required_fields}")
+        required_fields = ['league_id', 'league_name']
+        for field in required_fields:
+            if field not in league:
+                raise ValueError(f"Missing required field: {field}")
 
         query = f"""
-            INSERT INTO {self.table} (league_id, league_name, league_short, league_description, league_icon)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO {self.table} (league_id, league_name, league_shortcode, status)
+            VALUES (?, ?, ?, ?)
         """
         return self._execute_query(query, (
-            league['league_id'], league['league_name'], league['league_short'],
-            league['league_description'], league['league_icon']
+            league['league_id'], league['league_name'],
+            league.get('league_shortcode', ''),
+            league.get('status', 'active'),
         ))
 
     def update(self, league_id: int, league: Dict[str, Any]) -> bool:
@@ -55,12 +56,13 @@ class LeaguesRepository(BaseRepository):
 
         query = f"""
             UPDATE {self.table}
-            SET league_name = ?, league_short = ?, league_description = ?, league_icon = ?
+            SET league_name = ?, league_shortcode = ?, status = ?
             WHERE league_id = ?
         """
         result = self._execute_query(query, (
-            updated_data['league_name'], updated_data['league_short'],
-            updated_data['league_description'], updated_data['league_icon'],
+            updated_data.get('league_name', ''),
+            updated_data.get('league_shortcode', ''),
+            updated_data.get('status', 'active'),
             league_id
         ))
         return result > 0
