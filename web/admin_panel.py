@@ -944,28 +944,31 @@ async def api_sync_force():
 @admin_bp.route('/api/leagues')
 @require_admin
 async def api_admin_leagues():
-    if not _cit:
-        return jsonify({'error': 'Citadel API not available'}), 503
+    if not _db:
+        return jsonify({'error': 'Database not ready'}), 503
     try:
-        cit_leagues = _cit.getLeagues()
+        db_leagues = _db.leagues.get_all()
         league_list = []
-        for league in cit_leagues:
-            entry = {
-                'id': league.id,
-                'name': league.name,
-                'shortcode': league.shortcode if hasattr(league, 'shortcode') else '',
-                'status': 'unknown',
-            }
-            if _db:
+        for db_league in db_leagues:
+            lid = db_league['league_id']
+            name = db_league.get('league_name') or f'League {lid}'
+            shortcode = db_league.get('league_short') or ''
+            if _cit:
                 try:
-                    db_league = _db.leagues.get_by_id(league.id)
-                    if db_league:
-                        entry['status'] = db_league.get('status', 'active')
-                        entry['divisions'] = _db.divisions.count_by_league(league.id)
-                        entry['teams'] = _db.teams.count_by_league(league.id)
-                        entry['matches'] = _db.matches.count_by_league(league.id)
+                    cit_league = _cit.getLeague(lid)
+                    name = cit_league.name
+                    shortcode = getattr(cit_league, 'shortcode', shortcode) or shortcode
                 except Exception:
                     pass
+            entry = {
+                'id': lid,
+                'name': name,
+                'shortcode': shortcode,
+                'status': db_league.get('status', 'unknown'),
+                'divisions': _db.divisions.count_by_league(lid),
+                'teams': _db.teams.count_by_league(lid),
+                'matches': _db.matches.count_by_league(lid),
+            }
             league_list.append(entry)
         return jsonify({'leagues': league_list})
     except Exception as e:
@@ -976,16 +979,26 @@ async def api_admin_leagues():
 @admin_bp.route('/api/leagues/active')
 @require_admin
 async def api_admin_leagues_active():
-    if not _cit or not _db:
-        return jsonify({'error': 'Not ready'}), 503
+    if not _db:
+        return jsonify({'error': 'Database not ready'}), 503
     try:
-        cit_leagues = _cit.getLeagues()
+        db_leagues = _db.leagues.get_all()
         result = []
-        for league in cit_leagues:
-            db_league = _db.leagues.get_by_id(league.id)
-            if not db_league or db_league.get('status') != 'active':
+        for db_league in db_leagues:
+            if db_league.get('status') != 'active':
                 continue
-            divisions = _db.divisions.get_by_league(league.id)
+            lid = db_league['league_id']
+            name = db_league.get('league_name') or f'League {lid}'
+            shortcode = db_league.get('league_short') or ''
+            # Try to enrich with Citadel data
+            if _cit:
+                try:
+                    cit_league = _cit.getLeague(lid)
+                    name = cit_league.name
+                    shortcode = getattr(cit_league, 'shortcode', shortcode) or shortcode
+                except Exception:
+                    pass
+            divisions = _db.divisions.get_by_league(lid)
             div_list = []
             for d in divisions:
                 teams = _db.teams.get_by_division(d['id'])
@@ -1011,9 +1024,9 @@ async def api_admin_leagues_active():
                     'matches': matches_rich,
                 })
             result.append({
-                'id': league.id,
-                'name': league.name,
-                'shortcode': league.shortcode if hasattr(league, 'shortcode') else '',
+                'id': lid,
+                'name': name,
+                'shortcode': shortcode,
                 'divisions': div_list,
                 'team_count': sum(len(d['teams']) for d in div_list),
                 'match_count': sum(len(d['matches']) for d in div_list),
