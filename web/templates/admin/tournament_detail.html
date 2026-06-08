@@ -18,6 +18,7 @@
             <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
                 <button class="btn btn-secondary" id="btn-gen-launchpad">Update Launchpad</button>
                 <button class="btn btn-secondary" id="btn-assign-roles">Assign Roles</button>
+                <button class="btn btn-primary" id="btn-awards" style="display:none;">🏆 Awards</button>
                 <button class="btn btn-danger" id="btn-end-tournament">End Tournament</button>
             </div>
         </div>
@@ -96,6 +97,11 @@ function renderDetail(data) {
     const statusEl = document.getElementById('tournament-status');
     statusEl.textContent = data.status || 'unknown';
     statusEl.className = data.status === 'active' ? 'result-info' : 'result-warning';
+
+    // Show awards button
+    const awardsBtn = document.getElementById('btn-awards');
+    awardsBtn.style.display = '';
+    awardsBtn.onclick = () => { window.location.href = `/admin/awards?league=${data.id}`; };
 
     const container = document.getElementById('divisions-container');
     const template = document.getElementById('division-template');

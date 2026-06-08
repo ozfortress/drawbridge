@@ -442,3 +442,19 @@ body {
     border-color: var(--accent);
     outline: none;
 }
+
+/* Status badges */
+.status-badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+.status-pending { background: rgba(249, 226, 175, 0.15); color: var(--warning); border: 1px solid var(--warning); }
+.status-nominations { background: rgba(137, 180, 250, 0.15); color: var(--accent); border: 1px solid var(--accent); }
+.status-voting { background: rgba(166, 227, 161, 0.15); color: var(--success); border: 1px solid var(--success); }
+.status-calculating { background: rgba(249, 226, 175, 0.15); color: var(--warning); border: 1px solid var(--warning); }
+.status-complete { background: rgba(166, 227, 161, 0.15); color: var(--success); border: 1px solid var(--success); }
+.status-cancelled { background: rgba(243, 139, 168, 0.15); color: var(--danger); border: 1px solid var(--danger); }

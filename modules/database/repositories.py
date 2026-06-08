@@ -548,3 +548,527 @@ class MessageTemplatesRepository(BaseRepository):
         if existing:
             return self.update(template_name, {'content': content})
         return bool(self.insert({'template_name': template_name, 'content': content}))
+
+
+class AwardTemplatesRepository(BaseRepository):
+    """Repository for award_templates table."""
+
+    def __init__(self, db_connection):
+        super().__init__(db_connection, 'award_templates')
+
+    def get_by_id(self, tmpl_id: int) -> Optional[Dict[str, Any]]:
+        query = f"SELECT * FROM {self.table} WHERE id = ?"
+        return self._fetch_one(query, (tmpl_id,))
+
+    def get_all(self) -> List[Dict[str, Any]]:
+        query = f"SELECT * FROM {self.table} ORDER BY sort_order, id"
+        return self._fetch_all(query)
+
+    def insert(self, data: Dict[str, Any]) -> Optional[int]:
+        if 'name' not in data:
+            raise ValueError("Missing required field: name")
+        query = f"""
+            INSERT INTO {self.table} (name, description, sort_order)
+            VALUES (?, ?, ?)
+        """
+        return self._execute_query(query, (
+            data['name'], data.get('description', ''), data.get('sort_order', 0)
+        ))
+
+    def update(self, tmpl_id: int, data: Dict[str, Any]) -> bool:
+        existing = self.get_by_id(tmpl_id)
+        if not existing:
+            raise ValueError(f"AwardTemplate with ID {tmpl_id} not found")
+        merged = {**existing, **data}
+        query = f"""
+            UPDATE {self.table}
+            SET name = ?, description = ?, sort_order = ?
+            WHERE id = ?
+        """
+        result = self._execute_query(query, (
+            merged['name'], merged.get('description', ''), merged.get('sort_order', 0), tmpl_id
+        ))
+        return result > 0
+
+    def delete(self, tmpl_id: int) -> bool:
+        query = f"DELETE FROM {self.table} WHERE id = ?"
+        result = self._execute_query(query, (tmpl_id,))
+        return result > 0
+
+    def reorder(self, ordered_ids: List[int]) -> bool:
+        for i, tid in enumerate(ordered_ids):
+            self._execute_query(f"UPDATE {self.table} SET sort_order = ? WHERE id = ?", (i, tid))
+        return True
+
+
+class AwardEventsRepository(BaseRepository):
+    """Repository for award_events table."""
+
+    def __init__(self, db_connection):
+        super().__init__(db_connection, 'award_events')
+
+    def get_by_id(self, event_id: int) -> Optional[Dict[str, Any]]:
+        query = f"SELECT * FROM {self.table} WHERE id = ?"
+        return self._fetch_one(query, (event_id,))
+
+    def get_all(self) -> List[Dict[str, Any]]:
+        query = f"SELECT * FROM {self.table} ORDER BY created_at DESC"
+        return self._fetch_all(query)
+
+    def get_by_league(self, league_id: int) -> List[Dict[str, Any]]:
+        query = f"SELECT * FROM {self.table} WHERE league_id = ? ORDER BY created_at DESC"
+        return self._fetch_all(query, (league_id,))
+
+    def insert(self, data: Dict[str, Any]) -> Optional[int]:
+        required = ['league_id', 'name']
+        for f in required:
+            if f not in data:
+                raise ValueError(f"Missing required field: {f}")
+        query = f"""
+            INSERT INTO {self.table} (league_id, name, status, nomination_deadline, voting_deadline)
+            VALUES (?, ?, ?, ?, ?)
+        """
+        return self._execute_query(query, (
+            data['league_id'], data['name'],
+            data.get('status', 'pending'),
+            data.get('nomination_deadline'),
+            data.get('voting_deadline'),
+        ))
+
+    def update(self, event_id: int, data: Dict[str, Any]) -> bool:
+        existing = self.get_by_id(event_id)
+        if not existing:
+            raise ValueError(f"AwardEvent with ID {event_id} not found")
+        merged = {**existing, **data}
+        query = f"""
+            UPDATE {self.table}
+            SET league_id = ?, name = ?, status = ?, nomination_deadline = ?, voting_deadline = ?
+            WHERE id = ?
+        """
+        result = self._execute_query(query, (
+            merged['league_id'], merged['name'], merged['status'],
+            merged.get('nomination_deadline'), merged.get('voting_deadline'),
+            event_id
+        ))
+        return result > 0
+
+    def delete(self, event_id: int) -> bool:
+        query = f"DELETE FROM {self.table} WHERE id = ?"
+        result = self._execute_query(query, (event_id,))
+        return result > 0
+
+    def set_status(self, event_id: int, status: str) -> bool:
+        query = f"UPDATE {self.table} SET status = ? WHERE id = ?"
+        return self._execute_query(query, (status, event_id)) > 0
+
+
+class AwardEventCategoriesRepository(BaseRepository):
+    """Repository for award_event_categories table."""
+
+    def __init__(self, db_connection):
+        super().__init__(db_connection, 'award_event_categories')
+
+    def get_by_id(self, cat_id: int) -> Optional[Dict[str, Any]]:
+        query = f"SELECT * FROM {self.table} WHERE id = ?"
+        return self._fetch_one(query, (cat_id,))
+
+    def get_all(self) -> List[Dict[str, Any]]:
+        query = f"SELECT * FROM {self.table} ORDER BY sort_order, id"
+        return self._fetch_all(query)
+
+    def get_by_event(self, event_id: int) -> List[Dict[str, Any]]:
+        query = f"SELECT * FROM {self.table} WHERE event_id = ? ORDER BY sort_order, id"
+        return self._fetch_all(query, (event_id,))
+
+    def get_by_event_and_phase(self, event_id: int, phase: str) -> List[Dict[str, Any]]:
+        query = f"SELECT * FROM {self.table} WHERE event_id = ? AND phase = ? ORDER BY sort_order, id"
+        return self._fetch_all(query, (event_id, phase))
+
+    def insert(self, data: Dict[str, Any]) -> Optional[int]:
+        for f in ['event_id', 'name']:
+            if f not in data:
+                raise ValueError(f"Missing required field: {f}")
+        query = f"""
+            INSERT INTO {self.table} (event_id, template_id, name, phase, fill_type, sort_order)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """
+        return self._execute_query(query, (
+            data['event_id'], data.get('template_id'),
+            data['name'], data.get('phase', 'nomination'),
+            data.get('fill_type', 'manual'), data.get('sort_order', 0)
+        ))
+
+    def update(self, cat_id: int, data: Dict[str, Any]) -> bool:
+        existing = self.get_by_id(cat_id)
+        if not existing:
+            raise ValueError(f"Category with ID {cat_id} not found")
+        merged = {**existing, **data}
+        query = f"""
+            UPDATE {self.table}
+            SET template_id = ?, name = ?, phase = ?, fill_type = ?, sort_order = ?
+            WHERE id = ?
+        """
+        result = self._execute_query(query, (
+            merged.get('template_id'), merged['name'], merged['phase'],
+            merged['fill_type'], merged.get('sort_order', 0), cat_id
+        ))
+        return result > 0
+
+    def delete(self, cat_id: int) -> bool:
+        query = f"DELETE FROM {self.table} WHERE id = ?"
+        result = self._execute_query(query, (cat_id,))
+        return result > 0
+
+
+class AwardNominationsRepository(BaseRepository):
+    """Repository for award_nominations table."""
+
+    def __init__(self, db_connection):
+        super().__init__(db_connection, 'award_nominations')
+
+    def get_by_id(self, nom_id: int) -> Optional[Dict[str, Any]]:
+        query = f"SELECT * FROM {self.table} WHERE id = ?"
+        return self._fetch_one(query, (nom_id,))
+
+    def get_all(self) -> List[Dict[str, Any]]:
+        query = f"SELECT * FROM {self.table}"
+        return self._fetch_all(query)
+
+    def get_by_event(self, event_id: int) -> List[Dict[str, Any]]:
+        query = f"SELECT * FROM {self.table} WHERE event_id = ? ORDER BY division_id, team_id, category_id"
+        return self._fetch_all(query, (event_id,))
+
+    def get_by_event_and_category(self, event_id: int, category_id: int) -> List[Dict[str, Any]]:
+        query = f"SELECT * FROM {self.table} WHERE event_id = ? AND category_id = ?"
+        return self._fetch_all(query, (event_id, category_id))
+
+    def get_by_team_and_category(self, team_id: int, category_id: int) -> Optional[Dict[str, Any]]:
+        query = f"SELECT * FROM {self.table} WHERE team_id = ? AND category_id = ?"
+        return self._fetch_one(query, (team_id, category_id))
+
+    def get_by_team_and_event(self, team_id: int, event_id: int) -> List[Dict[str, Any]]:
+        query = f"SELECT * FROM {self.table} WHERE team_id = ? AND event_id = ?"
+        return self._fetch_all(query, (team_id, event_id))
+
+    def get_by_division(self, division_id: int, event_id: int) -> List[Dict[str, Any]]:
+        query = f"SELECT * FROM {self.table} WHERE division_id = ? AND event_id = ?"
+        return self._fetch_all(query, (division_id, event_id))
+
+    def insert(self, data: Dict[str, Any]) -> Optional[int]:
+        required = ['event_id', 'category_id', 'team_id', 'division_id', 'submitted_by', 'response']
+        for f in required:
+            if f not in data:
+                raise ValueError(f"Missing required field: {f}")
+        query = f"""
+            INSERT INTO {self.table}
+            (event_id, category_id, team_id, division_id, submitted_by, response, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """
+        return self._execute_query(query, (
+            data['event_id'], data['category_id'], data['team_id'],
+            data['division_id'], data['submitted_by'], data['response'],
+            data.get('status', 'accepted')
+        ))
+
+    def update(self, nom_id: int, data: Dict[str, Any]) -> bool:
+        existing = self.get_by_id(nom_id)
+        if not existing:
+            raise ValueError(f"Nomination with ID {nom_id} not found")
+        merged = {**existing, **data}
+        query = f"""
+            UPDATE {self.table}
+            SET response = ?, status = ?, invalidated_by = ?, invalidated_at = ?,
+                invalidation_reason = ?
+            WHERE id = ?
+        """
+        result = self._execute_query(query, (
+            merged['response'], merged['status'],
+            merged.get('invalidated_by'), merged.get('invalidated_at'),
+            merged.get('invalidation_reason'), nom_id
+        ))
+        return result > 0
+
+    def delete(self, nom_id: int) -> bool:
+        query = f"DELETE FROM {self.table} WHERE id = ?"
+        result = self._execute_query(query, (nom_id,))
+        return result > 0
+
+    def set_status(self, nom_id: int, status: str, invalidated_by: int = None, reason: str = None) -> bool:
+        query = f"""
+            UPDATE {self.table}
+            SET status = ?, invalidated_by = ?,
+                invalidated_at = CASE WHEN ? IS NOT NULL THEN NOW() ELSE NULL END,
+                invalidation_reason = ?
+            WHERE id = ?
+        """
+        return self._execute_query(query, (status, invalidated_by, invalidated_by, reason, nom_id)) > 0
+
+    def count_by_event(self, event_id: int) -> int:
+        return self._fetch_scalar(f"SELECT COUNT(*) FROM {self.table} WHERE event_id = ?", (event_id,)) or 0
+
+    def count_by_team(self, team_id: int, event_id: int) -> int:
+        return self._fetch_scalar(f"SELECT COUNT(*) FROM {self.table} WHERE team_id = ? AND event_id = ?", (team_id, event_id)) or 0
+
+    def distinct_responses(self, event_id: int, category_id: int) -> List[str]:
+        rows = self._fetch_all(
+            f"SELECT DISTINCT response FROM {self.table} WHERE event_id = ? AND category_id = ? AND status = 'accepted'",
+            (event_id, category_id)
+        )
+        return [r['response'] for r in rows if r.get('response')]
+
+    def has_team_submitted_all(self, team_id: int, event_id: int, category_ids: List[int]) -> bool:
+        if not category_ids:
+            return False
+        count = self._fetch_scalar(
+            f"SELECT COUNT(*) FROM {self.table} WHERE team_id = ? AND event_id = ? AND category_id IN ({','.join('?' * len(category_ids))})",
+            (team_id, event_id, *category_ids)
+        ) or 0
+        return count == len(category_ids)
+
+    def delete_by_event(self, event_id: int) -> bool:
+        return self._execute_query(f"DELETE FROM {self.table} WHERE event_id = ?", (event_id,)) > 0
+
+    def delete_by_category(self, category_id: int) -> bool:
+        return self._execute_query(f"DELETE FROM {self.table} WHERE category_id = ?", (category_id,)) > 0
+
+
+class AwardNominationAuditLogRepository(BaseRepository):
+    """Repository for award_nomination_audit_log table."""
+
+    def __init__(self, db_connection):
+        super().__init__(db_connection, 'award_nomination_audit_log')
+
+    def get_by_id(self, log_id: int) -> Optional[Dict[str, Any]]:
+        query = f"SELECT * FROM {self.table} WHERE id = ?"
+        return self._fetch_one(query, (log_id,))
+
+    def get_all(self) -> List[Dict[str, Any]]:
+        query = f"SELECT * FROM {self.table} ORDER BY created_at DESC"
+        return self._fetch_all(query)
+
+    def get_by_nomination(self, nomination_id: int) -> List[Dict[str, Any]]:
+        query = f"SELECT * FROM {self.table} WHERE nomination_id = ? ORDER BY created_at DESC"
+        return self._fetch_all(query, (nomination_id,))
+
+    def insert(self, data: Dict[str, Any]) -> Optional[int]:
+        required = ['nomination_id', 'action', 'admin_user_id']
+        for f in required:
+            if f not in data:
+                raise ValueError(f"Missing required field: {f}")
+        query = f"""
+            INSERT INTO {self.table}
+            (nomination_id, action, admin_user_id, admin_username, old_value, new_value, reason)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """
+        return self._execute_query(query, (
+            data['nomination_id'], data['action'], data['admin_user_id'],
+            data.get('admin_username'), data.get('old_value'),
+            data.get('new_value'), data.get('reason')
+        ))
+
+    def update(self, log_id: int, data: Dict[str, Any]) -> bool:
+        raise NotImplementedError('Audit log entries are immutable')
+
+    def delete(self, log_id: int) -> bool:
+        raise NotImplementedError('Audit log entries are immutable')
+
+
+class AwardVotesRepository(BaseRepository):
+    """Repository for award_votes table."""
+
+    def __init__(self, db_connection):
+        super().__init__(db_connection, 'award_votes')
+
+    def get_by_id(self, vote_id: int) -> Optional[Dict[str, Any]]:
+        query = f"SELECT * FROM {self.table} WHERE id = ?"
+        return self._fetch_one(query, (vote_id,))
+
+    def get_all(self) -> List[Dict[str, Any]]:
+        query = f"SELECT * FROM {self.table}"
+        return self._fetch_all(query)
+
+    def get_by_event(self, event_id: int) -> List[Dict[str, Any]]:
+        query = f"SELECT * FROM {self.table} WHERE event_id = ? ORDER BY division_id, team_id, category_id"
+        return self._fetch_all(query, (event_id,))
+
+    def get_by_event_and_category(self, event_id: int, category_id: int) -> List[Dict[str, Any]]:
+        query = f"SELECT * FROM {self.table} WHERE event_id = ? AND category_id = ?"
+        return self._fetch_all(query, (event_id, category_id))
+
+    def get_by_team_and_event(self, team_id: int, event_id: int) -> List[Dict[str, Any]]:
+        query = f"SELECT * FROM {self.table} WHERE team_id = ? AND event_id = ?"
+        return self._fetch_all(query, (team_id, event_id))
+
+    def get_by_team_and_category(self, team_id: int, category_id: int) -> Optional[Dict[str, Any]]:
+        query = f"SELECT * FROM {self.table} WHERE team_id = ? AND category_id = ?"
+        return self._fetch_one(query, (team_id, category_id))
+
+    def get_by_division(self, division_id: int, event_id: int) -> List[Dict[str, Any]]:
+        query = f"SELECT * FROM {self.table} WHERE division_id = ? AND event_id = ?"
+        return self._fetch_all(query, (division_id, event_id))
+
+    def insert(self, data: Dict[str, Any]) -> Optional[int]:
+        required = ['event_id', 'category_id', 'team_id', 'division_id', 'submitted_by', 'choice_1']
+        for f in required:
+            if f not in data:
+                raise ValueError(f"Missing required field: {f}")
+        query = f"""
+            INSERT INTO {self.table}
+            (event_id, category_id, team_id, division_id, submitted_by, choice_1, choice_2, choice_3, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        return self._execute_query(query, (
+            data['event_id'], data['category_id'], data['team_id'],
+            data['division_id'], data['submitted_by'], data['choice_1'],
+            data.get('choice_2'), data.get('choice_3'),
+            data.get('status', 'accepted')
+        ))
+
+    def update(self, vote_id: int, data: Dict[str, Any]) -> bool:
+        existing = self.get_by_id(vote_id)
+        if not existing:
+            raise ValueError(f"Vote with ID {vote_id} not found")
+        merged = {**existing, **data}
+        query = f"""
+            UPDATE {self.table}
+            SET choice_1 = ?, choice_2 = ?, choice_3 = ?, status = ?,
+                invalidated_by = ?, invalidated_at = ?, invalidation_reason = ?
+            WHERE id = ?
+        """
+        result = self._execute_query(query, (
+            merged['choice_1'], merged.get('choice_2'), merged.get('choice_3'),
+            merged['status'], merged.get('invalidated_by'),
+            merged.get('invalidated_at'), merged.get('invalidation_reason'),
+            vote_id
+        ))
+        return result > 0
+
+    def delete(self, vote_id: int) -> bool:
+        query = f"DELETE FROM {self.table} WHERE id = ?"
+        result = self._execute_query(query, (vote_id,))
+        return result > 0
+
+    def set_status(self, vote_id: int, status: str, invalidated_by: int = None, reason: str = None) -> bool:
+        query = f"""
+            UPDATE {self.table}
+            SET status = ?, invalidated_by = ?,
+                invalidated_at = CASE WHEN ? IS NOT NULL THEN NOW() ELSE NULL END,
+                invalidation_reason = ?
+            WHERE id = ?
+        """
+        return self._execute_query(query, (status, invalidated_by, invalidated_by, reason, vote_id)) > 0
+
+    def count_by_event(self, event_id: int) -> int:
+        return self._fetch_scalar(f"SELECT COUNT(*) FROM {self.table} WHERE event_id = ?", (event_id,)) or 0
+
+    def count_by_team(self, team_id: int, event_id: int) -> int:
+        return self._fetch_scalar(f"SELECT COUNT(*) FROM {self.table} WHERE team_id = ? AND event_id = ?", (team_id, event_id)) or 0
+
+    def has_team_submitted_all(self, team_id: int, event_id: int, category_ids: List[int]) -> bool:
+        if not category_ids:
+            return False
+        count = self._fetch_scalar(
+            f"SELECT COUNT(*) FROM {self.table} WHERE team_id = ? AND event_id = ? AND category_id IN ({','.join('?' * len(category_ids))})",
+            (team_id, event_id, *category_ids)
+        ) or 0
+        return count == len(category_ids)
+
+    def delete_by_event(self, event_id: int) -> bool:
+        return self._execute_query(f"DELETE FROM {self.table} WHERE event_id = ?", (event_id,)) > 0
+
+    def delete_by_category(self, category_id: int) -> bool:
+        return self._execute_query(f"DELETE FROM {self.table} WHERE category_id = ?", (category_id,)) > 0
+
+
+class AwardVoteAuditLogRepository(BaseRepository):
+    """Repository for award_vote_audit_log table."""
+
+    def __init__(self, db_connection):
+        super().__init__(db_connection, 'award_vote_audit_log')
+
+    def get_by_id(self, log_id: int) -> Optional[Dict[str, Any]]:
+        query = f"SELECT * FROM {self.table} WHERE id = ?"
+        return self._fetch_one(query, (log_id,))
+
+    def get_all(self) -> List[Dict[str, Any]]:
+        query = f"SELECT * FROM {self.table} ORDER BY created_at DESC"
+        return self._fetch_all(query)
+
+    def get_by_vote(self, vote_id: int) -> List[Dict[str, Any]]:
+        query = f"SELECT * FROM {self.table} WHERE vote_id = ? ORDER BY created_at DESC"
+        return self._fetch_all(query, (vote_id,))
+
+    def insert(self, data: Dict[str, Any]) -> Optional[int]:
+        required = ['vote_id', 'action', 'admin_user_id']
+        for f in required:
+            if f not in data:
+                raise ValueError(f"Missing required field: {f}")
+        query = f"""
+            INSERT INTO {self.table}
+            (vote_id, action, admin_user_id, admin_username, old_value, new_value, reason)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """
+        return self._execute_query(query, (
+            data['vote_id'], data['action'], data['admin_user_id'],
+            data.get('admin_username'), data.get('old_value'),
+            data.get('new_value'), data.get('reason')
+        ))
+
+    def update(self, log_id: int, data: Dict[str, Any]) -> bool:
+        raise NotImplementedError('Audit log entries are immutable')
+
+    def delete(self, log_id: int) -> bool:
+        raise NotImplementedError('Audit log entries are immutable')
+
+
+class AwardResultsRepository(BaseRepository):
+    """Repository for award_results table."""
+
+    def __init__(self, db_connection):
+        super().__init__(db_connection, 'award_results')
+
+    def get_by_id(self, result_id: int) -> Optional[Dict[str, Any]]:
+        query = f"SELECT * FROM {self.table} WHERE id = ?"
+        return self._fetch_one(query, (result_id,))
+
+    def get_all(self) -> List[Dict[str, Any]]:
+        query = f"SELECT * FROM {self.table}"
+        return self._fetch_all(query)
+
+    def get_by_event(self, event_id: int) -> List[Dict[str, Any]]:
+        query = f"SELECT * FROM {self.table} WHERE event_id = ? ORDER BY division_id, category_id, placement"
+        return self._fetch_all(query, (event_id,))
+
+    def get_by_event_and_division(self, event_id: int, division_id: int) -> List[Dict[str, Any]]:
+        query = f"SELECT * FROM {self.table} WHERE event_id = ? AND division_id = ? ORDER BY category_id, placement"
+        return self._fetch_all(query, (event_id, division_id))
+
+    def get_by_event_and_category(self, event_id: int, category_id: int) -> List[Dict[str, Any]]:
+        query = f"SELECT * FROM {self.table} WHERE event_id = ? AND category_id = ? ORDER BY placement"
+        return self._fetch_all(query, (event_id, category_id))
+
+    def insert(self, data: Dict[str, Any]) -> Optional[int]:
+        required = ['event_id', 'category_id', 'division_id', 'placement', 'entry']
+        for f in required:
+            if f not in data:
+                raise ValueError(f"Missing required field: {f}")
+        query = f"""
+            INSERT INTO {self.table}
+            (event_id, category_id, division_id, placement, entry, points)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """
+        return self._execute_query(query, (
+            data['event_id'], data['category_id'], data['division_id'],
+            data['placement'], data['entry'], data.get('points', 0)
+        ))
+
+    def update(self, result_id: int, data: Dict[str, Any]) -> bool:
+        raise NotImplementedError('Results are regenerated, not updated')
+
+    def delete(self, result_id: int) -> bool:
+        query = f"DELETE FROM {self.table} WHERE id = ?"
+        result = self._execute_query(query, (result_id,))
+        return result > 0
+
+    def delete_by_event(self, event_id: int) -> bool:
+        return self._execute_query(f"DELETE FROM {self.table} WHERE event_id = ?", (event_id,)) > 0

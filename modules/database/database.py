@@ -12,7 +12,11 @@ from .base import DatabaseConnection, MigrationManager
 from .repositories import (
     LeaguesRepository, DivisionsRepository, TeamsRepository,
     MatchesRepository, LogsRepository, SyncedUsersRepository,
-    MessageTemplatesRepository
+    MessageTemplatesRepository,
+    AwardTemplatesRepository, AwardEventsRepository,
+    AwardEventCategoriesRepository, AwardNominationsRepository,
+    AwardNominationAuditLogRepository, AwardVotesRepository,
+    AwardVoteAuditLogRepository, AwardResultsRepository,
 )
 
 
@@ -56,6 +60,14 @@ class Database:
         self.logs = LogsRepository(self.connection)
         self.synced_users = SyncedUsersRepository(self.connection)
         self.message_templates = MessageTemplatesRepository(self.connection)
+        self.award_templates = AwardTemplatesRepository(self.connection)
+        self.award_events = AwardEventsRepository(self.connection)
+        self.award_event_categories = AwardEventCategoriesRepository(self.connection)
+        self.award_nominations = AwardNominationsRepository(self.connection)
+        self.award_nomination_audit_log = AwardNominationAuditLogRepository(self.connection)
+        self.award_votes = AwardVotesRepository(self.connection)
+        self.award_vote_audit_log = AwardVoteAuditLogRepository(self.connection)
+        self.award_results = AwardResultsRepository(self.connection)
 
         # Initialize migration manager
         self.migrations = MigrationManager(self.connection)
