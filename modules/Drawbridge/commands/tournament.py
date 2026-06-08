@@ -42,7 +42,7 @@ def log_command(func):
     return wrapper
 
 @discord.app_commands.guild_only()
-class Tournament(discord_commands.GroupCog, group_name='tournament', name='tournamnet', group_description='Commands for managing tournaments. This is a new string',):
+class Tournament(discord_commands.GroupCog, group_name='tournament', group_description='Commands for managing tournaments. This is a new string',):
     def __init__(self, bot:discord_commands.Bot, db:database.Database, cit:citadel.Citadel, main_logger) -> None:
         self.bot = bot
         self.cit = cit
