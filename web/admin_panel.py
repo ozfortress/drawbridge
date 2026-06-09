@@ -1579,6 +1579,43 @@ async def api_award_nominations_list(event_id: int):
         return _db_error(e)
 
 
+@admin_bp.route('/api/awards/events/<int:event_id>/nominations/<int:nom_id>/edit', methods=['PUT'])
+@require_admin
+async def api_award_nominations_edit(event_id: int, nom_id: int):
+    if not _db:
+        return jsonify({'error': 'Database not ready'}), 503
+    data = await request.get_json()
+    session_user = get_session_user()
+    new_response = (data.get('response') or '').strip() if data else ''
+    if not new_response:
+        return jsonify({'error': 'response is required'}), 400
+    try:
+        nom = _db.award_nominations.get_by_id(nom_id)
+        if not nom:
+            return jsonify({'error': 'Nomination not found'}), 404
+        old_value = nom.get('response', '')
+        _db.award_nominations.update(nom_id, {
+            'response': new_response,
+            'status': 'accepted',
+            'invalidated_by': None,
+            'invalidated_at': None,
+            'invalidation_reason': None,
+        })
+        _db.award_nomination_audit_log.insert({
+            'nomination_id': nom_id,
+            'action': 'edit',
+            'admin_user_id': session_user['sub'],
+            'admin_username': session_user.get('username', ''),
+            'old_value': old_value,
+            'new_value': new_response,
+            'reason': data.get('reason', ''),
+        })
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f'Award nomination edit error: {e}')
+        return _db_error(e)
+
+
 @admin_bp.route('/api/awards/events/<int:event_id>/nominations/<int:nom_id>/invalidate', methods=['PUT'])
 @require_admin
 async def api_award_nominations_invalidate(event_id: int, nom_id: int):

@@ -71,6 +71,7 @@
     min-width: 160px;
     width: 160px;
 }
+.response-table-wrap { overflow-x: auto; padding-right: 24px; }
 .response-table tbody tr:nth-child(even) td { background: rgba(255,255,255,0.015); }
 .response-table .response-cell {
     word-break: break-word;
@@ -139,6 +140,19 @@
         <div class="action-grid" style="margin-top:1rem;">
             <button class="btn btn-danger" id="btn-confirm-invalidate">Invalidate All</button>
             <button class="btn btn-secondary" id="btn-cancel-invalidate">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- Edit nomination modal -->
+<div id="edit-modal" style="display:none !important;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:1001;align-items:center;justify-content:center;">
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:2rem;max-width:500px;width:90%;">
+        <h3 style="margin-bottom:0.5rem;">Edit Nomination</h3>
+        <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:0.25rem;" id="edit-cat-name"></p>
+        <textarea id="edit-response" class="form-input" rows="4" style="width:100%;font-family:inherit;"></textarea>
+        <div class="action-grid" style="margin-top:1rem;">
+            <button class="btn btn-primary" id="btn-save-edit">Save</button>
+            <button class="btn btn-secondary" id="btn-cancel-edit">Cancel</button>
         </div>
     </div>
 </div>
@@ -242,18 +256,20 @@ function renderSections() {
         html += `</div>`;
 
         // Response table (categories only)
-        html += `<div style="overflow-x:auto;"><table class="response-table"><thead><tr>`;
+        html += `<div class="response-table-wrap"><table class="response-table"><thead><tr>`;
         visibleCategories.forEach(c => {
             html += `<th>${escHtml(c.name)}</th>`;
         });
-        html += `<th style="width:24px;min-width:24px;padding:0;border:none;background:transparent;"></th>`;
         html += `</tr></thead><tbody><tr>`;
         visibleCategories.forEach(cat => {
             const sub = team.submissions[cat.id];
             if (sub) {
                 html += '<td class="response-cell">';
                 if (tab === 'nominations') {
-                    html += escHtml(sub.response);
+                    html += `<div style="display:flex;gap:0.4rem;align-items:flex-start;">`;
+                    html += `<span style="flex:1;">${escHtml(sub.response)}</span>`;
+                    html += `<button class="btn-edit-nom" data-nom-id="${sub.id}" data-response="${escHtml(sub.response)}" data-cat="${escHtml(cat.name)}" title="Edit" style="flex-shrink:0;background:none;border:1px solid var(--border);color:var(--text-secondary);cursor:pointer;border-radius:3px;padding:0.1rem 0.3rem;font-size:0.75rem;">✎</button>`;
+                    html += `</div>`;
                 } else {
                     html += '<div class="vote-choices">';
                     const labels = ['1st', '2nd', '3rd'];
@@ -270,7 +286,6 @@ function renderSections() {
                 html += '<td style="color:var(--text-secondary);font-size:0.8rem;text-align:center;">—</td>';
             }
         });
-        html += '<td style="width:24px;min-width:24px;padding:0;border:none;"></td>';
         html += '</tr></tbody></table></div>';
         html += '</div>';
     });
@@ -312,6 +327,36 @@ document.getElementById('btn-confirm-invalidate').addEventListener('click', asyn
 document.getElementById('btn-cancel-invalidate').addEventListener('click', () => {
     document.getElementById('invalidate-modal').style.display = 'none';
     _invalidateTarget = null;
+});
+
+// ── Edit nomination ──
+let _editNomId = null;
+
+document.getElementById('submissions-container').addEventListener('click', (e) => {
+    const btn = e.target.closest('.btn-edit-nom');
+    if (!btn) return;
+    _editNomId = parseInt(btn.dataset.nomId);
+    document.getElementById('edit-cat-name').textContent = btn.dataset.cat;
+    document.getElementById('edit-response').value = btn.dataset.response;
+    document.getElementById('edit-modal').style.display = 'flex';
+});
+
+document.getElementById('btn-save-edit').addEventListener('click', async () => {
+    if (!_editNomId) return;
+    const response = document.getElementById('edit-response').value.trim();
+    if (!response) { API.toast('Response cannot be empty', 'warning'); return; }
+    try {
+        await API.request('PUT', `${API_BASE}/events/${EVENT_ID}/nominations/${_editNomId}/edit`, { response });
+        API.toast('Saved', 'success');
+        document.getElementById('edit-modal').style.display = 'none';
+        loadTab(_currentTab);
+    } catch (e) { API.toast(e.message, 'error'); }
+    _editNomId = null;
+});
+
+document.getElementById('btn-cancel-edit').addEventListener('click', () => {
+    document.getElementById('edit-modal').style.display = 'none';
+    _editNomId = null;
 });
 
 loadEvent().then(() => loadTab('nominations'));
