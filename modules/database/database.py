@@ -18,6 +18,7 @@ from .repositories import (
     AwardNominationsRepository, AwardNominationAuditLogRepository,
     AwardVotesRepository, AwardVoteAuditLogRepository,
     AwardResultsRepository, AwardAdminFillOptionsRepository,
+    TournamentScheduleSettingsRepository, TeamAvailabilityRepository,
 )
 
 
