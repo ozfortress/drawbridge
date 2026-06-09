@@ -256,7 +256,7 @@ function renderSections() {
         html += `</div>`;
 
         // Response table (categories only)
-        html += `<div class="response-table-wrap"><table class="response-table"><thead><tr>`;
+        html += `<div class="response-table-wrap" data-sync-scroll="true"><table class="response-table"><thead><tr>`;
         visibleCategories.forEach(c => {
             html += `<th>${escHtml(c.name)}</th>`;
         });
@@ -291,6 +291,25 @@ function renderSections() {
     });
 
     document.getElementById('submissions-container').innerHTML = html;
+    bindSyncedScroll();
+}
+
+function bindSyncedScroll() {
+    const wrappers = document.querySelectorAll('.response-table-wrap[data-sync-scroll="true"]');
+    if (wrappers.length < 2) return;
+    let scrolling = false;
+    wrappers.forEach(w => {
+        w.addEventListener('scroll', () => {
+            if (scrolling) return;
+            scrolling = true;
+            wrappers.forEach(other => {
+                if (other !== w) {
+                    other.scrollLeft = w.scrollLeft;
+                }
+            });
+            scrolling = false;
+        });
+    });
 }
 
 function openInvalidate(teamId, teamName) {
