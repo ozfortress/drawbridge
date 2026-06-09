@@ -130,7 +130,7 @@ function renderEvent(ev) {
     document.getElementById('btn-close-voting').style.display = (s === 'voting') ? '' : 'none';
     document.getElementById('btn-calculate').style.display = (s === 'voting' || s === 'voting_closed' || s === 'complete') ? '' : 'none';
     document.getElementById('btn-set-pending').style.display = (s !== 'pending' && s !== 'calculating') ? '' : 'none';
-    document.getElementById('btn-delete-event').style.display = (s === 'pending') ? '' : 'none';
+    document.getElementById('btn-delete-event').style.display = (s === 'nominations' || s === 'voting' || s === 'calculating') ? 'none' : '';
 
     // Categories
     const catTbody = document.getElementById('categories-tbody');
