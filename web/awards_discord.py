@@ -390,6 +390,9 @@ async def handle_vote_button(interaction: discord.Interaction, event_id: int, te
     for fo in fill_options:
         fill_opts_by_cat.setdefault(fo['category_id'], []).append(fo['option'])
 
+    # Pre-collect nomination-category IDs for autofill_player
+    nom_cat_ids = [c['id'] for c in categories if c['fill_type'] == 'nomination']
+
     nominees_by_cat = {}
     for cat in categories:
         if cat['fill_type'] == 'admin_fill':
@@ -397,6 +400,17 @@ async def handle_vote_button(interaction: discord.Interaction, event_id: int, te
         elif cat['fill_type'] == 'autofill_team':
             teams_in_div = _db.teams.get_by_division(division_id)
             nominees = [t['team_name'] for t in teams_in_div if t['team_id'] != team_id]
+        elif cat['fill_type'] == 'autofill_player':
+            # Pull distinct responses from all nomination categories
+            all_responses = set()
+            for nc_id in nom_cat_ids:
+                for r in _db.award_nominations.distinct_responses(event_id, nc_id):
+                    all_responses.add(r)
+            nominees = sorted(all_responses)
+            # Exclude the current team's own nominations
+            own_noms = _db.award_nominations.get_by_team_and_event(team_id, event_id)
+            own_responses = {n['response'] for n in own_noms} if own_noms else set()
+            nominees = [n for n in nominees if n not in own_responses]
         else:
             nominees = _db.award_nominations.distinct_responses(event_id, cat['id'])
             # Exclude the current team's own nomination so they can't self-vote
