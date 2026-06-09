@@ -2,7 +2,7 @@
 
 import discord
 from discord import TextStyle
-from discord.ui import Modal, TextInput, View
+from discord.ui import Modal, TextInput, View, Button
 
 # In-memory session store for modal chaining
 # Key: f"{interaction.user.id}:{event_id}" -> dict
@@ -46,6 +46,61 @@ class AwardsVotesView(View):
 
     async def _button_callback(self, interaction: discord.Interaction):
         await handle_vote_button(interaction, self._event_id, self._team_id)
+
+
+# ── Continue button (transient, not persistent) ──────────────
+
+
+class ContinueNominationView(View):
+    """Transient view with a button to open the next nomination page."""
+
+    def __init__(self, event_id: int, team_id: int, categories: list,
+                 page: int, page_size: int, existing: list | None):
+        super().__init__(timeout=300)
+        self._event_id = event_id
+        self._team_id = team_id
+        self._categories = categories
+        self._page = page
+        self._page_size = page_size
+        self._existing = existing
+        total = max(1, (len(categories) + page_size - 1) // page_size)
+        btn = Button(label=f'Continue to Page {page + 1}/{total}', style=discord.ButtonStyle.primary)
+        btn.callback = self._callback
+        self.add_item(btn)
+
+    async def _callback(self, interaction: discord.Interaction):
+        modal = build_nomination_modal(self._event_id, self._team_id,
+                                       self._categories, self._page,
+                                       self._page_size, self._existing)
+        await interaction.response.send_modal(modal)
+
+
+class ContinueVoteView(View):
+    """Transient view with a button to open the next voting page."""
+
+    def __init__(self, event_id: int, team_id: int, categories: list,
+                 current_index: int, division_id: int,
+                 existing_data: dict | None, nominees_by_cat: dict | None):
+        super().__init__(timeout=300)
+        self._event_id = event_id
+        self._team_id = team_id
+        self._categories = categories
+        self._current_index = current_index
+        self._division_id = division_id
+        self._existing_data = existing_data
+        self._nominees_by_cat = nominees_by_cat
+        total = len(categories)
+        btn = Button(label=f'Continue to Category {current_index + 1}/{total}',
+                     style=discord.ButtonStyle.primary)
+        btn.callback = self._callback
+        self.add_item(btn)
+
+    async def _callback(self, interaction: discord.Interaction):
+        modal = build_vote_modal(self._event_id, self._team_id,
+                                 self._categories, self._current_index,
+                                 self._division_id, self._existing_data,
+                                 self._nominees_by_cat)
+        await interaction.response.send_modal(modal)
 
 
 # ── Nomination Modals ─────────────────────────────────────────
@@ -98,9 +153,12 @@ def build_nomination_modal(event_id: int, team_id: int, categories: list,
                                         categories, _sessions[skey]['nominations'])
             _sessions.pop(skey, None)
         else:
-            next_modal = build_nomination_modal(event_id, team_id, categories,
-                                                page + 1, page_size, existing)
-            await interaction.response.send_modal(next_modal)
+            await interaction.response.send_message(
+                f"Page {page + 1} saved! Click below for the next page.",
+                view=ContinueNominationView(event_id, team_id, categories,
+                                            page + 1, page_size, existing),
+                ephemeral=True
+            )
 
     modal.on_submit = on_submit
     return modal
@@ -230,10 +288,13 @@ def build_vote_modal(event_id: int, team_id: int, categories: list,
                                   categories, _sessions[skey]['votes'])
             _sessions.pop(skey, None)
         else:
-            next_modal = build_vote_modal(event_id, team_id, categories,
-                                          current_index + 1, division_id,
-                                          existing_data, nominees_by_cat)
-            await interaction.response.send_modal(next_modal)
+            await interaction.response.send_message(
+                f"Vote for \"{cat['name']}\" saved! Click below for the next category.",
+                view=ContinueVoteView(event_id, team_id, categories,
+                                      current_index + 1, division_id,
+                                      existing_data, nominees_by_cat),
+                ephemeral=True
+            )
 
     modal.on_submit = on_submit
     return modal
