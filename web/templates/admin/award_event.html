@@ -18,9 +18,12 @@
             </div>
             <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
                 <button class="btn btn-primary" id="btn-open-nominations">📢 Open Nominations</button>
+                <button class="btn btn-warning" id="btn-close-nominations" style="display:none;">🔒 Close Nominations</button>
                 <button class="btn btn-primary" id="btn-open-voting">🗳️ Open Voting</button>
+                <button class="btn btn-warning" id="btn-close-voting" style="display:none;">🔒 Close Voting</button>
                 <button class="btn btn-warning" id="btn-calculate">📊 Calculate Results</button>
                 <button class="btn btn-secondary" id="btn-set-pending">Reset to Pending</button>
+                <button class="btn btn-danger" id="btn-delete-event">🗑️ Delete Event</button>
             </div>
         </div>
     </div>
@@ -57,7 +60,7 @@
             <div style="margin-bottom:0.75rem;">
                 <a href="/admin/awards/{{ event_id }}/submissions" class="btn btn-primary" style="font-size:0.85rem;">📋 View All Submissions</a>
             </div>
-            <div id="divisions-container"></div>
+            <div id="divisions-container" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:0.75rem;"></div>
         </div>
 
     <div class="card">
@@ -119,6 +122,16 @@ function renderEvent(ev) {
     else badge.style.borderColor = 'var(--border)';
     document.getElementById('event-league').textContent = `League: ${ev.league_name}`;
 
+    // Toggle action buttons based on status
+    const s = ev.status;
+    document.getElementById('btn-open-nominations').style.display = (s === 'pending' || s === 'nominations_closed') ? '' : 'none';
+    document.getElementById('btn-close-nominations').style.display = (s === 'nominations') ? '' : 'none';
+    document.getElementById('btn-open-voting').style.display = (s === 'nominations' || s === 'nominations_closed' || s === 'voting_closed') ? '' : 'none';
+    document.getElementById('btn-close-voting').style.display = (s === 'voting') ? '' : 'none';
+    document.getElementById('btn-calculate').style.display = (s === 'voting' || s === 'voting_closed' || s === 'complete') ? '' : 'none';
+    document.getElementById('btn-set-pending').style.display = (s !== 'pending' && s !== 'calculating') ? '' : 'none';
+    document.getElementById('btn-delete-event').style.display = (s === 'pending') ? '' : 'none';
+
     // Categories
     const catTbody = document.getElementById('categories-tbody');
     catTbody.innerHTML = (ev.categories || []).map((c, i) => {
@@ -147,15 +160,37 @@ function renderEvent(ev) {
 
     // Divisions
     const divContainer = document.getElementById('divisions-container');
-    divContainer.innerHTML = (ev.divisions || []).map(d => `
-        <div style="margin-bottom:0.75rem;padding:0.75rem;background:var(--bg-input);border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
-            <span>${d.name}</span>
-            <span style="font-size:0.85rem;color:var(--text-secondary);">
-                <a href="#" class="view-noms-link" data-div="${d.id}" style="color:var(--accent);">View Noms</a> ·
-                <a href="#" class="view-votes-link" data-div="${d.id}" style="color:var(--accent);">View Votes</a>
-            </span>
-        </div>
-    `).join('');
+    divContainer.innerHTML = (ev.divisions || []).map(d => {
+        const nomPct = d.team_count ? Math.round((d.teams_nominated / d.team_count) * 100) : 0;
+        const votePct = d.team_count ? Math.round((d.teams_voted / d.team_count) * 100) : 0;
+        return `<div style="background:var(--bg-input);border-radius:8px;padding:1rem;border:1px solid var(--border);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+                <strong>${d.name}</strong>
+                <span style="font-size:0.85rem;color:var(--text-secondary);">${d.team_count} teams</span>
+            </div>
+            <div style="margin-bottom:0.35rem;">
+                <div style="display:flex;justify-content:space-between;font-size:0.8rem;margin-bottom:0.15rem;">
+                    <span>Nominations</span>
+                    <span>${d.teams_nominated} / ${d.team_count}</span>
+                </div>
+                <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;">
+                    <div style="height:100%;width:${nomPct}%;background:var(--accent);border-radius:3px;transition:width 0.3s;"></div>
+                </div>
+            </div>
+            <div style="margin-bottom:0.5rem;">
+                <div style="display:flex;justify-content:space-between;font-size:0.8rem;margin-bottom:0.15rem;">
+                    <span>Votes</span>
+                    <span>${d.teams_voted} / ${d.team_count}</span>
+                </div>
+                <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;">
+                    <div style="height:100%;width:${votePct}%;background:var(--success);border-radius:3px;transition:width 0.3s;"></div>
+                </div>
+            </div>
+            <div style="text-align:right;">
+                <a href="/admin/awards/${EVENT_ID}/submissions" style="font-size:0.8rem;color:var(--accent);text-decoration:none;">View Submissions →</a>
+            </div>
+        </div>`;
+    }).join('');
 
     // Results
     loadResults();
@@ -272,6 +307,50 @@ document.getElementById('btn-set-pending').addEventListener('click', async () =>
         API.toast('Reset to pending', 'success');
         loadEvent();
     } catch (e) { API.toast(e.message, 'error'); }
+});
+
+// Close Nominations
+document.getElementById('btn-close-nominations').addEventListener('click', async () => {
+    if (!confirm('Close nominations? No new nominations will be accepted until reopened.')) return;
+    const btn = document.getElementById('btn-close-nominations');
+    btn.disabled = true;
+    try {
+        await API.post(`${API_BASE}/events/${EVENT_ID}/close-nominations`, {});
+        API.toast('Nominations closed', 'success');
+        loadEvent();
+    } catch (e) { API.toast(e.message, 'error'); }
+    btn.disabled = false;
+});
+
+// Close Voting
+document.getElementById('btn-close-voting').addEventListener('click', async () => {
+    if (!confirm('Close voting? No votes can be submitted or changed until reopened.')) return;
+    const btn = document.getElementById('btn-close-voting');
+    btn.disabled = true;
+    try {
+        await API.post(`${API_BASE}/events/${EVENT_ID}/close-voting`, {});
+        API.toast('Voting closed', 'success');
+        loadEvent();
+    } catch (e) { API.toast(e.message, 'error'); }
+    btn.disabled = false;
+});
+
+// Delete Event
+document.getElementById('btn-delete-event').addEventListener('click', async () => {
+    const msg = '⚠️ DELETE EVENT #' + EVENT_ID + '\n\nThis will permanently delete all categories, nominations, votes, and results. This cannot be undone!\n\nType DELETE to confirm.';
+    const confirmed = prompt(msg);
+    if (confirmed !== 'DELETE') {
+        API.toast('Cancelled — must type DELETE to confirm', 'warning');
+        return;
+    }
+    const btn = document.getElementById('btn-delete-event');
+    btn.disabled = true;
+    try {
+        await API.request('DELETE', `${API_BASE}/events/${EVENT_ID}`, {});
+        API.toast('Event deleted', 'success');
+        setTimeout(() => { window.location.href = '/admin/awards'; }, 1000);
+    } catch (e) { API.toast(e.message, 'error'); }
+    btn.disabled = false;
 });
 
 // Add Category

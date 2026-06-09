@@ -1465,11 +1465,28 @@ async def api_award_events_get(event_id: int):
             if cat['fill_type'] == 'admin_fill':
                 cat_out['fill_options'] = fill_opts_by_category.get(cat['id'], [])
             cat_details.append(cat_out)
+        # Per-division stats
+        div_details = []
+        for d in divisions:
+            teams_in_div = _db.teams.get_by_division(d['id'])
+            team_count = len(teams_in_div)
+            nom_cats = [c['id'] for c in categories]
+            div_noms = _db.award_nominations.get_by_division(d['id'], event_id) if nom_cats else []
+            div_votes = _db.award_votes.get_by_division(d['id'], event_id) if nom_cats else []
+            teams_nominated = len(set(r['team_id'] for r in div_noms))
+            teams_voted = len(set(r['team_id'] for r in div_votes))
+            div_details.append({
+                'id': d['id'],
+                'name': d['division_name'],
+                'team_count': team_count,
+                'teams_nominated': teams_nominated,
+                'teams_voted': teams_voted,
+            })
         return jsonify({
             **ev,
             'league_name': league.get('league_name', f"League {ev['league_id']}") if league else f"League {ev['league_id']}",
             'categories': cat_details,
-            'divisions': [{'id': d['id'], 'name': d['division_name']} for d in divisions],
+            'divisions': div_details,
         })
     except Exception as e:
         logger.error(f'Award event get error: {e}')
@@ -1483,7 +1500,7 @@ async def api_award_events_set_status(event_id: int):
         return jsonify({'error': 'Database not ready'}), 503
     data = await request.get_json()
     status = data.get('status', '') if data else ''
-    valid = ('pending', 'nominations', 'voting', 'calculating', 'complete', 'cancelled')
+    valid = ('pending', 'nominations', 'nominations_closed', 'voting', 'voting_closed', 'calculating', 'complete', 'cancelled')
     if status not in valid:
         return jsonify({'error': f'Invalid status. Valid: {", ".join(valid)}'}), 400
     try:
@@ -1491,6 +1508,66 @@ async def api_award_events_set_status(event_id: int):
         return jsonify({'success': True})
     except Exception as e:
         logger.error(f'Award event status error: {e}')
+        return _db_error(e)
+
+
+@admin_bp.route('/api/awards/events/<int:event_id>/close-nominations', methods=['POST'])
+@require_admin
+async def api_award_events_close_nominations(event_id: int):
+    if not _db:
+        return jsonify({'error': 'Database not ready'}), 503
+    try:
+        ev = _db.award_events.get_by_id(event_id)
+        if not ev:
+            return jsonify({'error': 'Event not found'}), 404
+        _db.award_events.set_status(event_id, 'nominations_closed')
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f'Close nominations error: {e}')
+        return _db_error(e)
+
+
+@admin_bp.route('/api/awards/events/<int:event_id>/close-voting', methods=['POST'])
+@require_admin
+async def api_award_events_close_voting(event_id: int):
+    if not _db:
+        return jsonify({'error': 'Database not ready'}), 503
+    try:
+        ev = _db.award_events.get_by_id(event_id)
+        if not ev:
+            return jsonify({'error': 'Event not found'}), 404
+        _db.award_events.set_status(event_id, 'voting_closed')
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f'Close voting error: {e}')
+        return _db_error(e)
+
+
+@admin_bp.route('/api/awards/events/<int:event_id>', methods=['DELETE'])
+@require_admin
+async def api_award_events_delete(event_id: int):
+    if not _db:
+        return jsonify({'error': 'Database not ready'}), 503
+    try:
+        ev = _db.award_events.get_by_id(event_id)
+        if not ev:
+            return jsonify({'error': 'Event not found'}), 404
+        # Clean up related data
+        if hasattr(_db, 'award_results'):
+            _db.award_results.delete_by_event(event_id)
+        if hasattr(_db, 'award_admin_fill_options'):
+            _db.award_admin_fill_options.delete_by_event(event_id)
+        if hasattr(_db, 'award_votes'):
+            _db.award_votes.delete_by_event(event_id)
+        if hasattr(_db, 'award_nominations'):
+            _db.award_nominations.delete_by_event(event_id)
+        cats = _db.award_event_categories.get_by_event(event_id)
+        for cat in cats:
+            _db.award_event_categories.delete(cat['id'])
+        _db.award_events.delete(event_id)
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f'Delete event error: {e}')
         return _db_error(e)
 
 
