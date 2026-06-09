@@ -529,7 +529,7 @@ _VOTE_TEMPLATE_DEFAULT = json.dumps({
 
 
 def _fill_template(template_name: str, default: str, subs: dict) -> tuple[str, list[discord.Embed]]:
-    """Get a template (DB/file), substitute placeholders, return (content, embeds)."""
+    """Get a template (DB/file), substitute placeholders, return (content, [embeds])."""
     from web.template_helper import get_template
     import json
     raw = get_template(template_name)
@@ -541,8 +541,9 @@ def _fill_template(template_name: str, default: str, subs: dict) -> tuple[str, l
         parsed = json.loads(raw)
         if isinstance(parsed, dict):
             content = parsed.get('content', '')
-            embeds_data = parsed.get('embeds') or []
-            embeds = [discord.Embed.from_dict(e) for e in embeds_data]
+            embeds = []
+            for e_data in (parsed.get('embeds') or []):
+                embeds.append(discord.Embed(**e_data))
             return content, embeds
     except (json.JSONDecodeError, TypeError):
         pass
