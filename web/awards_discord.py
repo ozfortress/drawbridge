@@ -1,5 +1,7 @@
 """Discord UI components (modals, views) for the awards nomination & voting system."""
 
+import json
+
 import discord
 from discord import TextStyle
 from discord.ui import Modal, TextInput, View, Button
@@ -517,28 +519,30 @@ async def handle_vote_button(interaction: discord.Interaction, event_id: int, te
 # ── Helper functions for sending messages ─────────────────────
 
 
-_NOMINATION_TEMPLATE_DEFAULT = '''{{role_mention}} \U0001f4e2 **Award Nominations are now open!**
+_NOMINATION_TEMPLATE_DEFAULT = json.dumps({
+    'content': '{{role_mention}} \U0001f4e2 **Award Nominations are now open!**\n\n**Categories to fill in:**\n{{categories_list}}\n\nClick the button below to submit your team\'s nominations.\nYou can edit your responses by clicking again before nominations close.',
+}, indent=2)
 
-**Categories to fill in:**
-{{categories_list}}
-
-Click the button below to submit your team's nominations.
-You can edit your responses by clicking again before nominations close.'''
-
-_VOTE_TEMPLATE_DEFAULT = '''{{role_mention}} \U0001f5f3\ufe0f **Voting is now open!**
-
-Click the button below to cast your team's votes.
-You have one ballot per team. You can edit by clicking again before voting closes.'''
+_VOTE_TEMPLATE_DEFAULT = json.dumps({
+    'content': '{{role_mention}} \U0001f5f3\ufe0f **Voting is now open!**\n\nClick the button below to cast your team\'s votes.\nYou have one ballot per team. You can edit by clicking again before voting closes.',
+}, indent=2)
 
 
 def _fill_template(template_name: str, default: str, subs: dict) -> str:
-    """Get a template (DB/file) and substitute placeholders."""
+    """Get a template (DB/file), substitute placeholders, return content text."""
     from web.template_helper import get_template
+    import json
     raw = get_template(template_name)
     if not raw:
         raw = default
     for k, v in subs.items():
         raw = raw.replace(k, str(v))
+    try:
+        parsed = json.loads(raw)
+        if isinstance(parsed, dict):
+            return parsed.get('content', raw)
+    except (json.JSONDecodeError, TypeError):
+        pass
     return raw
 
 

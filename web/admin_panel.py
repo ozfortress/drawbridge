@@ -1111,8 +1111,8 @@ async def api_tournament_detail(league_id: int):
 
 # Known template names and their default content for display in the admin editor
 _KNOWN_TEMPLATE_DEFAULTS: dict[str, str] = {
-    'award_nomination_open.txt': '{{role_mention}} 📢 **Award Nominations are now open!**\n\n**Categories to fill in:**\n{{categories_list}}\n\nClick the button below to submit your team\'s nominations.\nYou can edit your responses by clicking again before nominations close.',
-    'award_vote_open.txt': '{{role_mention}} 🗳️ **Voting is now open!**\n\nClick the button below to cast your team\'s votes.\nYou have one ballot per team. You can edit by clicking again before voting closes.',
+    'award_nomination_open.txt': '{\n  "content": "{{role_mention}} \U0001f4e2 **Award Nominations are now open!**\\n\\n**Categories to fill in:**\\n{{categories_list}}\\n\\nClick the button below to submit your team\'s nominations.\\nYou can edit your responses by clicking again before nominations close."\n}',
+    'award_vote_open.txt': '{\n  "content": "{{role_mention}} \U0001f5f3\ufe0f **Voting is now open!**\\n\\nClick the button below to cast your team\'s votes.\\nYou have one ballot per team. You can edit by clicking again before voting closes."\n}',
 }
 
 
