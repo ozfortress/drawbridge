@@ -535,19 +535,30 @@ def _fill_template(template_name: str, default: str, subs: dict) -> tuple[str, l
     raw = get_template(template_name)
     if not raw:
         raw = default
-    for k, v in subs.items():
-        raw = raw.replace(k, str(v))
     try:
         parsed = json.loads(raw)
-        if isinstance(parsed, dict):
-            content = parsed.get('content', '')
-            embeds = []
-            for e_data in (parsed.get('embeds') or []):
-                embeds.append(discord.Embed(**e_data))
-            return content, embeds
     except (json.JSONDecodeError, TypeError):
-        pass
-    return raw, []
+        # Plain-text fallback — substitute on the raw string
+        for k, v in subs.items():
+            raw = raw.replace(k, str(v))
+        return raw, []
+
+    # Walk parsed structure and substitute in all string values
+    def _walk(obj):
+        if isinstance(obj, str):
+            for k, v in subs.items():
+                obj = obj.replace(k, str(v))
+            return obj
+        if isinstance(obj, dict):
+            return {k: _walk(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [_walk(v) for v in obj]
+        return obj
+
+    parsed = _walk(parsed)
+    content = parsed.get('content', '') if isinstance(parsed, dict) else str(parsed)
+    embeds = [discord.Embed(**e) for e in (parsed.get('embeds') or [])] if isinstance(parsed, dict) else []
+    return content, embeds
 
 
 async def send_nomination_message(bot, channel_id: int, role_id: int,
