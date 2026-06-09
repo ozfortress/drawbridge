@@ -637,6 +637,37 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
             matchmessage['embed'] = discord.Embed(**matchmessage['embeds'][0])
             del matchmessage['embeds']
             await match_channel.send(**matchmessage)
+
+            # Compare team availabilities and post summary
+            try:
+                avail = self.db.team_availability.get_matching(
+                    team_home['team_id'], team_away['team_id'], match.league_id
+                ) if hasattr(self.db, 'team_availability') else []
+                if avail:
+                    from collections import defaultdict
+                    by_day = defaultdict(list)
+                    for a in avail:
+                        by_day[a['day_of_week']].append(a['time_slot'])
+                    day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+                    time_labels = {'19:00': '7pm', '20:00': '8pm', '21:00': '9pm'}
+                    desc_lines = []
+                    for day in sorted(by_day.keys()):
+                        times = ', '.join(time_labels.get(t, t) for t in sorted(by_day[day]))
+                        desc_lines.append(f'**{day_names[day]}**: {times}')
+                    avail_embed = discord.Embed(
+                        title='📅 Matching Availability',
+                        description='Both teams are available at these times:\n' + '\n'.join(desc_lines),
+                        color=discord.Color.green(),
+                    )
+                    avail_embed.add_field(
+                        name='Scheduling outside these times?',
+                        value='Feel free to negotiate any time that works for both teams.\nThe listed times are just what was set during registration.',
+                        inline=False,
+                    )
+                    await match_channel.send(embed=avail_embed)
+            except Exception as e:
+                self.logger.error(f'Failed to compare availabilities: {e}')
+
             # Update the database
             self.db.insert_match({
                 'match_id': match.id,

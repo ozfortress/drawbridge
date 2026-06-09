@@ -104,6 +104,13 @@ def initialize(bot, db, cit, tournament_cog, sync_cog):
         except Exception as e:
             logger.warning(f'Failed to register awards views: {e}')
 
+        try:
+            from web.schedule_discord import register_schedule_views
+            register_schedule_views(_bot, _db)
+            logger.info('Schedule persistent views registered')
+        except Exception as e:
+            logger.warning(f'Failed to register schedule views: {e}')
+
 
 # ── Session helpers ──────────────────────────────────────────
 from web.admin_auth import create_session, verify_session, get_oauth2_url, exchange_code, fetch_discord_user
@@ -2049,6 +2056,76 @@ async def api_award_events_open_voting(event_id: int):
         logger.error(f'Open voting error: {e}')
         return _db_error(e)
 
+
+@admin_bp.route('/api/leagues/<int:league_id>/schedule-settings')
+@require_admin
+async def api_schedule_settings_get(league_id: int):
+    if not _db:
+        return jsonify({'error': 'Database not ready'}), 503
+    try:
+        settings = _db.tournament_schedule_settings.get_by_league(league_id) if hasattr(_db, 'tournament_schedule_settings') else None
+        if settings:
+            excluded = [int(x) for x in settings['excluded_days'].split(',') if x.strip()] if settings.get('excluded_days') else []
+            return jsonify({'settings': {'excluded_days': excluded}})
+        return jsonify({'settings': {'excluded_days': []}})
+    except Exception as e:
+        logger.error(f'Schedule settings error: {e}')
+        return _db_error(e)
+
+
+@admin_bp.route('/api/leagues/<int:league_id>/schedule-settings', methods=['PUT'])
+@require_admin
+async def api_schedule_settings_update(league_id: int):
+    if not _db:
+        return jsonify({'error': 'Database not ready'}), 503
+    data = await request.get_json()
+    excluded = data.get('excluded_days', []) if data else []
+    excluded_str = ','.join(str(d) for d in excluded)
+    try:
+        existing = _db.tournament_schedule_settings.get_by_league(league_id) if hasattr(_db, 'tournament_schedule_settings') else None
+        if existing:
+            _db.tournament_schedule_settings.update(existing['id'], {'excluded_days': excluded_str})
+        else:
+            _db.tournament_schedule_settings.insert({'league_id': league_id, 'excluded_days': excluded_str})
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f'Schedule settings update error: {e}')
+        return _db_error(e)
+
+
+@admin_bp.route('/api/leagues/<int:league_id>/send-schedule-messages', methods=['POST'])
+@require_admin
+async def api_send_schedule_messages(league_id: int):
+    if not _check_bot_ready():
+        return jsonify({'error': 'Bot not ready'}), 503
+    if not _db:
+        return jsonify({'error': 'Database not ready'}), 503
+    try:
+        from web.schedule_discord import ScheduleButtonView
+        teams = _db.teams.get_by_league(league_id)
+        sent = 0
+        for team in teams:
+            if not team.get('team_channel'):
+                continue
+            channel = _bot.get_channel(team['team_channel'])
+            if not channel:
+                continue
+            view = ScheduleButtonView(team['team_id'], league_id)
+            try:
+                embed = discord.Embed(
+                    title='📅 Team Availability',
+                    description='Click the button below to set your team\'s availability for this season.\nSelect days and times that work best for your team.',
+                    color=discord.Color.blue(),
+                )
+                msg = await channel.send(embed=embed, view=view)
+                await msg.pin()
+                sent += 1
+            except Exception:
+                continue
+        return jsonify({'success': True, 'messages_sent': sent})
+    except Exception as e:
+        logger.error(f'Send schedule messages error: {e}')
+        return _db_error(e)
 
 @admin_bp.route('/api/awards/events/<int:event_id>/notify-invalidation', methods=['POST'])
 @require_admin

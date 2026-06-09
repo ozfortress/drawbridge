@@ -1179,3 +1179,127 @@ class AwardAdminFillOptionsRepository(BaseRepository):
 
     def delete_by_event(self, event_id: int) -> bool:
         return self._execute_query(f"DELETE FROM {self.table} WHERE event_id = ?", (event_id,)) > 0
+
+class TournamentScheduleSettingsRepository(BaseRepository):
+    """Repository for tournament_schedule_settings table."""
+
+    def __init__(self, db_connection):
+        super().__init__(db_connection, 'tournament_schedule_settings')
+
+    def get_by_id(self, settings_id: int) -> Optional[Dict[str, Any]]:
+        return self._fetch_one(f"SELECT * FROM {self.table} WHERE id = ?", (settings_id,))
+
+    def get_all(self) -> List[Dict[str, Any]]:
+        return self._fetch_all(f"SELECT * FROM {self.table}")
+
+    def get_by_league(self, league_id: int) -> Optional[Dict[str, Any]]:
+        return self._fetch_one(f"SELECT * FROM {self.table} WHERE league_id = ?", (league_id,))
+
+    def insert(self, data: Dict[str, Any]) -> Optional[int]:
+        required = ['league_id']
+        for f in required:
+            if f not in data:
+                raise ValueError(f"Missing required field: {f}")
+        return self._execute_query(
+            f"INSERT INTO {self.table} (league_id, excluded_days) VALUES (?, ?)",
+            (data['league_id'], data.get('excluded_days'))
+        )
+
+    def update(self, settings_id: int, data: Dict[str, Any]) -> bool:
+        existing = self.get_by_id(settings_id)
+        if not existing:
+            raise ValueError(f"Settings with ID {settings_id} not found")
+        merged = {**existing, **data}
+        return self._execute_query(
+            f"UPDATE {self.table} SET excluded_days = ? WHERE id = ?",
+            (merged['excluded_days'], settings_id)
+        ) > 0
+
+    def delete(self, settings_id: int) -> bool:
+        return self._execute_query(f"DELETE FROM {self.table} WHERE id = ?", (settings_id,)) > 0
+
+    def delete_by_league(self, league_id: int) -> bool:
+        return self._execute_query(f"DELETE FROM {self.table} WHERE league_id = ?", (league_id,)) > 0
+
+
+class TeamAvailabilityRepository(BaseRepository):
+    """Repository for team_availability table."""
+
+    DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    TIME_SLOTS = ['19:00', '20:00', '21:00']
+
+    def __init__(self, db_connection):
+        super().__init__(db_connection, 'team_availability')
+
+    def get_by_id(self, entry_id: int) -> Optional[Dict[str, Any]]:
+        return self._fetch_one(f"SELECT * FROM {self.table} WHERE id = ?", (entry_id,))
+
+    def get_all(self) -> List[Dict[str, Any]]:
+        return self._fetch_all(f"SELECT * FROM {self.table}")
+
+    def get_by_team(self, team_id: int, league_id: int) -> List[Dict[str, Any]]:
+        return self._fetch_all(
+            f"SELECT * FROM {self.table} WHERE team_id = ? AND league_id = ? ORDER BY day_of_week, time_slot",
+            (team_id, league_id)
+        )
+
+    def get_by_league(self, league_id: int) -> List[Dict[str, Any]]:
+        return self._fetch_all(
+            f"SELECT * FROM {self.table} WHERE league_id = ? ORDER BY team_id, day_of_week, time_slot",
+            (league_id,)
+        )
+
+    def insert(self, data: Dict[str, Any]) -> Optional[int]:
+        for f in ('team_id', 'league_id', 'day_of_week', 'time_slot'):
+            if f not in data:
+                raise ValueError(f"Missing required field: {f}")
+        return self._execute_query(
+            f"INSERT IGNORE INTO {self.table} (team_id, league_id, day_of_week, time_slot) VALUES (?, ?, ?, ?)",
+            (data['team_id'], data['league_id'], data['day_of_week'], data['time_slot'])
+        )
+
+    def set_availability(self, team_id: int, league_id: int, slots: List[tuple]) -> bool:
+        """Replace all availability for a team with the given (day, time) slots."""
+        self._execute_query(
+            f"DELETE FROM {self.table} WHERE team_id = ? AND league_id = ?",
+            (team_id, league_id)
+        )
+        for day, time in slots:
+            self.insert({
+                'team_id': team_id,
+                'league_id': league_id,
+                'day_of_week': day,
+                'time_slot': time,
+            })
+        return True
+
+    def delete(self, entry_id: int) -> bool:
+        return self._execute_query(f"DELETE FROM {self.table} WHERE id = ?", (entry_id,)) > 0
+
+    def delete_by_team(self, team_id: int, league_id: int) -> bool:
+        return self._execute_query(
+            f"DELETE FROM {self.table} WHERE team_id = ? AND league_id = ?",
+            (team_id, league_id)
+        ) > 0
+
+    def get_matching(self, team1_id: int, team2_id: int, league_id: int) -> List[Dict[str, Any]]:
+        """Find common availability slots between two teams."""
+        return self._fetch_all(
+            f"""
+            SELECT a.day_of_week, a.time_slot
+            FROM {self.table} a
+            INNER JOIN {self.table} b
+                ON a.day_of_week = b.day_of_week AND a.time_slot = b.time_slot
+            WHERE a.team_id = ? AND b.team_id = ? AND a.league_id = ? AND b.league_id = ?
+            ORDER BY a.day_of_week, a.time_slot
+            """,
+            (team1_id, team2_id, league_id, league_id)
+        )
+
+    def get_team_schedule(self, team_id: int, league_id: int) -> Dict[int, list]:
+        """Get availability grouped by day_of_week -> [time_slots]."""
+        rows = self.get_by_team(team_id, league_id)
+        schedule: Dict[int, list] = {}
+        for r in rows:
+            schedule.setdefault(r['day_of_week'], []).append(r['time_slot'])
+        return schedule

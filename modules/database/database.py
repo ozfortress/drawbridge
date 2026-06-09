@@ -71,6 +71,8 @@ class Database:
         self.award_vote_audit_log = AwardVoteAuditLogRepository(self.connection)
         self.award_results = AwardResultsRepository(self.connection)
         self.award_admin_fill_options = AwardAdminFillOptionsRepository(self.connection)
+        self.tournament_schedule_settings = TournamentScheduleSettingsRepository(self.connection)
+        self.team_availability = TeamAvailabilityRepository(self.connection)
 
         # Initialize migration manager
         self.migrations = MigrationManager(self.connection)
