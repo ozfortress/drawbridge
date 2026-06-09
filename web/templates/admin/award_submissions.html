@@ -3,10 +3,11 @@
 {% block extra_css %}
 <style>
 .submissions-table {
+    min-width: 900px;
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.8rem;
-    table-layout: auto;
+    font-size: 0.85rem;
+    table-layout: fixed;
 }
 .submissions-table th, .submissions-table td {
     border: 1px solid var(--border);
@@ -22,8 +23,8 @@
     white-space: nowrap;
 }
 .submissions-table thead th.cat-header {
-    min-width: 120px;
-    max-width: 200px;
+    min-width: 180px;
+    width: 180px;
 }
 .submissions-table .team-name {
     font-weight: 600;
@@ -79,7 +80,10 @@
 .filter-bar label { font-size: 0.85rem; color: var(--text-secondary); }
 .table-wrapper-sub {
     overflow-x: auto;
+    overflow-y: auto;
     max-height: 75vh;
+    border: 1px solid var(--border);
+    border-radius: 6px;
 }
 .invalidation-badge {
     display: inline-block;
@@ -214,13 +218,13 @@ function renderTable() {
     }
 
     let html = '<table class="submissions-table"><thead><tr>';
-    html += '<th style="width:30px;">#</th>';
-    html += '<th style="min-width:140px;">Team</th>';
-    html += '<th style="width:90px;">Division</th>';
+    html += '<th style="width:40px;">#</th>';
+    html += '<th style="width:160px;">Team</th>';
+    html += '<th style="width:100px;">Division</th>';
     visibleCategories.forEach(c => {
         html += `<th class="cat-header">${escHtml(c.name)}</th>`;
     });
-    html += '<th style="min-width:100px;">Submitted By</th>';
+    html += '<th style="width:120px;">Submitted By</th>';
     html += '<th style="width:90px;">Status</th>';
     html += '<th style="width:100px;">Actions</th>';
     html += '</tr></thead><tbody>';
