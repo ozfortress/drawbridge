@@ -1,0 +1,172 @@
+{% extends "admin/layout.html" %}
+{% block title %}Awards - Drawbridge Admin{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Awards</h1>
+    <p style="color:var(--text-secondary);font-size:0.9rem;">Manage award templates, events, nominations, and voting</p>
+</div>
+
+<div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;">
+        <h2 style="margin-bottom:0;">Award Events</h2>
+        <button class="btn btn-primary" id="btn-create-event">+ New Event</button>
+    </div>
+    <div id="events-container" class="table-wrapper">
+        <table class="data-table">
+            <thead>
+                <tr><th>ID</th><th>Name</th><th>League</th><th>Status</th><th>Categories</th><th>Noms</th><th>Created</th><th></th></tr>
+            </thead>
+            <tbody id="events-tbody"></tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Award Templates</h2>
+    <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:1rem;">Reusable category templates for award events</p>
+    <div style="display:flex;gap:0.5rem;margin-bottom:1rem;">
+        <input type="text" id="tmpl-name" class="form-input" placeholder="Template name" style="flex:1;">
+        <input type="text" id="tmpl-desc" class="form-input" placeholder="Description" style="flex:2;">
+        <button class="btn btn-primary" id="btn-create-tmpl">Add</button>
+    </div>
+    <div id="templates-container" class="table-wrapper">
+        <table class="data-table">
+            <thead><tr><th>ID</th><th>Name</th><th>Description</th><th>Actions</th></tr></thead>
+            <tbody id="templates-tbody"></tbody>
+        </table>
+    </div>
+</div>
+
+<div id="create-event-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:1000;display:none;align-items:center;justify-content:center;">
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:2rem;max-width:500px;width:90%;">
+        <h3 style="margin-bottom:1rem;">Create Award Event</h3>
+        <div class="form-group">
+            <label>Name</label>
+            <input type="text" id="new-event-name" class="form-input" placeholder="e.g. Season 5 Awards">
+        </div>
+        <div class="form-group">
+            <label>League</label>
+            <select id="new-event-league" class="form-input"></select>
+        </div>
+        <div class="form-group">
+            <label>Nomination Deadline (optional)</label>
+            <input type="datetime-local" id="new-event-nom-deadline" class="form-input">
+        </div>
+        <div class="form-group">
+            <label>Voting Deadline (optional)</label>
+            <input type="datetime-local" id="new-event-vote-deadline" class="form-input">
+        </div>
+        <div class="action-grid">
+            <button class="btn btn-primary" id="btn-save-event">Create</button>
+            <button class="btn btn-secondary" id="btn-cancel-event">Cancel</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const API_BASE = '/admin/api/awards';
+
+async function loadLeagues() {
+    try {
+        const r = await API.get('/admin/api/leagues');
+        return r.leagues || [];
+    } catch { return []; }
+}
+
+async function loadEvents() {
+    const tbody = document.getElementById('events-tbody');
+    try {
+        const r = await API.get(`${API_BASE}/events`);
+        tbody.innerHTML = (r.events || []).map(ev => `
+            <tr>
+                <td>${ev.id}</td>
+                <td><a href="/admin/awards/${ev.id}" style="color:var(--accent);">${ev.name}</a></td>
+                <td>${ev.league_name}</td>
+                <td><span class="status-badge status-${ev.status}">${ev.status}</span></td>
+                <td>${ev.category_count || 0}</td>
+                <td>${ev.nomination_count || 0}</td>
+                <td>${ev.created_at ? ev.created_at.split(' ')[0] : ''}</td>
+                <td><a href="/admin/awards/${ev.id}" class="btn btn-secondary" style="font-size:0.8rem;padding:0.3rem 0.6rem;">Manage</a></td>
+            </tr>
+        `).join('');
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="8" style="color:var(--danger);">${e.message}</td></tr>`;
+    }
+}
+
+async function loadTemplates() {
+    const tbody = document.getElementById('templates-tbody');
+    try {
+        const r = await API.get(`${API_BASE}/templates`);
+        tbody.innerHTML = (r.templates || []).map(t => `
+            <tr>
+                <td>${t.id}</td>
+                <td>${t.name}</td>
+                <td style="color:var(--text-secondary);">${t.description || '—'}</td>
+                <td><button class="btn btn-danger btn-del-tmpl" data-id="${t.id}" style="font-size:0.8rem;padding:0.2rem 0.5rem;">Delete</button></td>
+            </tr>
+        `).join('');
+        document.querySelectorAll('.btn-del-tmpl').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                if (!confirm('Delete this template?')) return;
+                try {
+                    await API.request('DELETE', `${API_BASE}/templates/${btn.dataset.id}`);
+                    API.toast('Deleted', 'success');
+                    loadTemplates();
+                } catch (e) { API.toast(e.message, 'error'); }
+            });
+        });
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="4" style="color:var(--danger);">${e.message}</td></tr>`;
+    }
+}
+
+document.getElementById('btn-create-event').addEventListener('click', async () => {
+    const modal = document.getElementById('create-event-modal');
+    const leagues = await loadLeagues();
+    const sel = document.getElementById('new-event-league');
+    sel.innerHTML = leagues.map(l => `<option value="${l.id}">${l.name} (${l.shortcode || '—'})</option>`).join('');
+    modal.style.display = 'flex';
+});
+
+document.getElementById('btn-cancel-event').addEventListener('click', () => {
+    document.getElementById('create-event-modal').style.display = 'none';
+});
+
+document.getElementById('btn-save-event').addEventListener('click', async () => {
+    const name = document.getElementById('new-event-name').value;
+    const leagueId = document.getElementById('new-event-league').value;
+    const nomDeadline = document.getElementById('new-event-nom-deadline').value;
+    const voteDeadline = document.getElementById('new-event-vote-deadline').value;
+    if (!name || !leagueId) { API.toast('Name and league required', 'warning'); return; }
+    try {
+        await API.post(`${API_BASE}/events`, {
+            name, league_id: parseInt(leagueId),
+            nomination_deadline: nomDeadline ? new Date(nomDeadline).toISOString() : null,
+            voting_deadline: voteDeadline ? new Date(voteDeadline).toISOString() : null,
+        });
+        API.toast('Event created', 'success');
+        document.getElementById('create-event-modal').style.display = 'none';
+        document.getElementById('new-event-name').value = '';
+        loadEvents();
+    } catch (e) { API.toast(e.message, 'error'); }
+});
+
+document.getElementById('btn-create-tmpl').addEventListener('click', async () => {
+    const name = document.getElementById('tmpl-name').value;
+    const desc = document.getElementById('tmpl-desc').value;
+    if (!name) { API.toast('Name required', 'warning'); return; }
+    try {
+        await API.post(`${API_BASE}/templates`, { name, description: desc });
+        API.toast('Template created', 'success');
+        document.getElementById('tmpl-name').value = '';
+        document.getElementById('tmpl-desc').value = '';
+        loadTemplates();
+    } catch (e) { API.toast(e.message, 'error'); }
+});
+
+loadEvents();
+loadTemplates();
+</script>
+{% endblock %}
