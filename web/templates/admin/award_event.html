@@ -64,6 +64,18 @@
         </div>
     </div>
 </div>
+
+<div id="fill-options-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:1000;align-items:center;justify-content:center;">
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:2rem;max-width:500px;width:90%;">
+        <h3 style="margin-bottom:0.5rem;">Edit Fill Options</h3>
+        <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:1rem;" id="fill-options-cat-name"></p>
+        <textarea id="fill-options-textarea" class="form-input" rows="8" style="width:100%;resize:vertical;font-family:monospace;"></textarea>
+        <div class="action-grid" style="margin-top:1rem;">
+            <button class="btn btn-primary" id="btn-save-fill-options">Save</button>
+            <button class="btn btn-secondary" id="btn-cancel-fill-options">Cancel</button>
+        </div>
+    </div>
+</div>
 {% endblock %}
 {% block scripts %}
 <script>
@@ -273,28 +285,39 @@ document.addEventListener('click', async (e) => {
     } catch (e) { API.toast(e.message, 'error'); }
 });
 
-// Admin Fill Options Editor
+// Admin Fill Options Editor (modal with textarea)
+let _fillCatId = null;
+
 document.addEventListener('click', async (e) => {
     const btn = e.target.closest('.btn-edit-fill');
     if (!btn) return;
-    const catId = btn.dataset.id;
+    _fillCatId = btn.dataset.id;
     const catNameEl = btn.closest('tr')?.querySelector('td:nth-child(2)');
-    const catName = catNameEl ? catNameEl.textContent : `Category #${catId}`;
+    const catName = catNameEl ? catNameEl.textContent : `Category #${_fillCatId}`;
+    document.getElementById('fill-options-cat-name').textContent = catName;
     try {
         const r = await API.get(`${API_BASE}/events/${EVENT_ID}/fill-options`);
         const currentOpts = (r.options || [])
-            .filter(o => o.category_id === parseInt(catId))
+            .filter(o => o.category_id === parseInt(_fillCatId))
             .map(o => o.option);
-        const text = prompt(
-            `Edit fill options for "${catName}"\nEnter one option per line:`,
-            currentOpts.join('\n')
-        );
-        if (text === null) return;
-        const options = text.split('\n').map(s => s.trim()).filter(s => s);
-        await API.request('PUT', `${API_BASE}/events/${EVENT_ID}/categories/${catId}/fill-options`, { options });
+        document.getElementById('fill-options-textarea').value = currentOpts.join('\n');
+        document.getElementById('fill-options-modal').style.display = 'flex';
+    } catch (e) { API.toast(e.message, 'error'); }
+});
+
+document.getElementById('btn-save-fill-options').addEventListener('click', async () => {
+    const text = document.getElementById('fill-options-textarea').value;
+    const options = text.split('\n').map(s => s.trim()).filter(s => s);
+    try {
+        await API.request('PUT', `${API_BASE}/events/${EVENT_ID}/categories/${_fillCatId}/fill-options`, { options });
         API.toast('Fill options updated', 'success');
+        document.getElementById('fill-options-modal').style.display = 'none';
         loadEvent();
     } catch (e) { API.toast(e.message, 'error'); }
+});
+
+document.getElementById('btn-cancel-fill-options').addEventListener('click', () => {
+    document.getElementById('fill-options-modal').style.display = 'none';
 });
 
 loadEvent();
