@@ -252,6 +252,7 @@ class VotePreferenceSelect(discord.ui.Select):
                 'category_id': view._category_id,
                 'team_id': view._team_id,
                 'division_id': division_id,
+                'submitted_by': interaction.user.id,
                 'status': 'accepted',
             })
             _db.award_votes.insert(data)
@@ -395,9 +396,13 @@ async def handle_vote_button(interaction: discord.Interaction, event_id: int, te
             nominees = fill_opts_by_cat.get(cat['id'], [])
         elif cat['fill_type'] == 'autofill_team':
             teams_in_div = _db.teams.get_by_division(division_id)
-            nominees = [t['team_name'] for t in teams_in_div]
+            nominees = [t['team_name'] for t in teams_in_div if t['team_id'] != team_id]
         else:
             nominees = _db.award_nominations.distinct_responses(event_id, cat['id'])
+            # Exclude the current team's own nomination so they can't self-vote
+            own_nom = _db.award_nominations.get_by_team_and_category(team_id, cat['id'])
+            if own_nom and own_nom.get('response') in nominees:
+                nominees = [n for n in nominees if n != own_nom['response']]
         nominees_by_cat[cat['id']] = nominees
 
     existing_votes = _db.award_votes.get_by_team_and_event(team_id, event_id)
