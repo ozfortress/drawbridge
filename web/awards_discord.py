@@ -172,7 +172,7 @@ async def handle_nominate_button(interaction: discord.Interaction, event_id: int
         await interaction.response.send_message('Nominations are not currently open for this event.', ephemeral=True)
         return
 
-    categories = _db.award_event_categories.get_by_event_and_fill_types(event_id, ['nomination', 'autofill_player'])
+    categories = _db.award_event_categories.get_by_event_and_fill_types(event_id, ['nomination'])
     if not categories:
         await interaction.response.send_message('No nomination categories configured.', ephemeral=True)
         return
@@ -342,7 +342,7 @@ async def handle_vote_button(interaction: discord.Interaction, event_id: int, te
                 'choice_3': ev.get('choice_3', ''),
             }
 
-    nom_cats = [c for c in categories if c['fill_type'] in ('nomination', 'autofill_player')]
+    nom_cats = [c for c in categories if c['fill_type'] == 'nomination']
     if nom_cats:
         has_noms = _db.award_nominations.has_team_submitted_all(
             team_id, event_id, [c['id'] for c in nom_cats]
