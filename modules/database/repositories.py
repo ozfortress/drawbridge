@@ -1273,6 +1273,16 @@ class TeamAvailabilityRepository(BaseRepository):
             })
         return True
 
+    def update(self, entry_id: int, data: Dict[str, Any]) -> bool:
+        existing = self.get_by_id(entry_id)
+        if not existing:
+            raise ValueError(f"Availability entry with ID {entry_id} not found")
+        merged = {**existing, **data}
+        return self._execute_query(
+            f"UPDATE {self.table} SET day_of_week = ?, time_slot = ? WHERE id = ?",
+            (merged['day_of_week'], merged['time_slot'], entry_id)
+        ) > 0
+
     def delete(self, entry_id: int) -> bool:
         return self._execute_query(f"DELETE FROM {self.table} WHERE id = ?", (entry_id,)) > 0
 
