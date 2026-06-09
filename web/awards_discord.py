@@ -75,34 +75,6 @@ class ContinueNominationView(View):
         await interaction.response.send_modal(modal)
 
 
-class ContinueVoteView(View):
-    """Transient view with a button to open the next voting page."""
-
-    def __init__(self, event_id: int, team_id: int, categories: list,
-                 current_index: int, division_id: int,
-                 existing_data: dict | None, nominees_by_cat: dict | None):
-        super().__init__(timeout=300)
-        self._event_id = event_id
-        self._team_id = team_id
-        self._categories = categories
-        self._current_index = current_index
-        self._division_id = division_id
-        self._existing_data = existing_data
-        self._nominees_by_cat = nominees_by_cat
-        total = len(categories)
-        btn = Button(label=f'Continue to Category {current_index + 1}/{total}',
-                     style=discord.ButtonStyle.primary)
-        btn.callback = self._callback
-        self.add_item(btn)
-
-    async def _callback(self, interaction: discord.Interaction):
-        modal = build_vote_modal(self._event_id, self._team_id,
-                                 self._categories, self._current_index,
-                                 self._division_id, self._existing_data,
-                                 self._nominees_by_cat)
-        await interaction.response.send_modal(modal)
-
-
 # ── Nomination Modals ─────────────────────────────────────────
 
 
@@ -220,7 +192,7 @@ async def _finalize_nominations(interaction: discord.Interaction, event_id: int,
     await interaction.response.send_message(msg, ephemeral=True)
 
 
-# ── Voting (Dropdowns) ─────────────────────────────────────────
+# ── Voting (Persistent per-category messages) ──────────────────
 
 
 def _nominees_to_options(nominees: list[str]) -> list[discord.SelectOption]:
@@ -232,185 +204,145 @@ def _nominees_to_options(nominees: list[str]) -> list[discord.SelectOption]:
 
 
 class VotePreferenceSelect(discord.ui.Select):
-    """A select that records one preference and advances to the next."""
+    """One of three preference selects on a category message."""
 
-    def __init__(self, placeholder: str, options: list[discord.SelectOption],
-                 pref_num: int, cat_name: str, color: discord.Color):
+    def __init__(self, pref_num: int, category_id: int, team_id: int,
+                 options: list[discord.SelectOption]):
         super().__init__(
-            placeholder=placeholder,
+            placeholder={1: '1st Preference…', 2: '2nd Preference…', 3: '3rd Preference…'}[pref_num],
             options=options,
             min_values=1, max_values=1,
-            custom_id=f'vp_{pref_num}',
+            custom_id=f'vsel_{category_id}_{team_id}_{pref_num}',
         )
         self._pref_num = pref_num
-        self._cat_name = cat_name
-        self._color = color
 
     async def callback(self, interaction: discord.Interaction):
         view: VoteCategoryView = self.view
         choice = self.values[0]
-        # Store choice
-        if self._pref_num == 1:
-            view._choice_1 = choice
-        elif self._pref_num == 2:
-            view._choice_2 = choice
-        elif self._pref_num == 3:
-            view._choice_3 = choice
-        await view._advance(interaction)
+
+        # Refresh state from DB so restart doesn't lose existing choices
+        from web.admin_panel import _db
+        db_vote = _db.award_votes.get_by_team_and_category(view._team_id, view._category_id)
+        if db_vote:
+            view._choice_1 = db_vote.get('choice_1', '') or ''
+            view._choice_2 = db_vote.get('choice_2', '') or ''
+            view._choice_3 = db_vote.get('choice_3', '') or ''
+
+        for p in (1, 2, 3):
+            if p != self._pref_num:
+                existing = getattr(view, f'_choice_{p}', '')
+                if existing == choice:
+                    await interaction.response.send_message(
+                        f'**{choice}** is already your {["", "1st", "2nd", "3rd"][p]} preference. Pick someone else.',
+                        ephemeral=True,
+                    )
+                    return
+
+        setattr(view, f'_choice_{self._pref_num}', choice)
+        embed = view._build_embed()
+        await interaction.response.edit_message(embed=embed, view=view)
 
 
 class VoteCategoryView(View):
-    """Collects 1st/2nd/3rd preferences for one category via sequential selects."""
+    """Persistent channel message per category with 3 selects + Save button."""
 
-    def __init__(self, event_id: int, team_id: int, division_id: int,
-                 cat: dict, nominees: list[str],
-                 existing: dict | None, color: discord.Color,
-                 cat_index: int, total_cats: int,
-                 all_categories: list[dict],
-                 categories_remaining: list[dict],
-                 nominees_by_cat: dict[int, list[str]],
-                 existing_data: dict):
-        super().__init__(timeout=300)
+    def __init__(self, event_id: int, team_id: int, cat_name: str,
+                 category_id: int, nominees: list[str],
+                 choice_1: str = '', choice_2: str = '', choice_3: str = ''):
+        super().__init__(timeout=None)
         self._event_id = event_id
         self._team_id = team_id
-        self._division_id = division_id
-        self._cat = cat
+        self._cat_name = cat_name
+        self._category_id = category_id
         self._nominees = nominees
-        self._existing = existing or {}
-        self._color = color
-        self._cat_index = cat_index
-        self._total_cats = total_cats
-        self._all_categories = all_categories
-        self._categories_remaining = categories_remaining
-        self._nominees_by_cat = nominees_by_cat
-        self._existing_data = existing_data
-        self._choice_1: str | None = None
-        self._choice_2: str | None = None
-        self._choice_3: str | None = None
+        self._choice_1 = choice_1
+        self._choice_2 = choice_2
+        self._choice_3 = choice_3
+        self._build_items()
 
-    def _remaining_options(self) -> list[discord.SelectOption]:
-        exclude = {self._choice_1, self._choice_2, self._choice_3}
-        remaining = [n for n in self._nominees if n not in exclude]
-        return _nominees_to_options(remaining)
+    def _build_items(self):
+        self.clear_items()
+        # For re-registration at startup, use a placeholder so Select isn't empty
+        opts = _nominees_to_options(self._nominees) if self._nominees else [discord.SelectOption(label='(placeholder)', value='')]
+        for pref in (1, 2, 3):
+            self.add_item(VotePreferenceSelect(pref, self._category_id, self._team_id, opts))
+        save = Button(label='💾 Save Votes', style=discord.ButtonStyle.success,
+                       custom_id=f'vsave_{self._category_id}_{self._team_id}')
+        save.callback = self._on_save
+        self.add_item(save)
 
-    def _embed(self, title: str, description: str) -> discord.Embed:
-        e = discord.Embed(title=title, description=description, color=self._color)
-        if self._choice_1:
-            e.add_field(name='1st Preference', value=self._choice_1, inline=False)
-        if self._choice_2:
-            e.add_field(name='2nd Preference', value=self._choice_2, inline=False)
-        if self._choice_3:
-            e.add_field(name='3rd Preference', value=self._choice_3, inline=False)
+    def _build_embed(self) -> discord.Embed:
+        e = discord.Embed(
+            title=f'🗳️ {self._cat_name}',
+            description='Select your **1st**, **2nd**, and **3rd** preference below, then click **Save Votes**.',
+            color=discord.Color.blue(),
+        )
+        e.add_field(name='1st Preference', value=self._choice_1 or '—', inline=True)
+        e.add_field(name='2nd Preference', value=self._choice_2 or '—', inline=True)
+        e.add_field(name='3rd Preference', value=self._choice_3 or '—', inline=True)
         return e
 
-    async def _send_initial(self, interaction: discord.Interaction, edit: bool = False):
-        cat = self._cat
-        desc = f'Category {self._cat_index + 1} of {self._total_cats}\nSelect your **1st Preference** from the dropdown below.'
-        embed = self._embed(f'🗳️ {cat["name"]}', desc)
-        options = _nominees_to_options(self._nominees)
-        select = VotePreferenceSelect('Choose 1st Preference…', options, 1, cat['name'], self._color)
-        self.clear_items()
-        self.add_item(select)
+    async def _on_save(self, interaction: discord.Interaction):
+        from web.admin_panel import _db, logger
 
-        if edit:
-            await interaction.response.edit_message(embed=embed, view=self)
-        else:
-            await interaction.response.send_message(embed=embed, view=self, ephemeral=True)
+        # Refresh state from DB (important after restart)
+        db_vote = _db.award_votes.get_by_team_and_category(self._team_id, self._category_id)
+        if db_vote:
+            self._choice_1 = db_vote.get('choice_1', '') or ''
+            self._choice_2 = db_vote.get('choice_2', '') or ''
+            self._choice_3 = db_vote.get('choice_3', '') or ''
 
-    async def _advance(self, interaction: discord.Interaction):
-        cat = self._cat
-        if not self._choice_2 and self._choice_1:
-            # Ask for 2nd
-            desc = f'Category {self._cat_index + 1} of {self._total_cats}\nYour 1st choice: **{self._choice_1}**\nSelect your **2nd Preference** from the remaining options.'
-            embed = self._embed(f'🗳️ {cat["name"]}', desc)
-            remaining = self._remaining_options()
-            if not remaining:
-                # No options left for 2nd/3rd — skip to confirm
-                self._choice_2 = ''
-                await self._show_confirm(interaction)
-                return
-            select = VotePreferenceSelect('Choose 2nd Preference…', remaining, 2, cat['name'], self._color)
+        if not self._choice_1:
+            await interaction.response.send_message('You must select a 1st Preference before saving.', ephemeral=True)
+            return
+
+        non_empty = [c for c in (self._choice_1, self._choice_2, self._choice_3) if c]
+        if len(set(non_empty)) != len(non_empty):
+            await interaction.response.send_message('All preferences must be different nominees.', ephemeral=True)
+            return
+
+        try:
+            existing = _db.award_votes.get_by_team_and_category(self._team_id, self._category_id)
+            if existing:
+                _db.award_votes.update(existing['id'], {
+                    'choice_1': self._choice_1,
+                    'choice_2': self._choice_2 or '',
+                    'choice_3': self._choice_3 or '',
+                    'status': 'accepted',
+                    'submitted_by': interaction.user.id,
+                })
+            else:
+                team = _db.teams.get_by_team_id(self._team_id)
+                division_id = team['division'] if team else 0
+                _db.award_votes.insert({
+                    'event_id': self._event_id,
+                    'category_id': self._category_id,
+                    'team_id': self._team_id,
+                    'division_id': division_id,
+                    'submitted_by': interaction.user.id,
+                    'choice_1': self._choice_1,
+                    'choice_2': self._choice_2 or '',
+                    'choice_3': self._choice_3 or '',
+                    'status': 'accepted',
+                })
+
             self.clear_items()
-            self.add_item(select)
-            await interaction.response.edit_message(embed=embed, view=self)
-
-        elif not self._choice_3 and self._choice_2 is not None:
-            # Ask for 3rd
-            desc = f'Category {self._cat_index + 1} of {self._total_cats}\n1st: **{self._choice_1}**\n2nd: **{self._choice_2}**\nSelect your **3rd Preference** from the remaining options.'
-            embed = self._embed(f'🗳️ {cat["name"]}', desc)
-            remaining = self._remaining_options()
-            if not remaining:
-                self._choice_3 = ''
-                await self._show_confirm(interaction)
-                return
-            select = VotePreferenceSelect('Choose 3rd Preference…', remaining, 3, cat['name'], self._color)
-            self.clear_items()
-            self.add_item(select)
-            await interaction.response.edit_message(embed=embed, view=self)
-
-        else:
-            await self._show_confirm(interaction)
-
-    async def _show_confirm(self, interaction: discord.Interaction):
-        desc = f'Category {self._cat_index + 1} of {self._total_cats}\nConfirm your votes or click **Change**.'
-        embed = self._embed(f'🗳️ {self._cat["name"]}', desc)
-        self.clear_items()
-        confirm = Button(label='✅ Confirm & Continue', style=discord.ButtonStyle.success, custom_id='vc_confirm')
-        change = Button(label='🔄 Change', style=discord.ButtonStyle.secondary, custom_id='vc_change')
-        confirm.callback = self._on_confirm
-        change.callback = self._on_change
-        self.add_item(confirm)
-        self.add_item(change)
-        await interaction.response.edit_message(embed=embed, view=self)
-
-    async def _on_confirm(self, interaction: discord.Interaction):
-        # Save to session
-        skey = _session_key(interaction.user.id, self._event_id)
-        if skey not in _sessions:
-            _sessions[skey] = {'event_id': self._event_id, 'team_id': self._team_id, 'votes': {}}
-        _sessions[skey]['votes'][self._cat['id']] = {
-            'choice_1': self._choice_1 or '',
-            'choice_2': self._choice_2 or '',
-            'choice_3': self._choice_3 or '',
-        }
-
-        remaining = self._categories_remaining
-        if remaining:
-            # Next category
-            next_cat = remaining[0]
-            rest = remaining[1:]
-            nominees = self._nominees_by_cat.get(next_cat['id'], [])
-            existing = self._existing_data.get(next_cat['id'], {})
-            idx = self._cat_index + 1
-            next_view = VoteCategoryView(
-                self._event_id, self._team_id, self._division_id,
-                next_cat, nominees, existing, self._color,
-                idx, self._total_cats, self._all_categories, rest,
-                self._nominees_by_cat, self._existing_data,
-            )
-            await next_view._send_initial(interaction, edit=True)
-        else:
-            # All done — finalize
-            saved = await _finalize_votes(self._event_id, self._team_id,
-                                          self._division_id,
-                                          self._all_categories,
-                                          _sessions[skey]['votes'])
-            _sessions.pop(skey, None)
-            embed = discord.Embed(
-                title='✅ Votes Submitted!',
-                description=f'({saved}/{self._total_cats} categories)',
+            done = discord.Embed(
+                title=f'✅ Votes Saved — {self._cat_name}',
                 color=discord.Color.green(),
             )
-            await interaction.response.edit_message(embed=embed, view=None)
+            done.add_field(name='1st', value=self._choice_1, inline=True)
+            done.add_field(name='2nd', value=self._choice_2 or '—', inline=True)
+            done.add_field(name='3rd', value=self._choice_3 or '—', inline=True)
+            await interaction.response.edit_message(embed=done, view=None)
 
-    async def _on_change(self, interaction: discord.Interaction):
-        self._choice_2 = None
-        self._choice_3 = None
-        await self._send_initial(interaction, edit=True)
+        except Exception as e:
+            logger.error(f'Failed to save vote: {e}')
+            await interaction.response.send_message('Failed to save. Please try again.', ephemeral=True)
 
 
 async def handle_vote_button(interaction: discord.Interaction, event_id: int, team_id: int):
-    """Handle the vote button click — start voting flow via dropdowns."""
+    """Handle the vote button click — send one channel message per category."""
     from web.admin_panel import _db
     event = _db.award_events.get_by_id(event_id) if _db else None
     if not event or event['status'] not in ('voting',):
@@ -442,14 +374,6 @@ async def handle_vote_button(interaction: discord.Interaction, event_id: int, te
         nominees_by_cat[cat['id']] = nominees
 
     existing_votes = _db.award_votes.get_by_team_and_event(team_id, event_id)
-    existing_data = {}
-    if existing_votes:
-        for ev in existing_votes:
-            existing_data[ev['category_id']] = {
-                'choice_1': ev.get('choice_1', ''),
-                'choice_2': ev.get('choice_2', ''),
-                'choice_3': ev.get('choice_3', ''),
-            }
 
     nom_cats = [c for c in categories if c['fill_type'] == 'nomination']
     if nom_cats:
@@ -463,56 +387,31 @@ async def handle_vote_button(interaction: discord.Interaction, event_id: int, te
             )
             return
 
-    first_cat = categories[0]
-    remaining = categories[1:]
-    nominees = nominees_by_cat.get(first_cat['id'], [])
-    existing = existing_data.get(first_cat['id'], {})
-    color = discord.Color.blue()
-    total = len(categories)
+    await interaction.response.defer(ephemeral=True)
 
-    view = VoteCategoryView(
-        event_id, team_id, division_id,
-        first_cat, nominees, existing, color,
-        0, total, categories, remaining,
-        nominees_by_cat, existing_data,
-    )
-    await view._send_initial(interaction, edit=False)
-
-
-async def _finalize_votes(event_id: int, team_id: int, division_id: int,
-                           categories: list, vote_data: dict) -> int:
-    """Save all votes to the database, returns (saved, total)."""
-    from web.admin_panel import _db, logger
-    saved = 0
+    sent = 0
     for cat in categories:
-        vd = vote_data.get(cat['id'], {})
-        choice_1 = vd.get('choice_1', '')
-        if not choice_1:
+        nominees = nominees_by_cat.get(cat['id'], [])
+        if not nominees:
             continue
-        try:
-            existing = _db.award_votes.get_by_team_and_category(team_id, cat['id'])
-            if existing:
-                _db.award_votes.update(existing['id'], {
-                    'choice_1': choice_1,
-                    'choice_2': vd.get('choice_2', ''),
-                    'choice_3': vd.get('choice_3', ''),
-                    'status': 'accepted',
-                })
-            else:
-                _db.award_votes.insert({
-                    'event_id': event_id,
-                    'category_id': cat['id'],
-                    'team_id': team_id,
-                    'division_id': division_id,
-                    'choice_1': choice_1,
-                    'choice_2': vd.get('choice_2', ''),
-                    'choice_3': vd.get('choice_3', ''),
-                    'status': 'accepted',
-                })
-            saved += 1
-        except Exception as e:
-            logger.error(f'Failed to save vote: {e}')
-    return saved
+
+        # Pre-fill from existing vote if any
+        c1 = c2 = c3 = ''
+        if existing_votes:
+            for ev in existing_votes:
+                if ev['category_id'] == cat['id']:
+                    c1 = ev.get('choice_1', '') or ''
+                    c2 = ev.get('choice_2', '') or ''
+                    c3 = ev.get('choice_3', '') or ''
+                    break
+
+        view = VoteCategoryView(event_id, team_id, cat['name'], cat['id'],
+                                nominees, c1, c2, c3)
+        embed = view._build_embed()
+        await interaction.channel.send(embed=embed, view=view)
+        sent += 1
+
+    await interaction.followup.send(f'📬 Posted {sent} category voting messages in {interaction.channel.mention}.')
 
 
 # ── Helper functions for sending messages ─────────────────────
@@ -586,3 +485,9 @@ def register_views(bot, db):
                     bot.add_view(AwardsNominationsView(event['id'], team['team_id']))
                 elif event['status'] == 'voting':
                     bot.add_view(AwardsVotesView(event['id'], team['team_id']))
+                    cats = db.award_event_categories.get_by_event(event['id'])
+                    for cat in cats:
+                        bot.add_view(VoteCategoryView(
+                            event['id'], team['team_id'],
+                            cat['name'], cat['id'], [],
+                        ))
