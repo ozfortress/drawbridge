@@ -2,40 +2,62 @@
 {% block title %}Submissions #{{ event_id }} - Drawbridge Admin{% endblock %}
 {% block extra_css %}
 <style>
-.submissions-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
-.submissions-table th, .submissions-table td {
+.team-card {
     border: 1px solid var(--border);
-    padding: 0.4rem 0.5rem;
+    border-radius: 8px;
+    margin-bottom: 0.75rem;
+    background: var(--bg-card);
+    overflow: hidden;
+}
+.team-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+.team-card-header:hover { background: var(--bg-input); }
+.team-card-header .team-name { font-weight: 600; font-size: 0.95rem; }
+.team-card-header .team-meta { font-size: 0.8rem; color: var(--text-secondary); display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+.team-card-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    padding: 1rem;
+}
+.team-card-body.open { display: block; }
+.submission-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.submission-table th, .submission-table td {
+    border: 1px solid var(--border);
+    padding: 0.4rem 0.6rem;
     text-align: left;
     vertical-align: top;
-    min-width: 120px;
-    max-width: 250px;
 }
-.submissions-table th { background: var(--bg-input); position: sticky; top: 0; z-index: 1; }
-.submissions-table th.team-header { writing-mode: sideways-lr; text-orientation: mixed; height: 80px; white-space: nowrap; }
-.submissions-table td { background: var(--bg-card); }
-.submissions-table td.invalidated { opacity: 0.5; background: #2a1a1a; }
-.submissions-table .cat-name { font-weight: 600; white-space: nowrap; min-width: 130px; }
-.submissions-table .fill-type-badge {
-    display: inline-block; font-size: 0.65rem; padding: 0.1rem 0.3rem;
-    border-radius: 3px; background: var(--bg-input); color: var(--text-secondary);
-    margin-left: 0.25rem;
-}
-.status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 0.3rem; }
-.status-dot.accepted { background: var(--success); }
-.status-dot.rejected { background: var(--danger); }
-.status-dot.pending { background: var(--warning); }
-.submission-cell { display: flex; flex-direction: column; gap: 0.25rem; }
-.submission-text { word-break: break-word; line-height: 1.3; }
-.submission-meta { font-size: 0.7rem; color: var(--text-secondary); }
-.btn-invalidate { font-size: 0.7rem; padding: 0.15rem 0.4rem; cursor: pointer; border: 1px solid var(--danger); background: transparent; color: var(--danger); border-radius: 3px; }
-.btn-invalidate:hover { background: var(--danger); color: #fff; }
+.submission-table th { background: var(--bg-input); }
+.entry-row { display: flex; flex-direction: column; gap: 0.15rem; }
+.entry-row .cat-name { font-weight: 600; color: var(--accent); }
+.entry-row .response-text { word-break: break-word; }
+.entry-row .vote-choices { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.entry-row .vote-choice { background: var(--bg-input); padding: 0.15rem 0.4rem; border-radius: 3px; font-size: 0.8rem; }
+.status-badge-sm { display: inline-block; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.7rem; font-weight: 600; }
+.status-badge-sm.accepted { background: #1a3a1a; color: #4caf50; }
+.status-badge-sm.rejected { background: #3a1a1a; color: #f44336; }
+.status-badge-sm.pending { background: #3a3a1a; color: #ff9800; }
+.submission-meta-grid { display: grid; grid-template-columns: auto 1fr; gap: 0.3rem 1rem; font-size: 0.8rem; margin-bottom: 1rem; }
+.submission-meta-grid .label { color: var(--text-secondary); }
+.invalidated-banner { background: #3a1a1a; border: 1px solid #f44336; border-radius: 4px; padding: 0.5rem 0.75rem; font-size: 0.8rem; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
 .tab-bar { display: flex; gap: 0; margin-bottom: 1rem; border-bottom: 2px solid var(--border); }
 .tab-btn { padding: 0.5rem 1.2rem; background: transparent; border: none; color: var(--text-secondary); cursor: pointer; font-size: 0.9rem; border-bottom: 2px solid transparent; margin-bottom: -2px; }
 .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
 .filter-bar { display: flex; gap: 0.75rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap; }
 .filter-bar label { font-size: 0.85rem; color: var(--text-secondary); }
-.table-wrapper-sub { overflow-x: auto; max-height: 70vh; }
+.expand-icon { font-size: 0.7rem; color: var(--text-secondary); transition: transform 0.2s; }
+.expand-icon.open { transform: rotate(90deg); }
+#invalidate-modal {
+    display:none;position:fixed;top:0;left:0;right:0;bottom:0;
+    background:rgba(0,0,0,0.6);z-index:1000;align-items:center;justify-content:center;
+}
 </style>
 {% endblock %}
 {% block content %}
@@ -54,20 +76,18 @@
     <select id="division-filter" class="form-input" style="width:auto;font-size:0.85rem;">
         <option value="">All Divisions</option>
     </select>
-    <label>Category:</label>
-    <select id="category-filter" class="form-input" style="width:auto;font-size:0.85rem;">
-        <option value="">All Categories</option>
-    </select>
     <span id="summary-count" style="font-size:0.85rem;color:var(--text-secondary);margin-left:auto;"></span>
 </div>
 
-<div id="submissions-container" class="table-wrapper-sub"></div>
+<div id="submissions-container"></div>
 
 <!-- Invalidation reason modal -->
-<div id="invalidate-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:1000;align-items:center;justify-content:center;">
+<div id="invalidate-modal">
     <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:2rem;max-width:450px;width:90%;">
-        <h3 id="invalidate-title" style="margin-bottom:0.5rem;">Invalidate Submission</h3>
-        <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:1rem;" id="invalidate-desc"></p>
+        <h3 style="margin-bottom:0.5rem;">Invalidate Submission</h3>
+        <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:0.25rem;" id="invalidate-cat-name"></p>
+        <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:1rem;" id="invalidate-team-name"></p>
+        <div id="invalidate-current-value" style="background:var(--bg-input);padding:0.5rem;border-radius:4px;font-size:0.85rem;margin-bottom:1rem;word-break:break-word;"></div>
         <textarea id="invalidate-reason" class="form-input" rows="3" style="width:100%;" placeholder="Reason for invalidation..."></textarea>
         <div class="action-grid" style="margin-top:1rem;">
             <button class="btn btn-danger" id="btn-confirm-invalidate">Invalidate</button>
@@ -83,18 +103,18 @@ const API_BASE = '/admin/api/awards';
 let _currentTab = 'nominations';
 let _currentData = { nominations: [], votes: [], categories: [], teams: [] };
 let _invalidateTarget = null;
-let _divisions = [];
 
 async function loadEvent() {
     try {
         const ev = await API.get(`${API_BASE}/events/${EVENT_ID}`);
         document.getElementById('page-title').textContent = `Submissions — ${ev.name}`;
         _currentData.categories = ev.categories || [];
-        _currentData.teams = [];
         const divFilter = document.getElementById('division-filter');
-        _divisions = ev.divisions || [];
-        divFilter.innerHTML = '<option value="">All Divisions</option>' +
-            _divisions.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+        (ev.divisions || []).forEach(d => {
+            const opt = document.createElement('option');
+            opt.value = d.id; opt.textContent = d.name;
+            divFilter.appendChild(opt);
+        });
         return ev;
     } catch (e) {
         document.getElementById('submissions-container').innerHTML =
@@ -110,100 +130,163 @@ async function loadTab(tab) {
         const key = tab === 'nominations' ? 'nominations' : 'votes';
         const r = await API.get(`${API_BASE}/events/${EVENT_ID}/${key}`);
         _currentData[key] = r[key] || [];
-        renderSubmissions();
+        renderTeams();
     } catch (e) {
         document.getElementById('submissions-container').innerHTML =
             `<div class="result-box result-error">${e.message}</div>`;
     }
 }
 
-function renderSubmissions() {
+function renderTeams() {
     const divId = document.getElementById('division-filter').value;
-    const catId = document.getElementById('category-filter').value;
     const tab = _currentTab;
-    const data = tab === 'nominations' ? _currentData.nominations : _currentData.votes;
-    const categories = _currentData.categories.filter(c => c.fill_type === 'nomination' || tab === 'votes');
-
-    // Build team-category matrix
-    const teamsMap = {};
-    data.forEach(d => { teamsMap[d.team_id] = d.team_name; });
-    const teamIds = Object.keys(teamsMap).map(Number).sort((a, b) => a - b);
-
-    // Filter by division
-    let filteredData = data;
-    if (divId) {
-        filteredData = filteredData.filter(d => d.division_id === parseInt(divId));
-    }
-    if (catId) {
-        filteredData = filteredData.filter(d => d.category_id === parseInt(catId));
-    }
-
-    // Get unique teams from filtered data
-    const filteredTeamIds = [...new Set(filteredData.map(d => d.team_id))].sort((a, b) => a - b);
-    const visibleCategories = categories.filter(c =>
-        !catId || c.id === parseInt(catId)
+    const data = _currentData[tab];
+    const categories = _currentData.categories.filter(c =>
+        c.fill_type === 'nomination' || tab === 'votes'
     );
+    const catMap = {};
+    categories.forEach(c => { catMap[c.id] = c; });
 
-    document.getElementById('summary-count').textContent =
-        `${filteredTeamIds.length} teams × ${visibleCategories.length} categories`;
+    // Group submissions by team
+    const teamGroups = {};
+    data.forEach(d => {
+        const tid = d.team_id;
+        if (!teamGroups[tid]) {
+            teamGroups[tid] = {
+                team_id: tid,
+                team_name: d.team_name || `Team ${tid}`,
+                division_name: d.division_name || '',
+                division_id: d.division_id,
+                submissions: [],
+            };
+        }
+        teamGroups[tid].submissions.push(d);
+    });
 
-    if (!visibleCategories.length || !filteredTeamIds.length) {
+    // If division filter active, also fetch all teams to show which teams exist but haven't submitted
+    // For now, only show teams that have submitted
+
+    let teams = Object.values(teamGroups);
+    if (divId) teams = teams.filter(t => t.division_id === parseInt(divId));
+
+    // Sort by team name
+    teams.sort((a, b) => a.team_name.localeCompare(b.team_name));
+
+    document.getElementById('summary-count').textContent = `${teams.length} teams`;
+
+    if (!teams.length) {
         document.getElementById('submissions-container').innerHTML =
-            '<p style="color:var(--text-secondary);text-align:center;padding:2rem;">No data to display.</p>';
+            '<p style="color:var(--text-secondary);text-align:center;padding:2rem;">No submissions yet.</p>';
         return;
     }
 
-    // Build lookup: cat_id + team_id -> submission
-    const lookup = {};
-    filteredData.forEach(d => {
-        const key = `${d.category_id}:${d.team_id}`;
-        lookup[key] = d;
+    let html = '';
+    teams.forEach((team, idx) => {
+        const isRejected = team.submissions.some(s => s.status === 'rejected');
+        html += `<div class="team-card" data-team-id="${team.team_id}">`;
+        html += `<div class="team-card-header" onclick="toggleTeam(${team.team_id})">`;
+        html += `<div style="display:flex;align-items:center;gap:0.5rem;">`;
+        html += `<span class="expand-icon" id="expand-${team.team_id}">▶</span>`;
+        html += `<span class="team-name">${escHtml(team.team_name)}</span>`;
+        if (isRejected) html += `<span class="status-badge-sm rejected">Has Invalidated</span>`;
+        html += `</div>`;
+        html += `<div class="team-meta">`;
+        html += `<span>${escHtml(team.division_name || `Div ${team.division_id}`)}</span>`;
+        html += `<span>${team.submissions.length}/${categories.length} categories</span>`;
+        html += `<span>${team.submissions.filter(s => s.status === 'accepted').length} accepted</span>`;
+        html += `</div></div>`;
+
+        html += `<div class="team-card-body" id="body-${team.team_id}">`;
+        html += renderTeamDetails(team, categories, catMap, tab);
+        html += `</div></div>`;
     });
 
-    let html = '<table class="submissions-table"><thead><tr><th>Category</th>';
-    filteredTeamIds.forEach(tid => {
-        html += `<th class="team-header">${teamsMap[tid] || `Team ${tid}`}</th>`;
+    document.getElementById('submissions-container').innerHTML = html;
+}
+
+function renderTeamDetails(team, categories, catMap, tab) {
+    const subMap = {};
+    team.submissions.forEach(s => { subMap[s.category_id] = s; });
+
+    // Metadata from first submission
+    const first = team.submissions[0] || {};
+    const submittedBy = first.submitted_by || '';
+    const createdAt = first.created_at || '';
+
+    let html = '<div class="submission-meta-grid">';
+    html += `<span class="label">Submitted by:</span><span>${escHtml(submittedBy)}</span>`;
+    if (createdAt) {
+        html += `<span class="label">Submitted at:</span><span>${escHtml(createdAt)}</span>`;
+    }
+    html += '</div>';
+
+    // Show invalidated banners if any
+    team.submissions.filter(s => s.status === 'rejected').forEach(s => {
+        const cat = catMap[s.category_id] || {};
+        html += `<div class="invalidated-banner">`;
+        html += `<span><strong>${escHtml(cat.name || `Category ${s.category_id}`)}</strong> — Invalidated: ${escHtml(s.invalidation_reason || 'No reason given')}</span>`;
+        html += `</div>`;
     });
+
+    // Submission table
+    html += '<table class="submission-table"><thead><tr>';
+    if (tab === 'nominations') {
+        html += '<th style="width:30%;">Category</th><th>Response</th><th style="width:80px;">Status</th><th style="width:90px;"></th>';
+    } else {
+        html += '<th style="width:30%;">Category</th><th>Votes</th><th style="width:80px;">Status</th><th style="width:90px;"></th>';
+    }
     html += '</tr></thead><tbody>';
 
-    visibleCategories.forEach(cat => {
-        html += `<tr><td class="cat-name">${cat.name}<span class="fill-type-badge">${cat.fill_type}</span></td>`;
-        filteredTeamIds.forEach(tid => {
-            const key = `${cat.id}:${tid}`;
-            const entry = lookup[key];
-            if (entry) {
-                const isRejected = entry.status === 'rejected';
-                html += `<td class="${isRejected ? 'invalidated' : ''}"><div class="submission-cell">`;
-                if (tab === 'nominations') {
-                    html += `<span class="submission-text">${escHtml(entry.response)}</span>`;
-                } else {
-                    const parts = [entry.choice_1];
-                    if (entry.choice_2) parts.push(`2nd: ${entry.choice_2}`);
-                    if (entry.choice_3) parts.push(`3rd: ${entry.choice_3}`);
-                    html += `<span class="submission-text">${escHtml(parts.join('<br>'))}</span>`;
-                }
-                html += `<span class="submission-meta"><span class="status-dot ${entry.status}"></span>${entry.status}`;
-                if (entry.invalidation_reason) html += ` — ${escHtml(entry.invalidation_reason)}`;
-                html += '</span>';
-                if (!isRejected) {
-                    const endpoint = tab === 'nominations' ? 'nominations' : 'votes';
-                    html += `<button class="btn-invalidate" data-endpoint="${endpoint}" data-id="${entry.id}" data-team="${escHtml(teamsMap[tid] || tid)}" data-cat="${escHtml(cat.name)}">✕ Invalidate</button>`;
-                }
-                html += '</div></td>';
+    categories.forEach(cat => {
+        const sub = subMap[cat.id];
+        html += '<tr>';
+        html += `<td><span class="cat-name">${escHtml(cat.name)}</span></td>`;
+        if (sub) {
+            if (tab === 'nominations') {
+                html += `<td><div class="response-text">${escHtml(sub.response)}</div></td>`;
             } else {
-                html += '<td style="color:var(--text-secondary);font-size:0.75rem;text-align:center;">—</td>';
+                const choices = [sub.choice_1];
+                if (sub.choice_2) choices.push(`2nd: ${sub.choice_2}`);
+                if (sub.choice_3) choices.push(`3rd: ${sub.choice_3}`);
+                html += `<td><div class="vote-choices">${choices.map(c => `<span class="vote-choice">${escHtml(c)}</span>`).join('')}</div></td>`;
             }
-        });
+            html += `<td><span class="status-badge-sm ${sub.status}">${sub.status}</span></td>`;
+            if (sub.status !== 'rejected') {
+                const ep = tab === 'nominations' ? 'nominations' : 'votes';
+                const displayVal = tab === 'nominations' ? sub.response : `${sub.choice_1} / ${sub.choice_2 || '—'} / ${sub.choice_3 || '—'}`;
+                html += `<td><button class="btn btn-danger" style="font-size:0.75rem;padding:0.15rem 0.5rem;" onclick="openInvalidate('${ep}', ${sub.id}, '${escHtml(cat.name)}', '${escHtml(team.team_name)}', \`${escHtml(displayVal)}\`)">Invalidate</button></td>`;
+            } else {
+                html += '<td></td>';
+            }
+        } else {
+            html += `<td colspan="3" style="color:var(--text-secondary);font-size:0.8rem;text-align:center;">Not submitted</td>`;
+        }
         html += '</tr>';
     });
 
     html += '</tbody></table>';
-    document.getElementById('submissions-container').innerHTML = html;
+    return html;
+}
+
+function toggleTeam(teamId) {
+    const body = document.getElementById(`body-${teamId}`);
+    const icon = document.getElementById(`expand-${teamId}`);
+    const isOpen = body.classList.toggle('open');
+    icon.classList.toggle('open', isOpen);
+}
+
+function openInvalidate(endpoint, id, catName, teamName, currentValue) {
+    _invalidateTarget = { endpoint, id };
+    document.getElementById('invalidate-cat-name').textContent = `Category: ${catName}`;
+    document.getElementById('invalidate-team-name').textContent = `Team: ${teamName}`;
+    document.getElementById('invalidate-current-value').textContent = `Current: ${currentValue}`;
+    document.getElementById('invalidate-reason').value = '';
+    document.getElementById('invalidate-modal').style.display = 'flex';
 }
 
 function escHtml(s) {
     if (!s) return '';
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/`/g,'&#96;');
 }
 
 // ── Tab switching ──
@@ -211,37 +294,9 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => loadTab(btn.dataset.tab));
 });
 
-// ── Filter change ──
-document.getElementById('division-filter').addEventListener('change', renderSubmissions);
-document.getElementById('category-filter').addEventListener('change', renderSubmissions);
+document.getElementById('division-filter').addEventListener('change', renderTeams);
 
-// Also populate category filter when categories load
-async function initCategories() {
-    const ev = await loadEvent();
-    const catFilter = document.getElementById('category-filter');
-    (ev.categories || []).forEach(c => {
-        const opt = document.createElement('option');
-        opt.value = c.id;
-        opt.textContent = c.name;
-        catFilter.appendChild(opt);
-    });
-}
-
-// ── Invalidation flow ──
-document.getElementById('submissions-container').addEventListener('click', (e) => {
-    const btn = e.target.closest('.btn-invalidate');
-    if (!btn) return;
-    const endpoint = btn.dataset.endpoint;
-    const id = btn.dataset.id;
-    const team = btn.dataset.team;
-    const cat = btn.dataset.cat;
-    _invalidateTarget = { endpoint, id };
-    document.getElementById('invalidate-title').textContent = `Invalidate — ${cat}`;
-    document.getElementById('invalidate-desc').textContent = `Team: ${team}`;
-    document.getElementById('invalidate-reason').value = '';
-    document.getElementById('invalidate-modal').style.display = 'flex';
-});
-
+// ── Invalidation ──
 document.getElementById('btn-confirm-invalidate').addEventListener('click', async () => {
     if (!_invalidateTarget) return;
     const reason = document.getElementById('invalidate-reason').value.trim();
@@ -262,6 +317,6 @@ document.getElementById('btn-cancel-invalidate').addEventListener('click', () =>
 });
 
 // ── Init ──
-initCategories().then(() => loadTab('nominations'));
+loadEvent().then(() => loadTab('nominations'));
 </script>
 {% endblock %}
