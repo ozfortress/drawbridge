@@ -1531,6 +1531,21 @@ async def api_award_categories_delete(event_id: int, cat_id: int):
 # ── Awards API: Nominations & Votes ──────────────────────────
 
 
+def _enrich_nomination(n, db):
+    cat = db.award_event_categories.get_by_id(n['category_id'])
+    team = db.teams.get_by_team_id(n['team_id'])
+    div_name = ''
+    if team:
+        div = db.divisions.get_by_id(team['division'])
+        div_name = div['division_name'] if div else ''
+    return {
+        **n,
+        'category_name': cat['name'] if cat else f"Category {n['category_id']}",
+        'team_name': team['team_name'] if team else f"Team {n['team_id']}",
+        'division_name': div_name,
+    }
+
+
 @admin_bp.route('/api/awards/events/<int:event_id>/nominations')
 @require_admin
 async def api_award_nominations_list(event_id: int):
@@ -1538,15 +1553,7 @@ async def api_award_nominations_list(event_id: int):
         return jsonify({'error': 'Database not ready'}), 503
     try:
         noms = _db.award_nominations.get_by_event(event_id)
-        enriched = []
-        for n in noms:
-            cat = _db.award_event_categories.get_by_id(n['category_id'])
-            team = _db.teams.get_by_team_id(n['team_id'])
-            enriched.append({
-                **n,
-                'category_name': cat['name'] if cat else f"Category {n['category_id']}",
-                'team_name': team['team_name'] if team else f"Team {n['team_id']}",
-            })
+        enriched = [_enrich_nomination(n, _db) for n in noms]
         return jsonify({'nominations': enriched})
     except Exception as e:
         logger.error(f'Award nominations list error: {e}')
@@ -1581,6 +1588,21 @@ async def api_award_nominations_invalidate(event_id: int, nom_id: int):
         return _db_error(e)
 
 
+def _enrich_vote(v, db):
+    cat = db.award_event_categories.get_by_id(v['category_id'])
+    team = db.teams.get_by_team_id(v['team_id'])
+    div_name = ''
+    if team:
+        div = db.divisions.get_by_id(team['division'])
+        div_name = div['division_name'] if div else ''
+    return {
+        **v,
+        'category_name': cat['name'] if cat else f"Category {v['category_id']}",
+        'team_name': team['team_name'] if team else f"Team {v['team_id']}",
+        'division_name': div_name,
+    }
+
+
 @admin_bp.route('/api/awards/events/<int:event_id>/votes')
 @require_admin
 async def api_award_votes_list(event_id: int):
@@ -1588,15 +1610,7 @@ async def api_award_votes_list(event_id: int):
         return jsonify({'error': 'Database not ready'}), 503
     try:
         votes = _db.award_votes.get_by_event(event_id)
-        enriched = []
-        for v in votes:
-            cat = _db.award_event_categories.get_by_id(v['category_id'])
-            team = _db.teams.get_by_team_id(v['team_id'])
-            enriched.append({
-                **v,
-                'category_name': cat['name'] if cat else f"Category {v['category_id']}",
-                'team_name': team['team_name'] if team else f"Team {v['team_id']}",
-            })
+        enriched = [_enrich_vote(v, _db) for v in votes]
         return jsonify({'votes': enriched})
     except Exception as e:
         logger.error(f'Award votes list error: {e}')
@@ -1628,6 +1642,68 @@ async def api_award_votes_invalidate(event_id: int, vote_id: int):
         return jsonify({'success': True})
     except Exception as e:
         logger.error(f'Award vote invalidate error: {e}')
+        return _db_error(e)
+
+
+@admin_bp.route('/api/awards/events/<int:event_id>/nominations/invalidate-team/<int:team_id>', methods=['POST'])
+@require_admin
+async def api_award_nominations_invalidate_team(event_id: int, team_id: int):
+    if not _db:
+        return jsonify({'error': 'Database not ready'}), 503
+    data = await request.get_json()
+    reason = data.get('reason', '') if data else ''
+    session_user = get_session_user()
+    try:
+        noms = _db.award_nominations.get_by_team_and_event(team_id, event_id)
+        if not noms:
+            return jsonify({'error': 'No nominations found for this team'}), 404
+        count = 0
+        for nom in noms:
+            _db.award_nominations.set_status(nom['id'], 'rejected', session_user['sub'], reason)
+            _db.award_nomination_audit_log.insert({
+                'nomination_id': nom['id'],
+                'action': 'invalidate',
+                'admin_user_id': session_user['sub'],
+                'admin_username': session_user.get('username', ''),
+                'old_value': nom.get('response', ''),
+                'new_value': '',
+                'reason': reason,
+            })
+            count += 1
+        return jsonify({'success': True, 'invalidated': count})
+    except Exception as e:
+        logger.error(f'Award nominations invalidate team error: {e}')
+        return _db_error(e)
+
+
+@admin_bp.route('/api/awards/events/<int:event_id>/votes/invalidate-team/<int:team_id>', methods=['POST'])
+@require_admin
+async def api_award_votes_invalidate_team(event_id: int, team_id: int):
+    if not _db:
+        return jsonify({'error': 'Database not ready'}), 503
+    data = await request.get_json()
+    reason = data.get('reason', '') if data else ''
+    session_user = get_session_user()
+    try:
+        votes = _db.award_votes.get_by_team_and_event(team_id, event_id)
+        if not votes:
+            return jsonify({'error': 'No votes found for this team'}), 404
+        count = 0
+        for vote in votes:
+            _db.award_votes.set_status(vote['id'], 'rejected', session_user['sub'], reason)
+            _db.award_vote_audit_log.insert({
+                'vote_id': vote['id'],
+                'action': 'invalidate',
+                'admin_user_id': session_user['sub'],
+                'admin_username': session_user.get('username', ''),
+                'old_value': f"{vote.get('choice_1', '')} / {vote.get('choice_2', '')} / {vote.get('choice_3', '')}",
+                'new_value': '',
+                'reason': reason,
+            })
+            count += 1
+        return jsonify({'success': True, 'invalidated': count})
+    except Exception as e:
+        logger.error(f'Award votes invalidate team error: {e}')
         return _db_error(e)
 
 
