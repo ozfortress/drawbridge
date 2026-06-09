@@ -62,7 +62,11 @@
 
     <div class="card">
         <h2>Results</h2>
-        <div id="results-container" class="table-wrapper">
+        <div id="results-div-filter" style="margin-bottom:1rem;display:none;">
+            <label style="font-size:0.85rem;color:var(--text-secondary);margin-right:0.5rem;">Division:</label>
+            <select id="results-div-select" class="form-input" style="width:auto;min-width:180px;"></select>
+        </div>
+        <div id="results-container">
             <p style="color:var(--text-secondary);">Calculate results to see them here.</p>
         </div>
     </div>
@@ -159,37 +163,64 @@ function renderEvent(ev) {
 
 async function loadResults() {
     const container = document.getElementById('results-container');
+    const filterDiv = document.getElementById('results-div-filter');
+    const select = document.getElementById('results-div-select');
     try {
         const r = await API.get(`${API_BASE}/events/${EVENT_ID}/results`);
         if (!r.results || !r.results.length) {
+            filterDiv.style.display = 'none';
             container.innerHTML = '<p style="color:var(--text-secondary);">No results yet. Calculate to generate them.</p>';
             return;
         }
-        // Group by category and division
-        const groups = {};
-        r.results.forEach(res => {
-            const key = `${res.category_name}||${res.division_name}`;
-            if (!groups[key]) groups[key] = { category: res.category_name, division: res.division_name, entries: [] };
-            groups[key].entries.push(res);
-        });
-        container.innerHTML = Object.values(groups).map(g => `
-            <div style="margin-bottom:1rem;">
-                <h3 style="font-size:0.9rem;color:var(--accent);">${g.category} — ${g.division}</h3>
-                <table class="data-table" style="font-size:0.85rem;">
-                    <thead><tr><th>Place</th><th>Entry</th><th>Points</th></tr></thead>
-                    <tbody>
-                        ${g.entries.sort((a, b) => a.placement - b.placement).map(e => `
-                            <tr>
-                                <td>${e.placement === 1 ? '🥇' : e.placement === 2 ? '🥈' : e.placement === 3 ? '🥉' : '#' + e.placement}</td>
-                                <td>${e.entry}</td>
-                                <td>${e.points}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
-        `).join('');
+
+        // Collect unique divisions
+        const divs = [...new Set(r.results.map(res => res.division_name))].sort();
+
+        // Build dropdown
+        select.innerHTML = divs.map(d => `<option value="${d}">${d}</option>`).join('');
+        filterDiv.style.display = 'block';
+
+        function renderResults(divisionName) {
+            // Group by category for the selected division
+            const catGroups = {};
+            r.results.filter(res => res.division_name === divisionName).forEach(res => {
+                if (!catGroups[res.category_name]) catGroups[res.category_name] = [];
+                catGroups[res.category_name].push(res);
+            });
+            const catNames = Object.keys(catGroups).sort();
+
+            if (!catNames.length) {
+                container.innerHTML = '<p style="color:var(--text-secondary);">No results for this division.</p>';
+                return;
+            }
+
+            // 3-column grid
+            container.innerHTML = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;">' +
+                catNames.map(cat => `
+                    <div style="border:1px solid var(--border);border-radius:8px;padding:0.75rem;background:var(--bg-card);">
+                        <h3 style="font-size:0.9rem;color:var(--accent);margin-bottom:0.5rem;text-align:center;">${cat}</h3>
+                        <table class="data-table" style="font-size:0.8rem;width:100%;">
+                            <thead><tr><th>#</th><th>Entry</th><th>Pts</th></tr></thead>
+                            <tbody>
+                                ${catGroups[cat].sort((a, b) => a.placement - b.placement).map(e => `
+                                    <tr>
+                                        <td>${e.placement === 1 ? '🥇' : e.placement === 2 ? '🥈' : e.placement === 3 ? '🥉' : '#' + e.placement}</td>
+                                        <td>${e.entry}</td>
+                                        <td>${e.points}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `).join('') +
+            '</div>';
+        }
+
+        // Initial render + listen for changes
+        renderResults(select.value);
+        select.onchange = () => renderResults(select.value);
     } catch (e) {
+        filterDiv.style.display = 'none';
         container.innerHTML = `<p style="color:var(--danger);">${e.message}</p>`;
     }
 }
