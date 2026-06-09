@@ -1531,18 +1531,37 @@ async def api_award_categories_delete(event_id: int, cat_id: int):
 # ── Awards API: Nominations & Votes ──────────────────────────
 
 
-def _enrich_nomination(n, db):
+_username_cache: dict[int, str] = {}
+
+
+async def _resolve_username(user_id: int) -> str:
+    if user_id in _username_cache:
+        return _username_cache[user_id]
+    try:
+        if _bot:
+            user = await _bot.fetch_user(user_id)
+            name = str(user)
+            _username_cache[user_id] = name
+            return name
+    except Exception:
+        pass
+    return str(user_id)
+
+
+async def _enrich_nomination(n, db):
     cat = db.award_event_categories.get_by_id(n['category_id'])
     team = db.teams.get_by_team_id(n['team_id'])
     div_name = ''
     if team:
         div = db.divisions.get_by_id(team['division'])
         div_name = div['division_name'] if div else ''
+    username = await _resolve_username(n['submitted_by'])
     return {
         **n,
         'category_name': cat['name'] if cat else f"Category {n['category_id']}",
         'team_name': team['team_name'] if team else f"Team {n['team_id']}",
         'division_name': div_name,
+        'submitted_by_name': username,
     }
 
 
@@ -1553,7 +1572,7 @@ async def api_award_nominations_list(event_id: int):
         return jsonify({'error': 'Database not ready'}), 503
     try:
         noms = _db.award_nominations.get_by_event(event_id)
-        enriched = [_enrich_nomination(n, _db) for n in noms]
+        enriched = [await _enrich_nomination(n, _db) for n in noms]
         return jsonify({'nominations': enriched})
     except Exception as e:
         logger.error(f'Award nominations list error: {e}')
@@ -1588,18 +1607,20 @@ async def api_award_nominations_invalidate(event_id: int, nom_id: int):
         return _db_error(e)
 
 
-def _enrich_vote(v, db):
+async def _enrich_vote(v, db):
     cat = db.award_event_categories.get_by_id(v['category_id'])
     team = db.teams.get_by_team_id(v['team_id'])
     div_name = ''
     if team:
         div = db.divisions.get_by_id(team['division'])
         div_name = div['division_name'] if div else ''
+    username = await _resolve_username(v['submitted_by'])
     return {
         **v,
         'category_name': cat['name'] if cat else f"Category {v['category_id']}",
         'team_name': team['team_name'] if team else f"Team {v['team_id']}",
         'division_name': div_name,
+        'submitted_by_name': username,
     }
 
 
@@ -1610,7 +1631,7 @@ async def api_award_votes_list(event_id: int):
         return jsonify({'error': 'Database not ready'}), 503
     try:
         votes = _db.award_votes.get_by_event(event_id)
-        enriched = [_enrich_vote(v, _db) for v in votes]
+        enriched = [await _enrich_vote(v, _db) for v in votes]
         return jsonify({'votes': enriched})
     except Exception as e:
         logger.error(f'Award votes list error: {e}')
