@@ -1,6 +1,6 @@
 {% extends "admin/layout.html" %}
 {% block title %}Submissions #{{ event_id }} - Drawbridge Admin{% endblock %}
-{% block extra_css %}
+{% block content %}
 <style>
 /* ── Table ── */
 .submissions-table {
@@ -158,8 +158,6 @@
     justify-content: center;
 }
 </style>
-{% endblock %}
-{% block content %}
 <div class="page-header">
     <a href="/admin/awards/{{ event_id }}" style="color:var(--text-secondary);font-size:0.85rem;text-decoration:none;">← Award Event</a>
     <h1 style="margin-top:0.25rem;" id="page-title">Submissions</h1>
