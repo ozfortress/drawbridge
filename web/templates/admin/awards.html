@@ -49,6 +49,12 @@
             <select id="new-event-league" class="form-input"></select>
         </div>
         <div class="form-group">
+            <label>Template (optional)</label>
+            <select id="new-event-template" class="form-input">
+                <option value="">— No template —</option>
+            </select>
+        </div>
+        <div class="form-group">
             <label>Nomination Deadline (optional)</label>
             <input type="datetime-local" id="new-event-nom-deadline" class="form-input">
         </div>
@@ -102,7 +108,7 @@ async function loadTemplates() {
         tbody.innerHTML = (r.templates || []).map(t => `
             <tr>
                 <td>${t.id}</td>
-                <td>${t.name}</td>
+                <td><a href="/admin/awards/templates/${t.id}" style="color:var(--accent);">${t.name}</a></td>
                 <td style="color:var(--text-secondary);">${t.description || '—'}</td>
                 <td><button class="btn btn-danger btn-del-tmpl" data-id="${t.id}" style="font-size:0.8rem;padding:0.2rem 0.5rem;">Delete</button></td>
             </tr>
@@ -127,6 +133,12 @@ document.getElementById('btn-create-event').addEventListener('click', async () =
     const leagues = await loadLeagues();
     const sel = document.getElementById('new-event-league');
     sel.innerHTML = leagues.map(l => `<option value="${l.id}">${l.name} (${l.shortcode || '—'})</option>`).join('');
+    const tmplSel = document.getElementById('new-event-template');
+    try {
+        const r = await API.get(`${API_BASE}/templates`);
+        tmplSel.innerHTML = '<option value="">— No template —</option>' +
+            (r.templates || []).map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+    } catch { tmplSel.innerHTML = '<option value="">— No template —</option>'; }
     modal.style.display = 'flex';
 });
 
@@ -137,15 +149,18 @@ document.getElementById('btn-cancel-event').addEventListener('click', () => {
 document.getElementById('btn-save-event').addEventListener('click', async () => {
     const name = document.getElementById('new-event-name').value;
     const leagueId = document.getElementById('new-event-league').value;
+    const templateId = document.getElementById('new-event-template').value;
     const nomDeadline = document.getElementById('new-event-nom-deadline').value;
     const voteDeadline = document.getElementById('new-event-vote-deadline').value;
     if (!name || !leagueId) { API.toast('Name and league required', 'warning'); return; }
     try {
-        await API.post(`${API_BASE}/events`, {
+        const body = {
             name, league_id: parseInt(leagueId),
             nomination_deadline: nomDeadline ? new Date(nomDeadline).toISOString() : null,
             voting_deadline: voteDeadline ? new Date(voteDeadline).toISOString() : null,
-        });
+        };
+        if (templateId) body.template_id = parseInt(templateId);
+        await API.post(`${API_BASE}/events`, body);
         API.toast('Event created', 'success');
         document.getElementById('create-event-modal').style.display = 'none';
         document.getElementById('new-event-name').value = '';

@@ -113,7 +113,7 @@ async def handle_nominate_button(interaction: discord.Interaction, event_id: int
         await interaction.response.send_message('Nominations are not currently open for this event.', ephemeral=True)
         return
 
-    categories = _db.award_event_categories.get_by_event_and_phase(event_id, 'nomination')
+    categories = _db.award_event_categories.get_by_event_and_fill_types(event_id, ['nomination', 'autofill_player'])
     if not categories:
         await interaction.response.send_message('No nomination categories configured.', ephemeral=True)
         return
@@ -254,12 +254,20 @@ async def handle_vote_button(interaction: discord.Interaction, event_id: int, te
     team = _db.teams.get_by_team_id(team_id)
     division_id = team['division'] if team else 0
 
+    fill_options = _db.award_admin_fill_options.get_by_event(event_id) if hasattr(_db, 'award_admin_fill_options') else []
+    fill_opts_by_cat: dict[int, list[str]] = {}
+    for fo in fill_options:
+        fill_opts_by_cat.setdefault(fo['category_id'], []).append(fo['option'])
+
     nominees_by_cat = {}
     for cat in categories:
-        nominees = _db.award_nominations.distinct_responses(event_id, cat['id'])
-        if cat.get('fill_type') == 'autofill_team':
+        if cat['fill_type'] == 'admin_fill':
+            nominees = fill_opts_by_cat.get(cat['id'], [])
+        elif cat['fill_type'] == 'autofill_team':
             teams_in_div = _db.teams.get_by_division(division_id)
             nominees = [t['team_name'] for t in teams_in_div]
+        else:
+            nominees = _db.award_nominations.distinct_responses(event_id, cat['id'])
         nominees_by_cat[cat['id']] = nominees
 
     existing_votes = _db.award_votes.get_by_team_and_event(team_id, event_id)
@@ -272,7 +280,7 @@ async def handle_vote_button(interaction: discord.Interaction, event_id: int, te
                 'choice_3': ev.get('choice_3', ''),
             }
 
-    nom_cats = [c for c in categories if c.get('phase') == 'nomination']
+    nom_cats = [c for c in categories if c['fill_type'] in ('nomination', 'autofill_player')]
     if nom_cats:
         has_noms = _db.award_nominations.has_team_submitted_all(
             team_id, event_id, [c['id'] for c in nom_cats]

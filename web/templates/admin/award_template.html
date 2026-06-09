@@ -1,0 +1,141 @@
+{% extends "admin/layout.html" %}
+{% block title %}Template #{{ tmpl_id }} - Drawbridge Admin{% endblock %}
+{% block content %}
+<div class="page-header">
+    <a href="/admin/awards" style="color:var(--text-secondary);font-size:0.85rem;text-decoration:none;">← Awards</a>
+    <h1 id="tmpl-title" style="margin-top:0.25rem;">Template #{{ tmpl_id }}</h1>
+</div>
+
+<div id="event-progress" class="progress-container"></div>
+
+<div id="tmpl-content" style="display:none;">
+    <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;">
+            <div>
+                <h2 id="tmpl-name" style="margin-bottom:0.25rem;"></h2>
+                <p id="tmpl-desc" style="color:var(--text-secondary);font-size:0.85rem;"></p>
+            </div>
+            <button class="btn btn-danger" id="btn-delete-tmpl">Delete Template</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Categories</h2>
+        <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:1rem;">
+            Categories are copied to events when created from this template.
+            Choose a fill_type per category:
+            <code>nomination</code> (text input),
+            <code>autofill_team</code> (auto-filled with team names),
+            <code>autofill_player</code> (auto-filled from nominations),
+            <code>admin_fill</code> (admin pre-fills options, skips nominations).
+        </p>
+        <div style="display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap;">
+            <input type="text" id="cat-name" class="form-input" placeholder="Category name" style="flex:1;min-width:150px;">
+            <select id="cat-fill" class="form-input" style="width:auto;">
+                <option value="nomination">Nomination</option>
+                <option value="autofill_team">Auto-fill Teams</option>
+                <option value="autofill_player">Auto-fill Players</option>
+                <option value="admin_fill">Admin Fill</option>
+            </select>
+            <button class="btn btn-primary" id="btn-add-cat">Add</button>
+        </div>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead><tr><th>#</th><th>Name</th><th>Fill Type</th><th></th></tr></thead>
+                <tbody id="categories-tbody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const TMPL_ID = {{ tmpl_id }};
+const API_BASE = '/admin/api/awards';
+
+async function loadTemplate() {
+    const bar = API.createProgressBar('event-progress');
+    try {
+        const r = await API.get(`${API_BASE}/templates`);
+        const tmpl = (r.templates || []).find(t => t.id === TMPL_ID);
+        if (!tmpl) throw new Error('Template not found');
+        bar.setStatus('success');
+        bar.update(100, 'Loaded');
+        document.getElementById('tmpl-content').style.display = 'block';
+        document.getElementById('tmpl-title').textContent = `${tmpl.name} (#${TMPL_ID})`;
+        document.getElementById('tmpl-name').textContent = tmpl.name;
+        document.getElementById('tmpl-desc').textContent = tmpl.description || 'No description';
+        loadCategories();
+    } catch (e) {
+        bar.setStatus('error');
+        bar.update(100, e.message);
+        document.getElementById('tmpl-content').innerHTML = `<div class="result-box result-error">${e.message}</div>`;
+    }
+}
+
+async function loadCategories() {
+    const tbody = document.getElementById('categories-tbody');
+    try {
+        const r = await API.get(`${API_BASE}/templates/${TMPL_ID}/categories`);
+        tbody.innerHTML = (r.categories || []).map((c, i) => `
+            <tr>
+                <td>${i + 1}</td>
+                <td>${c.name}</td>
+                <td>
+                    <select class="cat-fill-select" data-id="${c.id}" style="font-size:0.85rem;">
+                        <option value="nomination" ${c.fill_type === 'nomination' ? 'selected' : ''}>Nomination</option>
+                        <option value="autofill_team" ${c.fill_type === 'autofill_team' ? 'selected' : ''}>Auto-fill Teams</option>
+                        <option value="autofill_player" ${c.fill_type === 'autofill_player' ? 'selected' : ''}>Auto-fill Players</option>
+                        <option value="admin_fill" ${c.fill_type === 'admin_fill' ? 'selected' : ''}>Admin Fill</option>
+                    </select>
+                </td>
+                <td><button class="btn btn-danger btn-del-cat" data-id="${c.id}" style="font-size:0.8rem;padding:0.2rem 0.4rem;">×</button></td>
+            </tr>
+        `).join('');
+        document.querySelectorAll('.cat-fill-select').forEach(sel => {
+            sel.addEventListener('change', async () => {
+                try {
+                    await API.request('PUT', `${API_BASE}/templates/${TMPL_ID}/categories/${sel.dataset.id}`, { fill_type: sel.value });
+                    API.toast('Updated', 'success');
+                } catch (e) { API.toast(e.message, 'error'); }
+            });
+        });
+        document.querySelectorAll('.btn-del-cat').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                if (!confirm('Delete this category?')) return;
+                try {
+                    await API.request('DELETE', `${API_BASE}/templates/${TMPL_ID}/categories/${btn.dataset.id}`);
+                    API.toast('Deleted', 'success');
+                    loadCategories();
+                } catch (e) { API.toast(e.message, 'error'); }
+            });
+        });
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="4" style="color:var(--danger);">${e.message}</td></tr>`;
+    }
+}
+
+document.getElementById('btn-add-cat').addEventListener('click', async () => {
+    const name = document.getElementById('cat-name').value;
+    const fill = document.getElementById('cat-fill').value;
+    if (!name) { API.toast('Category name required', 'warning'); return; }
+    try {
+        await API.post(`${API_BASE}/templates/${TMPL_ID}/categories`, { name, fill_type: fill });
+        API.toast('Category added', 'success');
+        document.getElementById('cat-name').value = '';
+        loadCategories();
+    } catch (e) { API.toast(e.message, 'error'); }
+});
+
+document.getElementById('btn-delete-tmpl').addEventListener('click', async () => {
+    if (!confirm('Delete this template and all its categories?')) return;
+    try {
+        await API.request('DELETE', `${API_BASE}/templates/${TMPL_ID}`);
+        API.toast('Deleted', 'success');
+        window.location.href = '/admin/awards';
+    } catch (e) { API.toast(e.message, 'error'); }
+});
+
+loadTemplate();
+</script>
+{% endblock %}

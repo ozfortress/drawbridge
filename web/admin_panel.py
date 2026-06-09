@@ -412,7 +412,7 @@ async def api_tournament_launchpad():
         return jsonify({'success': True, 'message': 'Launchpad generated and sent to launchpad channel.'})
     except Exception as e:
         logger.error(f'Launchpad error: {e}')
-        return jsonify({'error': str(e)}), 500
+        return _db_error(e)
 
 
 @admin_bp.route('/api/tournament/start', methods=['POST'])
@@ -606,7 +606,7 @@ async def api_tournament_assign_captain_roles():
         })
     except Exception as e:
         logger.error(f'Assign captain roles error: {e}')
-        return jsonify({'error': str(e)}), 500
+        return _db_error(e)
 
 
 @admin_bp.route('/api/tournament/end', methods=['POST'])
@@ -706,7 +706,7 @@ async def api_tournament_matchgen():
             return jsonify({'success': False, 'message': 'Match already exists or could not be generated.'})
     except Exception as e:
         logger.error(f'Matchgen error: {e}')
-        return jsonify({'error': str(e)}), 500
+        return _db_error(e)
 
 
 @admin_bp.route('/api/tournament/matchgen-round', methods=['POST'])
@@ -791,7 +791,7 @@ async def api_tournament_force_matchgen():
         return jsonify({'success': True, 'message': 'Match forcefully regenerated.'})
     except Exception as e:
         logger.error(f'Force matchgen error: {e}')
-        return jsonify({'error': str(e)}), 500
+        return _db_error(e)
 
 
 @admin_bp.route('/api/tournament/matchend', methods=['POST'])
@@ -825,7 +825,7 @@ async def api_tournament_matchend():
         return jsonify({'success': True, 'message': 'Match ended and archived.'})
     except Exception as e:
         logger.error(f'Matchend error: {e}')
-        return jsonify({'error': str(e)}), 500
+        return _db_error(e)
 
 
 @admin_bp.route('/api/tournament/random-demo-check', methods=['POST'])
@@ -908,7 +908,7 @@ async def api_tournament_random_demo_check():
         })
     except Exception as e:
         logger.error(f'Demo check error: {e}', exc_info=True)
-        return jsonify({'error': str(e)}), 500
+        return _db_error(e)
 
 
 # Sync API
@@ -933,7 +933,7 @@ async def api_sync_users():
         return jsonify({'users': user_list})
     except Exception as e:
         logger.error(f'Sync users error: {e}')
-        return jsonify({'error': str(e)}), 500
+        return _db_error(e)
 
 
 @admin_bp.route('/api/sync/force', methods=['POST'])
@@ -958,7 +958,7 @@ async def api_sync_force():
         return jsonify({'success': True, 'message': f'Force synced user {discord_id}.'})
     except Exception as e:
         logger.error(f'Force sync error: {e}')
-        return jsonify({'error': str(e)}), 500
+        return _db_error(e)
 
 
 # Leagues list (Citadel + DB status)
@@ -995,7 +995,7 @@ async def api_admin_leagues():
         return jsonify({'leagues': league_list})
     except Exception as e:
         logger.error(f'Leagues error: {e}')
-        return jsonify({'error': str(e)}), 500
+        return _db_error(e)
 
 
 @admin_bp.route('/api/leagues/active')
@@ -1055,7 +1055,7 @@ async def api_admin_leagues_active():
         return jsonify({'leagues': result})
     except Exception as e:
         logger.error(f'Active leagues error: {e}', exc_info=True)
-        return jsonify({'error': str(e)}), 500
+        return _db_error(e)
 
 
 @admin_bp.route('/api/tournament/<int:league_id>/detail')
@@ -1104,7 +1104,7 @@ async def api_tournament_detail(league_id: int):
         })
     except Exception as e:
         logger.error(f'Tournament detail error: {e}', exc_info=True)
-        return jsonify({'error': str(e)}), 500
+        return _db_error(e)
 
 
 # Message templates
@@ -1164,6 +1164,14 @@ async def api_template_update(name: str):
         return jsonify({'error': err}), 500
 
 
+def _db_error(e, default_msg='Database operation failed'):
+    """Return appropriate error response for database errors, detecting missing tables."""
+    err = str(e)
+    if "doesn't exist" in err:
+        return jsonify({'error': 'Required database table not available — verify migrations have been applied'}), 503
+    return jsonify({'error': err}), 500
+
+
 # ── Awards Page Routes ───────────────────────────────────────
 
 
@@ -1183,6 +1191,14 @@ async def award_event_page(event_id: int):
     return await render_template('admin/award_event.html', user=session_user, event_id=event_id)
 
 
+@admin_bp.route('/awards/templates/<int:tmpl_id>')
+async def award_template_page(tmpl_id: int):
+    session_user = get_session_user()
+    if not session_user or not session_user.get('is_admin'):
+        return redirect('/admin/login')
+    return await render_template('admin/award_template.html', user=session_user, tmpl_id=tmpl_id)
+
+
 # ── Awards API: Templates ────────────────────────────────────
 
 
@@ -1196,7 +1212,7 @@ async def api_award_templates_list():
         return jsonify({'templates': templates or []})
     except Exception as e:
         logger.error(f'Award templates list error: {e}')
-        return jsonify({'error': str(e)}), 500
+        return _db_error(e)
 
 
 @admin_bp.route('/api/awards/templates', methods=['POST'])
@@ -1216,7 +1232,7 @@ async def api_award_templates_create():
         return jsonify({'success': True, 'id': tmpl_id}), 201
     except Exception as e:
         logger.error(f'Award template create error: {e}')
-        return jsonify({'error': str(e)}), 500
+        return _db_error(e)
 
 
 @admin_bp.route('/api/awards/templates/<int:tmpl_id>')
@@ -1228,10 +1244,11 @@ async def api_award_templates_get(tmpl_id: int):
         tmpl = _db.award_templates.get_by_id(tmpl_id)
         if not tmpl:
             return jsonify({'error': 'Template not found'}), 404
-        return jsonify(tmpl)
+        categories = _db.award_template_categories.get_by_template(tmpl_id)
+        return jsonify({**tmpl, 'categories': categories})
     except Exception as e:
         logger.error(f'Award template get error: {e}')
-        return jsonify({'error': str(e)}), 500
+        return _db_error(e)
 
 
 @admin_bp.route('/api/awards/templates/<int:tmpl_id>', methods=['PUT'])
@@ -1247,7 +1264,7 @@ async def api_award_templates_update(tmpl_id: int):
         return jsonify({'success': True})
     except Exception as e:
         logger.error(f'Award template update error: {e}')
-        return jsonify({'error': str(e)}), 500
+        return _db_error(e)
 
 
 @admin_bp.route('/api/awards/templates/<int:tmpl_id>', methods=['DELETE'])
@@ -1256,11 +1273,78 @@ async def api_award_templates_delete(tmpl_id: int):
     if not _db:
         return jsonify({'error': 'Database not ready'}), 503
     try:
+        _db.award_template_categories.delete_by_template(tmpl_id)
         _db.award_templates.delete(tmpl_id)
         return jsonify({'success': True})
     except Exception as e:
         logger.error(f'Award template delete error: {e}')
-        return jsonify({'error': str(e)}), 500
+        return _db_error(e)
+
+
+# ── Awards API: Template Categories ──────────────────────────
+
+
+@admin_bp.route('/api/awards/templates/<int:tmpl_id>/categories')
+@require_admin
+async def api_award_template_categories_list(tmpl_id: int):
+    if not _db:
+        return jsonify({'error': 'Database not ready'}), 503
+    try:
+        cats = _db.award_template_categories.get_by_template(tmpl_id)
+        return jsonify({'categories': cats})
+    except Exception as e:
+        logger.error(f'Template categories list error: {e}')
+        return _db_error(e)
+
+
+@admin_bp.route('/api/awards/templates/<int:tmpl_id>/categories', methods=['POST'])
+@require_admin
+async def api_award_template_categories_create(tmpl_id: int):
+    if not _db:
+        return jsonify({'error': 'Database not ready'}), 503
+    data = await request.get_json()
+    if not data or 'name' not in data:
+        return jsonify({'error': 'name is required'}), 400
+    try:
+        cat_id = _db.award_template_categories.insert({
+            'template_id': tmpl_id,
+            'name': data['name'],
+            'fill_type': data.get('fill_type', 'nomination'),
+            'sort_order': data.get('sort_order', 0),
+        })
+        return jsonify({'success': True, 'id': cat_id}), 201
+    except Exception as e:
+        logger.error(f'Template category create error: {e}')
+        return _db_error(e)
+
+
+@admin_bp.route('/api/awards/templates/<int:tmpl_id>/categories/<int:cat_id>', methods=['PUT'])
+@require_admin
+async def api_award_template_categories_update(tmpl_id: int, cat_id: int):
+    if not _db:
+        return jsonify({'error': 'Database not ready'}), 503
+    data = await request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+    try:
+        _db.award_template_categories.update(cat_id, data)
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f'Template category update error: {e}')
+        return _db_error(e)
+
+
+@admin_bp.route('/api/awards/templates/<int:tmpl_id>/categories/<int:cat_id>', methods=['DELETE'])
+@require_admin
+async def api_award_template_categories_delete(tmpl_id: int, cat_id: int):
+    if not _db:
+        return jsonify({'error': 'Database not ready'}), 503
+    try:
+        _db.award_template_categories.delete(cat_id)
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f'Template category delete error: {e}')
+        return _db_error(e)
 
 
 # ── Awards API: Events ───────────────────────────────────────
@@ -1287,7 +1371,7 @@ async def api_award_events_list():
         return jsonify({'events': enriched})
     except Exception as e:
         logger.error(f'Award events list error: {e}')
-        return jsonify({'error': str(e)}), 500
+        return _db_error(e)
 
 
 @admin_bp.route('/api/awards/events', methods=['POST'])
@@ -1299,17 +1383,30 @@ async def api_award_events_create():
     if not data or 'league_id' not in data or 'name' not in data:
         return jsonify({'error': 'league_id and name are required'}), 400
     try:
+        template_id = data.get('template_id')
         event_id = _db.award_events.insert({
             'league_id': data['league_id'],
+            'template_id': template_id,
             'name': data['name'],
             'status': data.get('status', 'pending'),
             'nomination_deadline': data.get('nomination_deadline'),
             'voting_deadline': data.get('voting_deadline'),
         })
+        # Copy categories from template to this event
+        if template_id:
+            tmpl_cats = _db.award_template_categories.get_by_template(template_id)
+            for tc in tmpl_cats:
+                _db.award_event_categories.insert({
+                    'event_id': event_id,
+                    'template_category_id': tc['id'],
+                    'name': tc['name'],
+                    'fill_type': tc['fill_type'],
+                    'sort_order': tc.get('sort_order', 0),
+                })
         return jsonify({'success': True, 'id': event_id}), 201
     except Exception as e:
         logger.error(f'Award event create error: {e}')
-        return jsonify({'error': str(e)}), 500
+        return _db_error(e)
 
 
 @admin_bp.route('/api/awards/events/<int:event_id>')
@@ -1324,11 +1421,19 @@ async def api_award_events_get(event_id: int):
         league = _db.leagues.get_by_id(ev['league_id']) if _db.leagues else None
         categories = _db.award_event_categories.get_by_event(event_id)
         divisions = _db.divisions.get_by_league(ev['league_id'])
+        fill_options = _db.award_admin_fill_options.get_by_event(event_id) if hasattr(_db, 'award_admin_fill_options') else []
+        fill_opts_by_category: dict[int, list[str]] = {}
+        for fo in fill_options:
+            fill_opts_by_category.setdefault(fo['category_id'], []).append(fo['option'])
+
         cat_details = []
         for cat in categories:
             nom_count = len(_db.award_nominations.get_by_event_and_category(event_id, cat['id']))
             vote_count = len(_db.award_votes.get_by_event_and_category(event_id, cat['id']))
-            cat_details.append({**cat, 'nomination_count': nom_count, 'vote_count': vote_count})
+            cat_out = {**cat, 'nomination_count': nom_count, 'vote_count': vote_count}
+            if cat['fill_type'] == 'admin_fill':
+                cat_out['fill_options'] = fill_opts_by_category.get(cat['id'], [])
+            cat_details.append(cat_out)
         return jsonify({
             **ev,
             'league_name': league.get('league_name', f"League {ev['league_id']}") if league else f"League {ev['league_id']}",
@@ -1337,7 +1442,7 @@ async def api_award_events_get(event_id: int):
         })
     except Exception as e:
         logger.error(f'Award event get error: {e}')
-        return jsonify({'error': str(e)}), 500
+        return _db_error(e)
 
 
 @admin_bp.route('/api/awards/events/<int:event_id>/status', methods=['PUT'])
@@ -1355,7 +1460,7 @@ async def api_award_events_set_status(event_id: int):
         return jsonify({'success': True})
     except Exception as e:
         logger.error(f'Award event status error: {e}')
-        return jsonify({'error': str(e)}), 500
+        return _db_error(e)
 
 
 # ── Awards API: Categories ───────────────────────────────────
@@ -1381,7 +1486,7 @@ async def api_award_categories_create(event_id: int):
         return jsonify({'success': True, 'id': cat_id}), 201
     except Exception as e:
         logger.error(f'Award category create error: {e}')
-        return jsonify({'error': str(e)}), 500
+        return _db_error(e)
 
 
 @admin_bp.route('/api/awards/events/<int:event_id>/categories/<int:cat_id>', methods=['PUT'])
@@ -1397,7 +1502,7 @@ async def api_award_categories_update(event_id: int, cat_id: int):
         return jsonify({'success': True})
     except Exception as e:
         logger.error(f'Award category update error: {e}')
-        return jsonify({'error': str(e)}), 500
+        return _db_error(e)
 
 
 @admin_bp.route('/api/awards/events/<int:event_id>/categories/<int:cat_id>', methods=['DELETE'])
@@ -1412,7 +1517,7 @@ async def api_award_categories_delete(event_id: int, cat_id: int):
         return jsonify({'success': True})
     except Exception as e:
         logger.error(f'Award category delete error: {e}')
-        return jsonify({'error': str(e)}), 500
+        return _db_error(e)
 
 
 # ── Awards API: Nominations & Votes ──────────────────────────
@@ -1437,7 +1542,7 @@ async def api_award_nominations_list(event_id: int):
         return jsonify({'nominations': enriched})
     except Exception as e:
         logger.error(f'Award nominations list error: {e}')
-        return jsonify({'error': str(e)}), 500
+        return _db_error(e)
 
 
 @admin_bp.route('/api/awards/events/<int:event_id>/nominations/<int:nom_id>/invalidate', methods=['PUT'])
@@ -1465,7 +1570,7 @@ async def api_award_nominations_invalidate(event_id: int, nom_id: int):
         return jsonify({'success': True})
     except Exception as e:
         logger.error(f'Award nomination invalidate error: {e}')
-        return jsonify({'error': str(e)}), 500
+        return _db_error(e)
 
 
 @admin_bp.route('/api/awards/events/<int:event_id>/votes')
@@ -1487,7 +1592,7 @@ async def api_award_votes_list(event_id: int):
         return jsonify({'votes': enriched})
     except Exception as e:
         logger.error(f'Award votes list error: {e}')
-        return jsonify({'error': str(e)}), 500
+        return _db_error(e)
 
 
 @admin_bp.route('/api/awards/events/<int:event_id>/votes/<int:vote_id>/invalidate', methods=['PUT'])
@@ -1515,7 +1620,7 @@ async def api_award_votes_invalidate(event_id: int, vote_id: int):
         return jsonify({'success': True})
     except Exception as e:
         logger.error(f'Award vote invalidate error: {e}')
-        return jsonify({'error': str(e)}), 500
+        return _db_error(e)
 
 
 # ── Awards API: Calculate & Results ──────────────────────────
@@ -1566,7 +1671,47 @@ async def api_award_events_calculate(event_id: int):
     except Exception as e:
         logger.error(f'Award calculate error: {e}')
         _db.award_events.set_status(event_id, 'voting')
-        return jsonify({'error': str(e)}), 500
+        return _db_error(e)
+
+
+# ── Awards API: Admin Fill Options ───────────────────────────
+
+
+@admin_bp.route('/api/awards/events/<int:event_id>/fill-options')
+@require_admin
+async def api_award_fill_options_list(event_id: int):
+    if not _db:
+        return jsonify({'error': 'Database not ready'}), 503
+    try:
+        options = _db.award_admin_fill_options.get_by_event(event_id)
+        return jsonify({'options': options})
+    except Exception as e:
+        logger.error(f'Admin fill options list error: {e}')
+        return _db_error(e)
+
+
+@admin_bp.route('/api/awards/events/<int:event_id>/categories/<int:cat_id>/fill-options', methods=['PUT'])
+@require_admin
+async def api_award_fill_options_update(event_id: int, cat_id: int):
+    if not _db:
+        return jsonify({'error': 'Database not ready'}), 503
+    data = await request.get_json()
+    options = data.get('options', []) if data else []
+    if not isinstance(options, list):
+        return jsonify({'error': 'options must be a list of strings'}), 400
+    try:
+        _db.award_admin_fill_options.delete_by_category(cat_id)
+        for opt in options:
+            if opt.strip():
+                _db.award_admin_fill_options.insert({
+                    'event_id': event_id,
+                    'category_id': cat_id,
+                    'option': opt.strip(),
+                })
+        return jsonify({'success': True, 'count': len(options)})
+    except Exception as e:
+        logger.error(f'Admin fill options update error: {e}')
+        return _db_error(e)
 
 
 @admin_bp.route('/api/awards/events/<int:event_id>/results')
@@ -1596,7 +1741,7 @@ async def api_award_events_results(event_id: int):
         return jsonify({'results': enriched})
     except Exception as e:
         logger.error(f'Award results error: {e}')
-        return jsonify({'error': str(e)}), 500
+        return _db_error(e)
 
 
 # ── Awards API: Send Discord Messages ────────────────────────
@@ -1628,7 +1773,7 @@ async def api_award_events_open_nominations(event_id: int):
         return jsonify({'success': True, 'messages_sent': sent})
     except Exception as e:
         logger.error(f'Open nominations error: {e}')
-        return jsonify({'error': str(e)}), 500
+        return _db_error(e)
 
 
 @admin_bp.route('/api/awards/events/<int:event_id>/open-voting', methods=['POST'])
@@ -1657,7 +1802,7 @@ async def api_award_events_open_voting(event_id: int):
         return jsonify({'success': True, 'messages_sent': sent})
     except Exception as e:
         logger.error(f'Open voting error: {e}')
-        return jsonify({'error': str(e)}), 500
+        return _db_error(e)
 
 
 @admin_bp.route('/api/awards/events/<int:event_id>/notify-invalidation', methods=['POST'])
@@ -1685,4 +1830,4 @@ async def api_award_events_notify_invalidation(event_id: int):
         return jsonify({'error': 'Failed to send notification'}), 500
     except Exception as e:
         logger.error(f'Notify invalidation error: {e}')
-        return jsonify({'error': str(e)}), 500
+        return _db_error(e)

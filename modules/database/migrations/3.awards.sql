@@ -1,4 +1,5 @@
 -- Awards Nomination & Voting System
+-- Template categories hold the category definitions per template
 
 CREATE TABLE `award_templates` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -10,9 +11,21 @@ CREATE TABLE `award_templates` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+CREATE TABLE `award_template_categories` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `template_id` int(11) NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `fill_type` varchar(20) NOT NULL DEFAULT 'nomination',
+  `sort_order` int(11) NOT NULL DEFAULT 0,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_aw_tmpl_cat_tmpl` (`template_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 CREATE TABLE `award_events` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `league_id` int(11) NOT NULL,
+  `template_id` int(11) DEFAULT NULL,
   `name` varchar(200) NOT NULL,
   `status` varchar(20) NOT NULL DEFAULT 'pending',
   `nomination_deadline` datetime DEFAULT NULL,
@@ -20,21 +33,32 @@ CREATE TABLE `award_events` (
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
-  KEY `idx_award_events_league` (`league_id`)
+  KEY `idx_award_events_league` (`league_id`),
+  KEY `idx_award_events_tmpl` (`template_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE `award_event_categories` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `event_id` int(11) NOT NULL,
-  `template_id` int(11) DEFAULT NULL,
+  `template_category_id` int(11) DEFAULT NULL,
   `name` varchar(100) NOT NULL,
-  `phase` varchar(20) NOT NULL DEFAULT 'nomination',
-  `fill_type` varchar(20) NOT NULL DEFAULT 'manual',
+  `fill_type` varchar(20) NOT NULL DEFAULT 'nomination',
   `sort_order` int(11) NOT NULL DEFAULT 0,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   KEY `idx_award_cat_event` (`event_id`),
-  KEY `idx_award_cat_template` (`template_id`)
+  KEY `idx_award_cat_tmpl_cat` (`template_category_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `award_admin_fill_options` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `event_id` int(11) NOT NULL,
+  `category_id` int(11) NOT NULL,
+  `option` varchar(200) NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_aw_fill_cat` (`category_id`),
+  KEY `idx_aw_fill_event` (`event_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE `award_nominations` (
