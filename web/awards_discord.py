@@ -1,7 +1,7 @@
 """Discord UI components (modals, views) for the awards nomination & voting system."""
 
 import discord
-from discord import TextInputStyle
+from discord.enums import TextInputStyle
 from discord.ui import Modal, TextInput, View
 
 # In-memory session store for modal chaining
