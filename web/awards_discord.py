@@ -33,19 +33,73 @@ class AwardsNominationsView(View):
 
 
 class AwardsVotesView(View):
-    """Button for captains to submit/edit votes."""
+    """Buttons for captains to submit votes or view nominees."""
 
     def __init__(self, event_id: int, team_id: int):
         super().__init__(timeout=None)
         self._event_id = event_id
         self._team_id = team_id
-        custom_id = f'awards_vote_{event_id}_{team_id}'
-        btn = discord.ui.Button(label='🗳️ Submit Votes', custom_id=custom_id, style=discord.ButtonStyle.primary)
-        btn.callback = self._button_callback
-        self.add_item(btn)
+        vote_id = f'awards_vote_{event_id}_{team_id}'
+        vote_btn = discord.ui.Button(label='🗳️ Submit Votes', custom_id=vote_id, style=discord.ButtonStyle.primary)
+        vote_btn.callback = self._vote_callback
+        self.add_item(vote_btn)
+        view_id = f'awards_view_{event_id}_{team_id}'
+        view_btn = discord.ui.Button(label='📋 View Nominees', custom_id=view_id, style=discord.ButtonStyle.secondary)
+        view_btn.callback = self._view_callback
+        self.add_item(view_btn)
 
-    async def _button_callback(self, interaction: discord.Interaction):
+    async def _vote_callback(self, interaction: discord.Interaction):
         await handle_vote_button(interaction, self._event_id, self._team_id)
+
+    async def _view_callback(self, interaction: discord.Interaction):
+        from web.admin_panel import _db
+        categories = _db.award_event_categories.get_by_event(self._event_id)
+        if not categories:
+            await interaction.response.send_message('No categories found.', ephemeral=True)
+            return
+        team = _db.teams.get_by_team_id(self._team_id)
+        division_id = team['division'] if team else 0
+
+        fill_options = _db.award_admin_fill_options.get_by_event(self._event_id) if hasattr(_db, 'award_admin_fill_options') else []
+        fill_opts_by_cat: dict[int, list[str]] = {}
+        for fo in fill_options:
+            fill_opts_by_cat.setdefault(fo['category_id'], []).append(fo['option'])
+
+        nom_cat_ids = [c['id'] for c in categories if c['fill_type'] == 'nomination']
+
+        lines = []
+        for cat in categories:
+            if cat['fill_type'] == 'admin_fill':
+                opts = fill_opts_by_cat.get(cat['id'], [])
+            elif cat['fill_type'] == 'autofill_team':
+                teams_in_div = _db.teams.get_by_division(division_id)
+                opts = [t['team_name'] for t in teams_in_div if t['team_id'] != self._team_id]
+            elif cat['fill_type'] == 'autofill_player':
+                all_responses = set()
+                for nc_id in nom_cat_ids:
+                    for r in _db.award_nominations.distinct_responses(self._event_id, nc_id):
+                        all_responses.add(r)
+                own_noms = _db.award_nominations.get_by_team_and_event(self._team_id, self._event_id)
+                own_responses = {n['response'] for n in own_noms} if own_noms else set()
+                opts = sorted(all_responses - own_responses)
+            else:
+                opts = _db.award_nominations.distinct_responses(self._event_id, cat['id'])
+                own_nom = _db.award_nominations.get_by_team_and_category(self._team_id, cat['id'])
+                if own_nom and own_nom.get('response') in opts:
+                    opts = [n for n in opts if n != own_nom['response']]
+
+            lines.append(f'**{cat["name"]}**')
+            if opts:
+                lines.extend(f'• {o}' for o in opts)
+            else:
+                lines.append('*(no nominees)*')
+            lines.append('')
+
+        text = '\n'.join(lines)
+        pages = [text[i:i+1900] for i in range(0, len(text), 1900)]
+        await interaction.response.send_message(pages[0], ephemeral=True)
+        for page in pages[1:]:
+            await interaction.followup.send(page, ephemeral=True)
 
 
 # ── Continue button (transient, not persistent) ──────────────
@@ -463,19 +517,51 @@ async def handle_vote_button(interaction: discord.Interaction, event_id: int, te
 # ── Helper functions for sending messages ─────────────────────
 
 
+_NOMINATION_TEMPLATE_DEFAULT = '''{{role_mention}} \U0001f4e2 **Award Nominations are now open!**
+
+**Categories to fill in:**
+{{categories_list}}
+
+Click the button below to submit your team's nominations.
+You can edit your responses by clicking again before nominations close.'''
+
+_VOTE_TEMPLATE_DEFAULT = '''{{role_mention}} \U0001f5f3\ufe0f **Voting is now open!**
+
+Click the button below to cast your team's votes.
+You have one ballot per team. You can edit by clicking again before voting closes.'''
+
+
+def _fill_template(template_name: str, default: str, subs: dict) -> str:
+    """Get a template (DB/file) and substitute placeholders."""
+    from web.template_helper import get_template
+    raw = get_template(template_name)
+    if not raw:
+        raw = default
+    for k, v in subs.items():
+        raw = raw.replace(k, str(v))
+    return raw
+
+
 async def send_nomination_message(bot, channel_id: int, role_id: int,
                                    event_id: int, team_id: int,
                                    categories: list[str] = None):
     """Send nomination prompt to a team channel."""
+    from web.admin_panel import _db
     channel = bot.get_channel(channel_id)
     if not channel:
         return False
     try:
-        text = f'<@&{role_id}> \U0001f4e2 **Award Nominations are now open!**\n'
-        if categories:
-            text += '\n**Categories to fill in:**\n' + '\n'.join(f'• {c}' for c in categories) + '\n'
-        text += '\nClick the button below to submit your team\'s nominations.\n'
-        text += 'You can edit your responses by clicking again before nominations close.'
+        event = _db.award_events.get_by_id(event_id)
+        league = _db.leagues.get_by_id(event['league_id']) if event else None
+        team = _db.teams.get_by_team_id(team_id)
+        subs = {
+            '{{role_mention}}': f'<@&{role_id}>',
+            '{{event_name}}': event.get('name', '') if event else '',
+            '{{league_name}}': league.get('league_name', '') if league else '',
+            '{{team_name}}': team.get('team_name', '') if team else '',
+            '{{categories_list}}': '\n'.join(f'• {c}' for c in categories) if categories else '',
+        }
+        text = _fill_template('award_nomination_open.txt', _NOMINATION_TEMPLATE_DEFAULT, subs)
         view = AwardsNominationsView(event_id, team_id)
         await channel.send(text, view=view)
         return True
@@ -486,17 +572,23 @@ async def send_nomination_message(bot, channel_id: int, role_id: int,
 async def send_vote_message(bot, channel_id: int, role_id: int,
                              event_id: int, team_id: int):
     """Send voting prompt to a team channel."""
+    from web.admin_panel import _db
     channel = bot.get_channel(channel_id)
     if not channel:
         return False
     try:
+        event = _db.award_events.get_by_id(event_id)
+        league = _db.leagues.get_by_id(event['league_id']) if event else None
+        team = _db.teams.get_by_team_id(team_id)
+        subs = {
+            '{{role_mention}}': f'<@&{role_id}>',
+            '{{event_name}}': event.get('name', '') if event else '',
+            '{{league_name}}': league.get('league_name', '') if league else '',
+            '{{team_name}}': team.get('team_name', '') if team else '',
+        }
+        text = _fill_template('award_vote_open.txt', _VOTE_TEMPLATE_DEFAULT, subs)
         view = AwardsVotesView(event_id, team_id)
-        await channel.send(
-            f'<@&{role_id}> \U0001f5f3\ufe0f **Voting is now open!**\n'
-            f'Click the button below to cast your team\'s votes.\n'
-            f'You have one ballot per team. You can edit by clicking again before voting closes.',
-            view=view
-        )
+        await channel.send(text, view=view)
         return True
     except Exception:
         return False
