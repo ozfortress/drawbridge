@@ -1,7 +1,7 @@
 """Discord UI components (modals, views) for the awards nomination & voting system."""
 
 import discord
-from discord.enums import TextInputStyle
+from discord import TextStyle
 from discord.ui import Modal, TextInput, View
 
 # In-memory session store for modal chaining
@@ -71,7 +71,7 @@ def build_nomination_modal(event_id: int, team_id: int, categories: list,
         text_input = TextInput(
             label=cat['name'][:45],
             default=default_val,
-            style=TextInputStyle.short,
+            style=TextStyle.short,
             required=True,
             max_length=100,
             custom_id=f"nom_{cat['id']}",
@@ -189,7 +189,7 @@ def build_vote_modal(event_id: int, team_id: int, categories: list,
         inp = TextInput(
             label=f'{label} ({cat["name"][:30]})',
             default=default_val if default_val else hint if pref_idx == 1 else '',
-            style=TextInputStyle.short,
+            style=TextStyle.short,
             required=pref_idx == 1,
             max_length=100,
             custom_id=f'vote_{cat["id"]}_{pref_idx}',
