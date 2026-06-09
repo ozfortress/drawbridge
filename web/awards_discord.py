@@ -528,8 +528,8 @@ _VOTE_TEMPLATE_DEFAULT = json.dumps({
 }, indent=2)
 
 
-def _fill_template(template_name: str, default: str, subs: dict) -> str:
-    """Get a template (DB/file), substitute placeholders, return content text."""
+def _fill_template(template_name: str, default: str, subs: dict) -> tuple[str, list[discord.Embed]]:
+    """Get a template (DB/file), substitute placeholders, return (content, embeds)."""
     from web.template_helper import get_template
     import json
     raw = get_template(template_name)
@@ -540,10 +540,13 @@ def _fill_template(template_name: str, default: str, subs: dict) -> str:
     try:
         parsed = json.loads(raw)
         if isinstance(parsed, dict):
-            return parsed.get('content', raw)
+            content = parsed.get('content', '')
+            embeds_data = parsed.get('embeds') or []
+            embeds = [discord.Embed.from_dict(e) for e in embeds_data]
+            return content, embeds
     except (json.JSONDecodeError, TypeError):
         pass
-    return raw
+    return raw, []
 
 
 async def send_nomination_message(bot, channel_id: int, role_id: int,
@@ -565,9 +568,9 @@ async def send_nomination_message(bot, channel_id: int, role_id: int,
             '{{team_name}}': team.get('team_name', '') if team else '',
             '{{categories_list}}': '\n'.join(f'• {c}' for c in categories) if categories else '',
         }
-        text = _fill_template('award_nomination_open.txt', _NOMINATION_TEMPLATE_DEFAULT, subs)
+        text, embeds = _fill_template('award_nomination_open.txt', _NOMINATION_TEMPLATE_DEFAULT, subs)
         view = AwardsNominationsView(event_id, team_id)
-        await channel.send(text, view=view)
+        await channel.send(content=text or None, embeds=embeds or None, view=view)
         return True
     except Exception:
         return False
@@ -590,9 +593,9 @@ async def send_vote_message(bot, channel_id: int, role_id: int,
             '{{league_name}}': league.get('league_name', '') if league else '',
             '{{team_name}}': team.get('team_name', '') if team else '',
         }
-        text = _fill_template('award_vote_open.txt', _VOTE_TEMPLATE_DEFAULT, subs)
+        text, embeds = _fill_template('award_vote_open.txt', _VOTE_TEMPLATE_DEFAULT, subs)
         view = AwardsVotesView(event_id, team_id)
-        await channel.send(text, view=view)
+        await channel.send(content=text or None, embeds=embeds or None, view=view)
         return True
     except Exception:
         return False
