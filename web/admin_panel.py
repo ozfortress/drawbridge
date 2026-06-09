@@ -1109,14 +1109,30 @@ async def api_tournament_detail(league_id: int):
 
 # Message templates
 
+# Known template names and their default content for display in the admin editor
+_KNOWN_TEMPLATE_DEFAULTS: dict[str, str] = {
+    'award_nomination_open.txt': '{{role_mention}} 📢 **Award Nominations are now open!**\n\n**Categories to fill in:**\n{{categories_list}}\n\nClick the button below to submit your team\'s nominations.\nYou can edit your responses by clicking again before nominations close.',
+    'award_vote_open.txt': '{{role_mention}} 🗳️ **Voting is now open!**\n\nClick the button below to cast your team\'s votes.\nYou have one ballot per team. You can edit by clicking again before voting closes.',
+}
+
+
 @admin_bp.route('/api/templates')
 @require_admin
 async def api_templates_list():
     if not _db:
         return jsonify({'error': 'Database not ready'}), 503
     try:
-        templates = _db.message_templates.get_all()
-        return jsonify({'templates': templates or []})
+        templates = _db.message_templates.get_all() or []
+        db_names = {t['template_name'] for t in templates}
+        # Include known defaults not yet saved to DB
+        for name, default in _KNOWN_TEMPLATE_DEFAULTS.items():
+            if name not in db_names:
+                templates.append({
+                    'template_name': name,
+                    'content': default,
+                    'updated_at': None,
+                })
+        return jsonify({'templates': templates})
     except Exception as e:
         err = str(e)
         if "doesn't exist" in err:
@@ -1133,6 +1149,13 @@ async def api_template_get(name: str):
     try:
         template = _db.message_templates.get_by_name(name)
         if not template:
+            # Return default content if known
+            if name in _KNOWN_TEMPLATE_DEFAULTS:
+                return jsonify({
+                    'template_name': name,
+                    'content': _KNOWN_TEMPLATE_DEFAULTS[name],
+                    'updated_at': None,
+                })
             return jsonify({'error': 'Template not found'}), 404
         return jsonify(template)
     except Exception as e:
