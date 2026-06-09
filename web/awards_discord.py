@@ -220,25 +220,47 @@ class VotePreferenceSelect(discord.ui.Select):
         view: VoteCategoryView = self.view
         choice = self.values[0]
 
-        # Refresh state from DB so restart doesn't lose existing choices
         from web.admin_panel import _db
+
+        # Read current DB state (source of truth for concurrent edits)
         db_vote = _db.award_votes.get_by_team_and_category(view._team_id, view._category_id)
+        c1 = (db_vote.get('choice_1', '') or '') if db_vote else ''
+        c2 = (db_vote.get('choice_2', '') or '') if db_vote else ''
+        c3 = (db_vote.get('choice_3', '') or '') if db_vote else ''
+
+        # Check uniqueness against what's already saved in DB
+        others = {1: c1, 2: c2, 3: c3}
+        others.pop(self._pref_num, None)
+        for pref_num, val in others.items():
+            if val == choice:
+                await interaction.response.send_message(
+                    f'**{choice}** is already the {["", "1st", "2nd", "3rd"][pref_num]} preference. Pick someone else.',
+                    ephemeral=True,
+                )
+                return
+
+        # Save to DB immediately so concurrent callbacks see latest state
+        data = {'choice_1': c1, 'choice_2': c2, 'choice_3': c3}
+        data[f'choice_{self._pref_num}'] = choice
         if db_vote:
-            view._choice_1 = db_vote.get('choice_1', '') or ''
-            view._choice_2 = db_vote.get('choice_2', '') or ''
-            view._choice_3 = db_vote.get('choice_3', '') or ''
+            _db.award_votes.update(db_vote['id'], data)
+        else:
+            team = _db.teams.get_by_team_id(view._team_id)
+            division_id = team['division'] if team else 0
+            data.update({
+                'event_id': view._event_id,
+                'category_id': view._category_id,
+                'team_id': view._team_id,
+                'division_id': division_id,
+                'status': 'accepted',
+            })
+            _db.award_votes.insert(data)
 
-        for p in (1, 2, 3):
-            if p != self._pref_num:
-                existing = getattr(view, f'_choice_{p}', '')
-                if existing == choice:
-                    await interaction.response.send_message(
-                        f'**{choice}** is already your {["", "1st", "2nd", "3rd"][p]} preference. Pick someone else.',
-                        ephemeral=True,
-                    )
-                    return
+        # Refresh view state from DB after write
+        view._choice_1 = data.get('choice_1', '') or ''
+        view._choice_2 = data.get('choice_2', '') or ''
+        view._choice_3 = data.get('choice_3', '') or ''
 
-        setattr(view, f'_choice_{self._pref_num}', choice)
         embed = view._build_embed()
         await interaction.response.edit_message(embed=embed, view=view)
 
@@ -280,6 +302,11 @@ class VoteCategoryView(View):
         e.add_field(name='1st Preference', value=self._choice_1 or '—', inline=True)
         e.add_field(name='2nd Preference', value=self._choice_2 or '—', inline=True)
         e.add_field(name='3rd Preference', value=self._choice_3 or '—', inline=True)
+        if self._nominees:
+            nominees_str = '\n'.join(f'• {n}' for n in self._nominees[:30])
+            if len(self._nominees) > 30:
+                nominees_str += f'\n… and {len(self._nominees) - 30} more'
+            e.add_field(name='Valid Nominees', value=nominees_str, inline=False)
         return e
 
     async def _on_save(self, interaction: discord.Interaction):
@@ -418,19 +445,20 @@ async def handle_vote_button(interaction: discord.Interaction, event_id: int, te
 
 
 async def send_nomination_message(bot, channel_id: int, role_id: int,
-                                   event_id: int, team_id: int):
+                                   event_id: int, team_id: int,
+                                   categories: list[str] = None):
     """Send nomination prompt to a team channel."""
     channel = bot.get_channel(channel_id)
     if not channel:
         return False
     try:
+        text = f'<@&{role_id}> \U0001f4e2 **Award Nominations are now open!**\n'
+        if categories:
+            text += '\n**Categories to fill in:**\n' + '\n'.join(f'• {c}' for c in categories) + '\n'
+        text += '\nClick the button below to submit your team\'s nominations.\n'
+        text += 'You can edit your responses by clicking again before nominations close.'
         view = AwardsNominationsView(event_id, team_id)
-        await channel.send(
-            f'<@&{role_id}> \U0001f4e2 **Award Nominations are now open!**\n'
-            f'Click the button below to submit your team\'s nominations.\n'
-            f'You can edit your responses by clicking again before nominations close.',
-            view=view
-        )
+        await channel.send(text, view=view)
         return True
     except Exception:
         return False

@@ -1901,12 +1901,15 @@ async def api_award_events_open_nominations(event_id: int):
         if not ev:
             return jsonify({'error': 'Event not found'}), 404
         from web.awards_discord import send_nomination_message
+        cats = _db.award_event_categories.get_by_event_and_fill_types(event_id, ['nomination'])
+        cat_names = [c['name'] for c in cats] if cats else None
         teams = _db.teams.get_by_league(ev['league_id'])
         sent = 0
         for team in teams:
             if team.get('team_channel') and team.get('role_id'):
                 ok = await send_nomination_message(_bot, team['team_channel'],
-                                                     team['role_id'], event_id, team['team_id'])
+                                                     team['role_id'], event_id, team['team_id'],
+                                                     categories=cat_names)
                 if ok:
                     sent += 1
         _db.award_events.set_status(event_id, 'nominations')
