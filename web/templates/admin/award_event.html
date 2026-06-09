@@ -52,10 +52,13 @@
         </div>
     </div>
 
-    <div class="card">
-        <h2>Divisions</h2>
-        <div id="divisions-container"></div>
-    </div>
+        <div class="card">
+            <h2>Divisions</h2>
+            <div style="margin-bottom:0.75rem;">
+                <a href="/admin/awards/{{ event_id }}/submissions" class="btn btn-primary" style="font-size:0.85rem;">📋 View All Submissions</a>
+            </div>
+            <div id="divisions-container"></div>
+        </div>
 
     <div class="card">
         <h2>Results</h2>
@@ -255,34 +258,12 @@ document.getElementById('btn-add-cat').addEventListener('click', async () => {
     } catch (e) { API.toast(e.message, 'error'); }
 });
 
-// View nominations per division
+// View submissions — redirected to dedicated page
 document.addEventListener('click', async (e) => {
-    const link = e.target.closest('.view-noms-link');
+    const link = e.target.closest('.view-noms-link, .view-votes-link');
     if (!link) return;
     e.preventDefault();
-    const divId = link.dataset.div;
-    try {
-        const r = await API.get(`${API_BASE}/events/${EVENT_ID}/nominations`);
-        const filtered = (r.nominations || []).filter(n => n.division_id === parseInt(divId));
-        const text = filtered.map(n => `[${n.team_name}] ${n.category_name}: ${n.response}`).join('\n');
-        alert(text || 'No nominations for this division.');
-    } catch (e) { API.toast(e.message, 'error'); }
-});
-
-// View votes per division
-document.addEventListener('click', async (e) => {
-    const link = e.target.closest('.view-votes-link');
-    if (!link) return;
-    e.preventDefault();
-    const divId = link.dataset.div;
-    try {
-        const r = await API.get(`${API_BASE}/events/${EVENT_ID}/votes`);
-        const filtered = (r.votes || []).filter(v => v.division_id === parseInt(divId));
-        const text = filtered.map(v =>
-            `[${v.team_name}] ${v.category_name}: 1st=${v.choice_1}, 2nd=${v.choice_2 || '—'}, 3rd=${v.choice_3 || '—'}`
-        ).join('\n');
-        alert(text || 'No votes for this division.');
-    } catch (e) { API.toast(e.message, 'error'); }
+    window.location.href = `/admin/awards/${EVENT_ID}/submissions`;
 });
 
 // Admin Fill Options Editor (modal with textarea)

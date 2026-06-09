@@ -1191,6 +1191,14 @@ async def award_event_page(event_id: int):
     return await render_template('admin/award_event.html', user=session_user, event_id=event_id)
 
 
+@admin_bp.route('/awards/<int:event_id>/submissions')
+async def award_submissions_page(event_id: int):
+    session_user = get_session_user()
+    if not session_user or not session_user.get('is_admin'):
+        return redirect('/admin/login')
+    return await render_template('admin/award_submissions.html', user=session_user, event_id=event_id)
+
+
 @admin_bp.route('/awards/templates/<int:tmpl_id>')
 async def award_template_page(tmpl_id: int):
     session_user = get_session_user()
