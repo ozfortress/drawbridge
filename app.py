@@ -179,11 +179,14 @@ async def on_ready():
 
     botmisc= client.get_channel(int(os.getenv('ANNOUNCE_CHANNEL')))
     def get_latest_commit():
+        git_commit = os.getenv('GIT_COMMIT')
+        if git_commit:
+            return git_commit
         try:
             latest_commit = subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode().strip()
             return latest_commit
-        except subprocess.CalledProcessError as e:
-            logger.error(f'Failed to get latest commit: {e}')
+        except Exception as e:
+            logger.warning(f'Failed to get latest commit (no .git dir or GIT_COMMIT env var): {e}')
             return None
 
     latest_commit = get_latest_commit()
@@ -198,7 +201,9 @@ async def on_ready():
             logger.info(f'Bot started with commit {latest_commit[:6]} by {commit_author}')
             await botmisc.send(f'# Bot has been started\n- time: <t:{now}>\n- `{latest_commit[:6]}` - `{commit_date}`\n- author: {commit_author}\n```\n{commit_message}```')
         except Exception as e:
-            logger.error(f'Failed to process commit info: {e}')
+            logger.warning(f'Could not get full commit info (git show may be unavailable, commit hash: {latest_commit[:6]}): {e}')
+            now = int(datetime.datetime.now().timestamp())
+            await botmisc.send(f'# Bot has been started\n- time: <t:{now}>\n- commit: `{latest_commit[:6]}`')
     
     healthstatus['status'] = b"OK"
     

@@ -1,6 +1,9 @@
 FROM python:3.12.4-bookworm AS build
 LABEL org.opencontainers.image.source https://github.com/ozfortress/drawbridge
 
+ARG GIT_COMMIT
+ENV GIT_COMMIT=${GIT_COMMIT}
+
 RUN apt update && apt install -y socat
 WORKDIR /usr/src/app
 
