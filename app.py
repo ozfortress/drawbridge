@@ -182,11 +182,19 @@ async def on_ready():
         git_commit = os.getenv('GIT_COMMIT')
         if git_commit:
             return git_commit
+        for src in ('.git_commit', '/app/.git_commit'):
+            try:
+                with open(src) as f:
+                    val = f.read().strip()
+                    if val:
+                        return val
+            except Exception:
+                continue
         try:
             latest_commit = subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode().strip()
             return latest_commit
         except Exception as e:
-            logger.warning(f'Failed to get latest commit (no .git dir or GIT_COMMIT env var): {e}')
+            logger.warning(f'Failed to get latest commit: {e}')
             return None
 
     latest_commit = get_latest_commit()

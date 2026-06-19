@@ -9,8 +9,12 @@ WORKDIR /usr/src/app
 
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
-RUN git config --global --add safe.directory /usr/src/app
 COPY . .
+
+# Write commit info for runtime (git may not be available at runtime)
+RUN git rev-parse HEAD > .git_commit 2>/dev/null || echo ${GIT_COMMIT:-unknown} > .git_commit
+RUN git log -1 --format='%an' > .git_commit_author 2>/dev/null || echo "unknown" > .git_commit_author
+RUN git log -1 --format='%s' > .git_commit_msg 2>/dev/null || echo "" > .git_commit_msg
 EXPOSE 8080
 
 # Health check using the Python script
