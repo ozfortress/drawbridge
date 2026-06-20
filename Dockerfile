@@ -11,10 +11,21 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
-# Write commit info for runtime (git may not be available at runtime)
-RUN git rev-parse HEAD > .git_commit 2>/dev/null || echo ${GIT_COMMIT:-unknown} > .git_commit
-RUN git log -1 --format='%an' > .git_commit_author 2>/dev/null || echo "unknown" > .git_commit_author
-RUN git log -1 --format='%s' > .git_commit_msg 2>/dev/null || echo "" > .git_commit_msg
+# Extract commit hash from .git files directly (avoids git command issues)
+RUN set -ex; \
+    commit=""; \
+    if [ -n "$GIT_COMMIT" ]; then \
+        commit="$GIT_COMMIT"; \
+    elif [ -f .git/HEAD ]; then \
+        head_ref=$(cat .git/HEAD); \
+        case "$head_ref" in \
+            ref:*) ref_path=".git/$(echo "$head_ref" | cut -d' ' -f2)"; \
+                   [ -f "$ref_path" ] && commit=$(cat "$ref_path");; \
+            *)     commit="$head_ref";; \
+        esac; \
+    fi; \
+    echo "${commit:-unknown}" > .git_commit; \
+    echo "commit: $(cat .git_commit)"
 EXPOSE 8080
 
 # Health check using the Python script

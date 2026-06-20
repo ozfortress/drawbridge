@@ -177,41 +177,28 @@ async def on_ready():
     except Exception as e:
         logger.error(f'Failed to initialize admin panel: {e}')
 
-    botmisc= client.get_channel(int(os.getenv('ANNOUNCE_CHANNEL')))
-    def get_latest_commit():
-        git_commit = os.getenv('GIT_COMMIT')
-        if git_commit:
-            return git_commit
+    botmisc = client.get_channel(int(os.getenv('ANNOUNCE_CHANNEL')))
+    public_url = os.getenv('PUBLIC_URL', '')
+    now = int(datetime.datetime.now().timestamp())
+
+    def read_commit_hash():
         for src in ('.git_commit', '/app/.git_commit'):
             try:
                 with open(src) as f:
-                    val = f.read().strip()
-                    if val:
-                        return val
+                    return f.read().strip() or None
             except Exception:
                 continue
-        try:
-            latest_commit = subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode().strip()
-            return latest_commit
-        except Exception as e:
-            logger.warning(f'Failed to get latest commit: {e}')
-            return None
+        return None
 
-    latest_commit = get_latest_commit()
-    if latest_commit:
-        try:
-            commit_info = subprocess.check_output(['git', 'show', '-s', latest_commit]).decode().strip().split('\n')
-            commit_author = commit_info[1].split(':')[1].strip()
-            commit_message = '\n'.join(commit_info[4:]).strip()
-            commit_date = commit_info[2].split('Date:')[1].strip()
-            now = int(datetime.datetime.now().timestamp())
-            
-            logger.info(f'Bot started with commit {latest_commit[:6]} by {commit_author}')
-            await botmisc.send(f'# Bot has been started\n- time: <t:{now}>\n- `{latest_commit[:6]}` - `{commit_date}`\n- author: {commit_author}\n```\n{commit_message}```')
-        except Exception as e:
-            logger.warning(f'Could not get full commit info (git show may be unavailable, commit hash: {latest_commit[:6]}): {e}')
-            now = int(datetime.datetime.now().timestamp())
-            await botmisc.send(f'# Bot has been started\n- time: <t:{now}>\n- commit: `{latest_commit[:6]}`')
+    commit_hash = read_commit_hash()
+    commit_display = commit_hash[:6] if commit_hash else 'unknown'
+    logger.info(f'Bot started (commit: {commit_display})')
+
+    parts = [f'# Bot has been started', f'- time: <t:{now}>']
+    if public_url:
+        parts.append(f'- admin panel: {public_url}/admin')
+    parts.append(f'- commit: `{commit_display}`')
+    await botmisc.send('\n'.join(parts))
     
     healthstatus['status'] = b"OK"
     
