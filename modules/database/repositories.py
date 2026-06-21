@@ -1183,8 +1183,33 @@ class AwardAdminFillOptionsRepository(BaseRepository):
 class TournamentScheduleSettingsRepository(BaseRepository):
     """Repository for tournament_schedule_settings table."""
 
+    # Per-format presets. Day numbering: 0=Mon .. 6=Sun.
+    # Mirrors the ozfortress rulebook (section 7.3).
+    FORMAT_DEFAULTS = {
+        'sixes': {
+            'playable_days': [6, 0, 1, 2, 3],   # Sun–Thu
+            'default_day': 3,                    # Thursday
+            'deadline_day': 0,                   # Monday
+            'deadline_time': '19:00',            # 7PM AEST
+        },
+        'highlander': {
+            'playable_days': [2, 3, 4, 5, 6],    # Wed–Sun
+            'default_day': 6,                     # Sunday
+            'deadline_day': 3,                    # Thursday
+            'deadline_time': '19:00',            # 7PM AEST
+        },
+    }
+
     def __init__(self, db_connection):
         super().__init__(db_connection, 'tournament_schedule_settings')
+
+    @classmethod
+    def format_defaults(cls, fmt: Optional[str]) -> Optional[Dict[str, Any]]:
+        """Return the preset (playable_days, default_day, deadline_day, deadline_time)
+        for a format, or None for unknown/'other'."""
+        if not fmt:
+            return None
+        return cls.FORMAT_DEFAULTS.get(fmt.lower())
 
     def get_by_id(self, settings_id: int) -> Optional[Dict[str, Any]]:
         return self._fetch_one(f"SELECT * FROM {self.table} WHERE id = ?", (settings_id,))
@@ -1196,13 +1221,17 @@ class TournamentScheduleSettingsRepository(BaseRepository):
         return self._fetch_one(f"SELECT * FROM {self.table} WHERE league_id = ?", (league_id,))
 
     def insert(self, data: Dict[str, Any]) -> Optional[int]:
-        required = ['league_id']
-        for f in required:
-            if f not in data:
-                raise ValueError(f"Missing required field: {f}")
+        if 'league_id' not in data:
+            raise ValueError("Missing required field: league_id")
         return self._execute_query(
-            f"INSERT INTO {self.table} (league_id, excluded_days) VALUES (?, ?)",
-            (data['league_id'], data.get('excluded_days'))
+            f"""INSERT INTO {self.table}
+                (league_id, excluded_days, scheduling_enabled, `format`, deadline_day, deadline_time)
+                VALUES (?, ?, ?, ?, ?, ?)""",
+            (
+                data['league_id'], data.get('excluded_days'),
+                int(data.get('scheduling_enabled', 0)), data.get('format'),
+                data.get('deadline_day'), data.get('deadline_time'),
+            )
         )
 
     def update(self, settings_id: int, data: Dict[str, Any]) -> bool:
@@ -1211,8 +1240,15 @@ class TournamentScheduleSettingsRepository(BaseRepository):
             raise ValueError(f"Settings with ID {settings_id} not found")
         merged = {**existing, **data}
         return self._execute_query(
-            f"UPDATE {self.table} SET excluded_days = ? WHERE id = ?",
-            (merged['excluded_days'], settings_id)
+            f"""UPDATE {self.table}
+                SET excluded_days = ?, scheduling_enabled = ?, `format` = ?,
+                    deadline_day = ?, deadline_time = ?
+                WHERE id = ?""",
+            (
+                merged.get('excluded_days'), int(merged.get('scheduling_enabled', 0) or 0),
+                merged.get('format'), merged.get('deadline_day'),
+                merged.get('deadline_time'), settings_id,
+            )
         ) > 0
 
     def delete(self, settings_id: int) -> bool:
@@ -1313,3 +1349,109 @@ class TeamAvailabilityRepository(BaseRepository):
         for r in rows:
             schedule.setdefault(r['day_of_week'], []).append(r['time_slot'])
         return schedule
+
+
+class MatchSchedulesRepository(BaseRepository):
+    """Repository for match_schedules table (per-match propose/confirm workflow)."""
+
+    def __init__(self, db_connection):
+        super().__init__(db_connection, 'match_schedules')
+
+    def get_by_id(self, match_id: int) -> Optional[Dict[str, Any]]:
+        return self.get_by_match_id(match_id)
+
+    def get_by_match_id(self, match_id: int) -> Optional[Dict[str, Any]]:
+        return self._fetch_one(f"SELECT * FROM {self.table} WHERE match_id = ?", (match_id,))
+
+    def get_all(self) -> List[Dict[str, Any]]:
+        return self._fetch_all(f"SELECT * FROM {self.table}")
+
+    def get_by_league(self, league_id: int) -> List[Dict[str, Any]]:
+        return self._fetch_all(f"SELECT * FROM {self.table} WHERE league_id = ?", (league_id,))
+
+    def insert(self, data: Dict[str, Any]) -> Optional[int]:
+        for f in ('match_id', 'league_id'):
+            if f not in data:
+                raise ValueError(f"Missing required field: {f}")
+        return self._execute_query(
+            f"""INSERT INTO {self.table}
+                (match_id, league_id, status, deadline_at)
+                VALUES (?, ?, ?, ?)""",
+            (
+                data['match_id'], data['league_id'],
+                data.get('status', 'pending'), data.get('deadline_at'),
+            )
+        )
+
+    def update(self, match_id: int, data: Dict[str, Any]) -> bool:
+        existing = self.get_by_match_id(match_id)
+        if not existing:
+            raise ValueError(f"Match schedule {match_id} not found")
+        merged = {**existing, **data}
+        return self._execute_query(
+            f"""UPDATE {self.table}
+                SET status = ?, proposed_day = ?, proposed_time = ?, proposed_by_team = ?,
+                    proposed_by_user = ?, proposed_at = ?, scheduled_at = ?,
+                    deadline_at = ?, deadline_flagged = ?
+                WHERE match_id = ?""",
+            (
+                merged['status'], merged.get('proposed_day'), merged.get('proposed_time'),
+                merged.get('proposed_by_team'), merged.get('proposed_by_user'),
+                merged.get('proposed_at'), merged.get('scheduled_at'),
+                merged.get('deadline_at'), int(merged.get('deadline_flagged', 0) or 0),
+                match_id,
+            )
+        ) > 0
+
+    def set_proposal(self, match_id: int, day: int, time: str,
+                     team_id: int, user_id: int) -> bool:
+        """Record a proposal from one team (status -> proposed)."""
+        return self._execute_query(
+            f"""UPDATE {self.table}
+                SET status = 'proposed', proposed_day = ?, proposed_time = ?,
+                    proposed_by_team = ?, proposed_by_user = ?, proposed_at = NOW()
+                WHERE match_id = ?""",
+            (day, time, team_id, user_id, match_id)
+        ) > 0
+
+    def set_confirmed(self, match_id: int, scheduled_at_utc) -> bool:
+        """Lock in the agreed time (status -> confirmed)."""
+        return self._execute_query(
+            f"""UPDATE {self.table}
+                SET status = 'confirmed', scheduled_at = ?
+                WHERE match_id = ?""",
+            (scheduled_at_utc, match_id)
+        ) > 0
+
+    def set_flagged(self, match_id: int) -> bool:
+        """Mark that the past-deadline warning has been posted."""
+        return self._execute_query(
+            f"UPDATE {self.table} SET deadline_flagged = 1 WHERE match_id = ?",
+            (match_id,)
+        ) > 0
+
+    def get_overdue(self, now_utc) -> List[Dict[str, Any]]:
+        """Unconfirmed schedules past their deadline whose match is not archived.
+
+        Returns the schedule row plus the match's channel/team columns.
+        """
+        return self._fetch_all(
+            f"""SELECT ms.*, m.channel_id, m.team_home, m.team_away, m.division
+                FROM {self.table} ms
+                JOIN matches m ON ms.match_id = m.match_id
+                WHERE ms.status != 'confirmed'
+                  AND ms.deadline_at IS NOT NULL
+                  AND ms.deadline_at < ?
+                  AND m.archived = 0
+                ORDER BY ms.deadline_at""",
+            (now_utc,)
+        )
+
+    def delete(self, match_id: int) -> bool:
+        return self.delete_by_match(match_id)
+
+    def delete_by_match(self, match_id: int) -> bool:
+        return self._execute_query(f"DELETE FROM {self.table} WHERE match_id = ?", (match_id,)) > 0
+
+    def delete_by_league(self, league_id: int) -> bool:
+        return self._execute_query(f"DELETE FROM {self.table} WHERE league_id = ?", (league_id,)) > 0

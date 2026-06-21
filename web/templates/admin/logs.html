@@ -1,0 +1,275 @@
+{% extends "admin/layout.html" %}
+{% block title %}Logs - Drawbridge Admin{% endblock %}
+{% block content %}
+<style>
+    .logs-filters { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; }
+    .logs-filters .form-group { margin-bottom: 0; }
+    .logs-filters .form-input { max-width: 240px; }
+    .logs-meta { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.75rem; }
+    .log-row {
+        border: 1px solid var(--border);
+        border-left: 3px solid var(--text-muted);
+        border-radius: 8px;
+        padding: 0.75rem 1rem;
+        margin-bottom: 0.6rem;
+        background: var(--bg-secondary);
+    }
+    .log-row.SCHED  { border-left-color: #cba6f7; }
+    .log-row.CREATE { border-left-color: var(--success); }
+    .log-row.EDIT   { border-left-color: var(--warning); }
+    .log-row.DELETE { border-left-color: var(--danger); }
+    .log-row-head { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.4rem; }
+    .log-badge {
+        font-size: 0.7rem; font-weight: 700; letter-spacing: 0.03em;
+        padding: 0.15rem 0.5rem; border-radius: 5px; text-transform: uppercase;
+        background: var(--text-muted); color: var(--bg-primary);
+    }
+    .log-badge.SCHED  { background: #cba6f7; }
+    .log-badge.CREATE { background: var(--success); }
+    .log-badge.EDIT   { background: var(--warning); }
+    .log-badge.DELETE { background: var(--danger); }
+    .log-time { color: var(--text-muted); font-size: 0.8rem; }
+    .log-context { margin-left: auto; font-size: 0.82rem; color: var(--text-secondary); }
+    .log-context a { color: var(--accent); text-decoration: none; }
+    .log-context a:hover { text-decoration: underline; }
+    .log-user { display: flex; align-items: center; gap: 0.45rem; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.3rem; }
+    .log-user img { width: 20px; height: 20px; border-radius: 50%; }
+    .log-msg { color: var(--text-primary); white-space: pre-wrap; word-break: break-word; }
+    .log-msg .additionals { color: var(--text-muted); font-size: 0.85rem; }
+</style>
+
+<div class="page-header">
+    <h1>Logs</h1>
+</div>
+
+<div class="card">
+    <div class="logs-filters">
+        <div class="form-group">
+            <label for="f-type">Type</label>
+            <select id="f-type" class="form-input">
+                <option value="all">All activity</option>
+                <option value="SCHED">Scheduling</option>
+                <option value="CREATE">Messages sent</option>
+                <option value="EDIT">Messages edited</option>
+                <option value="DELETE">Messages deleted</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="f-match">Match</label>
+            <input id="f-match" class="form-input" list="match-list" placeholder="All matches" autocomplete="off">
+            <datalist id="match-list"></datalist>
+        </div>
+        <div class="form-group">
+            <label for="f-team">Team</label>
+            <input id="f-team" class="form-input" list="team-list" placeholder="All teams" autocomplete="off">
+            <datalist id="team-list"></datalist>
+        </div>
+        <div class="form-group">
+            <label for="f-limit">Limit</label>
+            <select id="f-limit" class="form-input" style="max-width:120px;">
+                <option value="100">100</option>
+                <option value="250">250</option>
+                <option value="500">500</option>
+            </select>
+        </div>
+        <button class="btn btn-primary" id="f-refresh">Refresh</button>
+        <button class="btn btn-secondary" id="f-copy" title="Copy a shareable link to this filtered view">🔗</button>
+        <button class="btn btn-secondary" id="f-clear">Clear</button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="logs-meta" id="logs-meta">Loading…</div>
+    <div id="logs-list"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const matchNames = {};   // match_id -> display name
+const teamNames = {};    // team_id  -> team name
+
+function esc(s) {
+    const d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
+}
+
+function fmtTime(ts) {
+    if (!ts) return '';
+    const d = new Date(ts);
+    return isNaN(d) ? ts : d.toLocaleString();
+}
+
+async function loadFilterOptions() {
+    try {
+        const [m, t] = await Promise.all([API.get('/api/matches'), API.get('/api/teams')]);
+        const ml = document.getElementById('match-list');
+        (m.matches || []).forEach(match => {
+            matchNames[match.match_id] = match.display_name || `Match ${match.match_id}`;
+            const o = document.createElement('option');
+            o.value = match.match_id;
+            o.label = `${matchNames[match.match_id]} (#${match.match_id})`;
+            ml.appendChild(o);
+        });
+        const tl = document.getElementById('team-list');
+        (t.teams || []).forEach(team => {
+            teamNames[team.team_id] = team.team_name || `Team ${team.team_id}`;
+            const o = document.createElement('option');
+            o.value = team.team_id;
+            o.label = `${teamNames[team.team_id]} (#${team.team_id})`;
+            tl.appendChild(o);
+        });
+    } catch (e) { /* filters still usable with raw IDs */ }
+}
+
+function contextHtml(log) {
+    const parts = [];
+    if (log.match_id) {
+        const name = matchNames[log.match_id] || `Match ${log.match_id}`;
+        parts.push(`<a href="#" data-match="${log.match_id}" title="Filter by this match">⚔️ ${esc(name)}</a>`);
+    }
+    if (log.team_id) {
+        const name = log.team_name || teamNames[log.team_id] || `Team ${log.team_id}`;
+        parts.push(`<a href="#" data-team="${log.team_id}" title="Filter by this team">📝 ${esc(name)}</a>`);
+    }
+    return parts.join(' • ');
+}
+
+function render(logs) {
+    const list = document.getElementById('logs-list');
+    if (!logs.length) {
+        list.innerHTML = `<div style="text-align:center;color:var(--text-muted);padding:2rem 0;">No log entries match these filters.</div>`;
+        return;
+    }
+    list.innerHTML = logs.map(log => {
+        const type = (log.log_type || 'INFO').toUpperCase();
+        const user = log.user_nick || log.user_name || `User ${log.user_id}`;
+        const avatar = log.user_avatar ? `<img src="${esc(log.user_avatar)}" alt="">` : '';
+        const msg = esc(log.processed_message || log.message_content || '');
+        const adds = log.message_additionals ? `<span class="additionals"> (${esc(log.message_additionals)})</span>` : '';
+        return `
+            <div class="log-row ${type}">
+                <div class="log-row-head">
+                    <span class="log-badge ${type}">${esc(type)}</span>
+                    <span class="log-time">${fmtTime(log.timestamp)}</span>
+                    <span class="log-context">${contextHtml(log)}</span>
+                </div>
+                <div class="log-user">${avatar}<strong>${esc(user)}</strong></div>
+                <div class="log-msg">${msg}${adds}</div>
+            </div>`;
+    }).join('');
+
+    list.querySelectorAll('[data-match]').forEach(a => a.addEventListener('click', (e) => {
+        e.preventDefault();
+        document.getElementById('f-match').value = a.dataset.match;
+        document.getElementById('f-team').value = '';
+        loadLogs();
+    }));
+    list.querySelectorAll('[data-team]').forEach(a => a.addEventListener('click', (e) => {
+        e.preventDefault();
+        document.getElementById('f-team').value = a.dataset.team;
+        document.getElementById('f-match').value = '';
+        loadLogs();
+    }));
+}
+
+// Shareable params — only the meaningful filters (not the view-only limit).
+function shareParams() {
+    const p = new URLSearchParams();
+    const type = document.getElementById('f-type').value;
+    const matchId = document.getElementById('f-match').value.trim();
+    const teamId = document.getElementById('f-team').value.trim();
+    if (type && type !== 'all') p.set('type', type);
+    if (matchId) p.set('match_id', matchId);
+    if (teamId) p.set('team_id', teamId);
+    return p;
+}
+
+function shareUrl() {
+    const p = shareParams();
+    return location.origin + location.pathname + (p.toString() ? `?${p}` : '');
+}
+
+function syncUrl() {
+    const p = shareParams();
+    history.replaceState(null, '', location.pathname + (p.toString() ? `?${p}` : ''));
+}
+
+async function copyText(text) {
+    try {
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(text);
+            return true;
+        }
+    } catch (e) { /* fall through to the legacy path below */ }
+    try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        return ok;
+    } catch (e) { return false; }
+}
+
+async function loadLogs() {
+    const meta = document.getElementById('logs-meta');
+    meta.textContent = 'Loading…';
+    const type = document.getElementById('f-type').value;
+    const limit = document.getElementById('f-limit').value;
+    const matchId = document.getElementById('f-match').value.trim();
+    const teamId = document.getElementById('f-team').value.trim();
+
+    syncUrl();  // keep the address bar shareable as filters change
+
+    const params = new URLSearchParams({ type, limit });
+    if (matchId) params.set('match_id', matchId);
+    if (teamId) params.set('team_id', teamId);
+
+    try {
+        const resp = await API.get(`/api/logs?${params.toString()}`);
+        const logs = resp.logs || [];
+        render(logs);
+        const filters = [];
+        if (matchId) filters.push(`match ${matchNames[matchId] ? esc(matchNames[matchId]) : '#' + esc(matchId)}`);
+        if (teamId) filters.push(`team ${teamNames[teamId] ? esc(teamNames[teamId]) : '#' + esc(teamId)}`);
+        meta.innerHTML = `Showing ${logs.length} ${logs.length === 1 ? 'entry' : 'entries'}` +
+            (filters.length ? ` · filtered by ${filters.join(', ')}` : '');
+    } catch (e) {
+        meta.textContent = `Failed to load logs: ${e.message}`;
+        document.getElementById('logs-list').innerHTML = '';
+    }
+}
+
+document.getElementById('f-refresh').addEventListener('click', loadLogs);
+document.getElementById('f-copy').addEventListener('click', async () => {
+    const ok = await copyText(shareUrl());
+    if (window.API && API.toast) {
+        API.toast(ok ? 'Link copied to clipboard' : 'Copy failed — copy it from the address bar', ok ? 'success' : 'error');
+    }
+});
+document.getElementById('f-type').addEventListener('change', loadLogs);
+document.getElementById('f-limit').addEventListener('change', loadLogs);
+['f-match', 'f-team'].forEach(id => document.getElementById(id).addEventListener('change', loadLogs));
+document.getElementById('f-clear').addEventListener('click', () => {
+    document.getElementById('f-type').value = 'all';
+    document.getElementById('f-match').value = '';
+    document.getElementById('f-team').value = '';
+    loadLogs();
+});
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadFilterOptions();
+    // Honour deep-link query params (e.g. redirected from /match/<id>, /team/<id>).
+    const qs = new URLSearchParams(window.location.search);
+    if (qs.get('match_id')) document.getElementById('f-match').value = qs.get('match_id');
+    if (qs.get('team_id')) document.getElementById('f-team').value = qs.get('team_id');
+    if (qs.get('type')) document.getElementById('f-type').value = qs.get('type');
+    loadLogs();
+});
+</script>
+{% endblock %}

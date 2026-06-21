@@ -66,6 +66,14 @@ try:
 except Exception as e:
     logger.warning(f'Failed to register admin panel blueprint: {e}')
 
+# Register internal scheduling API blueprint (API-key auth, for external sites)
+try:
+    from web.scheduling_api import scheduling_api_bp
+    app.register_blueprint(scheduling_api_bp)
+    logger.info('Scheduling API blueprint registered')
+except Exception as e:
+    logger.warning(f'Failed to register scheduling API blueprint: {e}')
+
 # Manual CORS implementation (more reliable than quart-cors)
 @app.after_request
 async def after_request(response):
@@ -224,49 +232,34 @@ async def startup():
     await log_viewer.init_db()
     logger.info("Simple web log viewer started")
 
+# The standalone log viewer has been retired — these routes now redirect to the
+# modern logs page inside the admin dashboard (/admin/logs). The /api/* endpoints
+# below stay, since the admin logs page consumes them.
 @app.route('/')
-@require_auth
 async def index():
-    """Main log viewer page"""
-    return await render_template('logs.html')
+    return redirect('/admin/logs')
 
 @app.route('/match/<int:match_id>')
-@require_auth
 async def match_logs(match_id):
-    """View logs for a specific match"""
-    return await render_template('logs.html', preset_match_id=match_id)
+    return redirect(f'/admin/logs?match_id={match_id}')
 
 @app.route('/team/<int:team_id>')
-@require_auth
 async def team_logs(team_id):
-    """View logs for a specific team by team_id"""
-    return await render_template('logs.html', preset_team_id=team_id)
+    return redirect(f'/admin/logs?team_id={team_id}')
 
 @app.route('/roster/<int:roster_id>')
-@require_auth
 async def roster_logs(roster_id):
-    """View logs for a specific team by roster_id (converts to team_id)"""
+    """Resolve roster_id -> team_id, then send to the admin logs page."""
+    team_id = roster_id
     try:
-        if not log_viewer.db:
-            return jsonify({'error': 'Database not available'}), 500
-        
-        # Look up team_id by roster_id
-        team_info = log_viewer.db.teams._fetch_one(
-            "SELECT team_id FROM teams WHERE roster_id = ?", 
-            (roster_id,)
-        )
-        
-        if team_info and team_info.get('team_id'):
-            team_id = team_info['team_id']
-            return await render_template('logs.html', preset_team_id=team_id)
-        else:
-            # If no team_id found, still try with roster_id as team_id
-            return await render_template('logs.html', preset_team_id=roster_id)
-            
+        if log_viewer.db:
+            info = log_viewer.db.teams._fetch_one(
+                "SELECT team_id FROM teams WHERE roster_id = ?", (roster_id,))
+            if info and info.get('team_id'):
+                team_id = info['team_id']
     except Exception as e:
         logger.error(f"Error looking up roster {roster_id}: {e}")
-        # Fallback to using roster_id as team_id
-        return await render_template('logs.html', preset_team_id=roster_id)
+    return redirect(f'/admin/logs?team_id={team_id}')
 
 @app.route('/api/logs')
 @require_auth

@@ -54,9 +54,10 @@
     </div>
 
     <div class="card" style="margin-top:1rem;">
-        <h2>📅 Team Scheduling</h2>
+        <h2>📅 Match Scheduling</h2>
         <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:0.75rem;">
-            Exclude days that should not be available for scheduling. Then send the schedule messages to all team channels.
+            Exclude days that shouldn't be offered when teams propose a time. Scheduling happens in each
+            match channel — there's nothing to send to team channels.
         </p>
         <div id="schedule-excluded" style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem;">
             <label style="display:flex;align-items:center;gap:0.25rem;font-size:0.85rem;cursor:pointer;">
@@ -81,9 +82,45 @@
                 <input type="checkbox" class="sched-day-cb" value="6"> Sunday
             </label>
         </div>
+        <hr style="border-color:var(--border);margin:0.75rem 0;">
+        <h3 style="font-size:0.95rem;margin-bottom:0.4rem;">Match Scheduling (per-match deadlines)</h3>
+        <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:0.5rem;">
+            When enabled, every generated match gets a "Propose Match Time" button and a weekly deadline.
+            Unscheduled matches past the deadline are flagged in the launchpad. Leave off for cups / one-off events.
+        </p>
+        <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.9rem;cursor:pointer;margin-bottom:0.6rem;">
+            <input type="checkbox" id="sched-enabled"> Enable match scheduling
+        </label>
+        <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end;margin-bottom:0.75rem;">
+            <label style="display:flex;flex-direction:column;gap:0.25rem;font-size:0.85rem;">
+                Format
+                <select id="sched-format" class="form-input" style="width:auto;">
+                    <option value="">— Select —</option>
+                    <option value="sixes">Sixes (Sun–Thu · deadline Mon 7PM)</option>
+                    <option value="highlander">Highlander (Wed–Sun · deadline Thu 7PM)</option>
+                    <option value="other">Other (custom)</option>
+                </select>
+            </label>
+            <label style="display:flex;flex-direction:column;gap:0.25rem;font-size:0.85rem;">
+                Deadline day
+                <select id="sched-deadline-day" class="form-input" style="width:auto;">
+                    <option value="">— Format default —</option>
+                    <option value="0">Monday</option>
+                    <option value="1">Tuesday</option>
+                    <option value="2">Wednesday</option>
+                    <option value="3">Thursday</option>
+                    <option value="4">Friday</option>
+                    <option value="5">Saturday</option>
+                    <option value="6">Sunday</option>
+                </select>
+            </label>
+            <label style="display:flex;flex-direction:column;gap:0.25rem;font-size:0.85rem;">
+                Deadline time (AEST)
+                <input type="time" id="sched-deadline-time" class="form-input" style="width:auto;">
+            </label>
+        </div>
         <div style="display:flex;gap:0.5rem;">
-            <button class="btn btn-primary" id="btn-save-schedule-settings">💾 Save Excluded Days</button>
-            <button class="btn btn-secondary" id="btn-send-schedule-msgs">📬 Send Schedule Messages</button>
+            <button class="btn btn-primary" id="btn-save-schedule-settings">💾 Save Settings</button>
         </div>
         <div id="schedule-result" class="result-box" style="display:none;margin-top:0.5rem;"></div>
     </div>
@@ -362,10 +399,15 @@ document.getElementById('btn-force-gen').addEventListener('click', async () => {
 async function loadScheduleSettings() {
     try {
         const r = await API.get(`/admin/api/leagues/${LEAGUE_ID}/schedule-settings`);
-        const excluded = r.settings?.excluded_days || [];
+        const s = r.settings || {};
+        const excluded = s.excluded_days || [];
         document.querySelectorAll('.sched-day-cb').forEach(cb => {
             cb.checked = excluded.includes(parseInt(cb.value));
         });
+        document.getElementById('sched-enabled').checked = !!s.scheduling_enabled;
+        document.getElementById('sched-format').value = s.format || '';
+        document.getElementById('sched-deadline-day').value = (s.deadline_day ?? '') === '' ? '' : String(s.deadline_day);
+        document.getElementById('sched-deadline-time').value = (s.deadline_time || '').slice(0, 5);
     } catch (e) { /* ignore — settings may not exist yet */ }
 }
 
@@ -374,10 +416,18 @@ document.getElementById('btn-save-schedule-settings').addEventListener('click', 
     document.querySelectorAll('.sched-day-cb:checked').forEach(cb => {
         excluded.push(parseInt(cb.value));
     });
+    const ddRaw = document.getElementById('sched-deadline-day').value;
+    const payload = {
+        excluded_days: excluded,
+        scheduling_enabled: document.getElementById('sched-enabled').checked,
+        format: document.getElementById('sched-format').value || null,
+        deadline_day: ddRaw === '' ? null : parseInt(ddRaw),
+        deadline_time: document.getElementById('sched-deadline-time').value || null,
+    };
     const result = document.getElementById('schedule-result');
     try {
-        await API.request('PUT', `/admin/api/leagues/${LEAGUE_ID}/schedule-settings`, { excluded_days: excluded });
-        result.textContent = 'Excluded days saved.';
+        await API.request('PUT', `/admin/api/leagues/${LEAGUE_ID}/schedule-settings`, payload);
+        result.textContent = 'Schedule settings saved.';
         result.className = 'result-box result-success';
         API.toast('Schedule settings saved', 'success');
     } catch (e) {
@@ -386,24 +436,6 @@ document.getElementById('btn-save-schedule-settings').addEventListener('click', 
         API.toast(e.message, 'error');
     }
     result.style.display = 'block';
-});
-
-document.getElementById('btn-send-schedule-msgs').addEventListener('click', async () => {
-    const btn = document.getElementById('btn-send-schedule-msgs');
-    const result = document.getElementById('schedule-result');
-    btn.disabled = true; btn.textContent = 'Sending...'; result.style.display = 'none';
-    try {
-        const r = await API.post(`/admin/api/leagues/${LEAGUE_ID}/send-schedule-messages`, {});
-        result.textContent = `Sent ${r.messages_sent || 0} schedule messages.`;
-        result.className = 'result-box result-success';
-        API.toast(`Sent ${r.messages_sent || 0} messages`, 'success');
-    } catch (e) {
-        result.textContent = e.message;
-        result.className = 'result-box result-error';
-        API.toast(e.message, 'error');
-    }
-    result.style.display = 'block';
-    btn.disabled = false; btn.textContent = '📬 Send Schedule Messages';
 });
 
 document.addEventListener('DOMContentLoaded', () => { loadDetail(); loadScheduleSettings(); });

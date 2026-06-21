@@ -105,11 +105,11 @@ def initialize(bot, db, cit, tournament_cog, sync_cog):
             logger.warning(f'Failed to register awards views: {e}')
 
         try:
-            from web.schedule_discord import register_schedule_views
-            register_schedule_views(_bot, _db)
-            logger.info('Schedule persistent views registered')
+            from web.match_schedule_discord import register_match_schedule_views
+            register_match_schedule_views(_bot, _db)
+            logger.info('Match schedule persistent views registered')
         except Exception as e:
-            logger.warning(f'Failed to register schedule views: {e}')
+            logger.warning(f'Failed to register match schedule views: {e}')
 
 
 # ── Session helpers ──────────────────────────────────────────
@@ -337,8 +337,11 @@ async def matches_page():
 
 
 @admin_bp.route('/logs')
-async def admin_logs_redirect():
-    return redirect('/')
+async def admin_logs_page():
+    session_user = get_session_user()
+    if not session_user or not session_user.get('is_admin'):
+        return redirect('/admin/login')
+    return await render_template('admin/logs.html', user=session_user)
 
 
 @admin_bp.route('/sync')
@@ -2066,8 +2069,17 @@ async def api_schedule_settings_get(league_id: int):
         settings = _db.tournament_schedule_settings.get_by_league(league_id) if hasattr(_db, 'tournament_schedule_settings') else None
         if settings:
             excluded = [int(x) for x in settings['excluded_days'].split(',') if x.strip()] if settings.get('excluded_days') else []
-            return jsonify({'settings': {'excluded_days': excluded}})
-        return jsonify({'settings': {'excluded_days': []}})
+            return jsonify({'settings': {
+                'excluded_days': excluded,
+                'scheduling_enabled': bool(settings.get('scheduling_enabled')),
+                'format': settings.get('format'),
+                'deadline_day': settings.get('deadline_day'),
+                'deadline_time': settings.get('deadline_time'),
+            }})
+        return jsonify({'settings': {
+            'excluded_days': [], 'scheduling_enabled': False,
+            'format': None, 'deadline_day': None, 'deadline_time': None,
+        }})
     except Exception as e:
         logger.error(f'Schedule settings error: {e}')
         return _db_error(e)
@@ -2078,54 +2090,40 @@ async def api_schedule_settings_get(league_id: int):
 async def api_schedule_settings_update(league_id: int):
     if not _db:
         return jsonify({'error': 'Database not ready'}), 503
-    data = await request.get_json()
-    excluded = data.get('excluded_days', []) if data else []
+    data = await request.get_json() or {}
+    excluded = data.get('excluded_days', [])
     excluded_str = ','.join(str(d) for d in excluded)
+    scheduling_enabled = 1 if data.get('scheduling_enabled') else 0
+    fmt = data.get('format') or None
+    deadline_day = data.get('deadline_day')
+    deadline_time = data.get('deadline_time') or None
+    # Fill the deadline from the format preset when not explicitly provided.
+    from modules.database.repositories import TournamentScheduleSettingsRepository
+    preset = TournamentScheduleSettingsRepository.format_defaults(fmt)
+    if preset:
+        if deadline_day in (None, ''):
+            deadline_day = preset['deadline_day']
+        if not deadline_time:
+            deadline_time = preset['deadline_time']
+    deadline_day = int(deadline_day) if deadline_day not in (None, '') else None
+    payload = {
+        'excluded_days': excluded_str,
+        'scheduling_enabled': scheduling_enabled,
+        'format': fmt,
+        'deadline_day': deadline_day,
+        'deadline_time': deadline_time,
+    }
     try:
         existing = _db.tournament_schedule_settings.get_by_league(league_id) if hasattr(_db, 'tournament_schedule_settings') else None
         if existing:
-            _db.tournament_schedule_settings.update(existing['id'], {'excluded_days': excluded_str})
+            _db.tournament_schedule_settings.update(existing['id'], payload)
         else:
-            _db.tournament_schedule_settings.insert({'league_id': league_id, 'excluded_days': excluded_str})
+            _db.tournament_schedule_settings.insert({'league_id': league_id, **payload})
         return jsonify({'success': True})
     except Exception as e:
         logger.error(f'Schedule settings update error: {e}')
         return _db_error(e)
 
-
-@admin_bp.route('/api/leagues/<int:league_id>/send-schedule-messages', methods=['POST'])
-@require_admin
-async def api_send_schedule_messages(league_id: int):
-    if not _check_bot_ready():
-        return jsonify({'error': 'Bot not ready'}), 503
-    if not _db:
-        return jsonify({'error': 'Database not ready'}), 503
-    try:
-        from web.schedule_discord import ScheduleButtonView
-        teams = _db.teams.get_by_league(league_id)
-        sent = 0
-        for team in teams:
-            if not team.get('team_channel'):
-                continue
-            channel = _bot.get_channel(team['team_channel'])
-            if not channel:
-                continue
-            view = ScheduleButtonView(team['team_id'], league_id)
-            try:
-                embed = discord.Embed(
-                    title='📅 Team Availability',
-                    description='Click the button below to set your team\'s availability for this season.\nSelect days and times that work best for your team.',
-                    color=discord.Color.blue(),
-                )
-                msg = await channel.send(embed=embed, view=view)
-                await msg.pin()
-                sent += 1
-            except Exception:
-                continue
-        return jsonify({'success': True, 'messages_sent': sent})
-    except Exception as e:
-        logger.error(f'Send schedule messages error: {e}')
-        return _db_error(e)
 
 @admin_bp.route('/api/awards/events/<int:event_id>/notify-invalidation', methods=['POST'])
 @require_admin

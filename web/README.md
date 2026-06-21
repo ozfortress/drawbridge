@@ -54,10 +54,15 @@ python web_server.py
 
 ## URLs
 
-- **Main Interface**: `http://localhost:8080/`
-- **Match Logs**: `http://localhost:8080/match/123`
-- **Team Logs**: `http://localhost:8080/team/456`
-- **Roster Logs**: `http://localhost:8080/roster/789`
+The standalone log viewer has been retired and folded into the admin dashboard.
+The routes below now redirect to `/admin/logs` (which supports `?match_id=` and
+`?team_id=` deep-links):
+
+- **Logs (admin dashboard)**: `http://localhost:8080/admin/logs`
+- `http://localhost:8080/` → redirects to `/admin/logs`
+- `http://localhost:8080/match/123` → `/admin/logs?match_id=123`
+- `http://localhost:8080/team/456` → `/admin/logs?team_id=456`
+- `http://localhost:8080/roster/789` → resolves to the team, then `/admin/logs?team_id=…`
 
 ## Environment Variables
 
@@ -117,7 +122,8 @@ The web interface reads from these database tables:
 ### Template Structure
 ```
 templates/
-└── logs.html    # Main log viewer interface
+└── admin/
+    └── logs.html    # Log viewer (part of the admin dashboard)
 ```
 
 ## Troubleshooting

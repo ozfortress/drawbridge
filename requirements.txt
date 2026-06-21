@@ -1,10 +1,13 @@
-discord.py==2.3.2
-python-dotenv==1.0.1
-requests==2.31.0
+discord.py==2.7.1
+python-dotenv==1.2.2
+requests==2.34.2
+# mariadb 1.1.10: CVE-2026-44172 (Connector/C) has no patched release as of writing — even
+# the latest 1.1.14 is still affected. Tracked; requires an upstream fix to resolve.
 mariadb==1.1.10
-pillow==10.3.0
-quart==0.19.4
-werkzeug==3.0.1
+pillow==12.2.0
+quart==0.20.0
+werkzeug==3.1.8
 aiofiles==23.2.1
-aiohttp==3.12.14
+aiohttp==3.14.1
 psutil==5.9.8
+tzdata==2024.1
