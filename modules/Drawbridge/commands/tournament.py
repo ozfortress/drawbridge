@@ -16,6 +16,7 @@ from discord.ext import tasks as discord_tasks
 import asyncio
 import functools
 from web.template_helper import get_template, set_db as template_set_db
+from web.match_schedule_discord import MatchScheduleButtonView, compute_deadline_utc, next_occurrence
 
 __title__ = 'Tournament Commands'
 __description__ = 'Commands for managing tournaments.'
@@ -25,6 +26,22 @@ checks = Checks()
 
 # Use centralized logging
 logger = get_logger('drawbridge.tournament', 'tournament.log')
+
+# Shared choices for the schedule command + its /schedule alias
+_SCHEDULE_DAY_CHOICES = [
+    app_commands.Choice(name='Monday', value=0),
+    app_commands.Choice(name='Tuesday', value=1),
+    app_commands.Choice(name='Wednesday', value=2),
+    app_commands.Choice(name='Thursday', value=3),
+    app_commands.Choice(name='Friday', value=4),
+    app_commands.Choice(name='Saturday', value=5),
+    app_commands.Choice(name='Sunday', value=6),
+]
+_SCHEDULE_TIME_CHOICES = [
+    app_commands.Choice(name='7:00 PM', value='19:00'),
+    app_commands.Choice(name='8:00 PM', value='20:00'),
+    app_commands.Choice(name='9:00 PM', value='21:00'),
+]
 
 def log_command(func):
     """Decorator for logging tournament commands - uses centralized logging."""
@@ -97,6 +114,14 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
             await channel.purge(limit=100, check=is_me)
             teams = self.db.teams.get_all()
             matches = self.db.matches.get_unarchived()
+            try:
+                all_scheds = self.db.match_schedules.get_all()
+                confirmed_sched = {s['match_id']: s for s in all_scheds if s.get('status') == 'confirmed'}
+                overdue = self.db.match_schedules.get_overdue(datetime.datetime.utcnow())
+            except Exception as e:
+                self.logger.error(f'Failed to load match schedules for launchpad: {e}')
+                confirmed_sched = {}
+                overdue = []
             leagueids = []
             leagues=[]
             divids=[]
@@ -134,10 +159,22 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
                                 if match['channel_id'] == 0:
                                     rawlaunchpadmessage += f'- [{match["match_id"]}](<https://ozfortress.com/matches/{match["match_id"]}>) -> Bye\n'
                                 else:
-                                    rawlaunchpadmessage += f'- [{match["match_id"]}](<https://ozfortress.com/matches/{match["match_id"]}>) -> <#{match["channel_id"]}>\n'
+                                    line = f'- [{match["match_id"]}](<https://ozfortress.com/matches/{match["match_id"]}>) -> <#{match["channel_id"]}>'
+                                    sched = confirmed_sched.get(match['match_id'])
+                                    if sched and sched.get('scheduled_at'):
+                                        unix = int(sched['scheduled_at'].replace(tzinfo=datetime.timezone.utc).timestamp())
+                                        line += f' — 🗓️ <t:{unix}:F>'
+                                    rawlaunchpadmessage += line + '\n'
                         if len(matches) == 0:
                             rawlaunchpadmessage += f'- No matches found\n'
                         rawlaunchpadmessage += '\n'
+            if overdue:
+                rawlaunchpadmessage += '\n# ⚠️ Unscheduled / Past Deadline\n'
+                rawlaunchpadmessage += 'These matches have no agreed time and are past their scheduling deadline. Admins, please intervene.\n'
+                for o in overdue:
+                    cid = o.get('channel_id')
+                    loc = f'<#{cid}>' if cid else 'No channel'
+                    rawlaunchpadmessage += f'- [{o["match_id"]}](<https://ozfortress.com/matches/{o["match_id"]}>) -> {loc}\n'
             launchpadmessages = []
             # split on the first \n under 2000 chars
             while len(rawlaunchpadmessage) > 2000:
@@ -147,6 +184,50 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
             launchpadmessages.append(rawlaunchpadmessage)
             for message in launchpadmessages:
                 await channel.send(content=message)
+
+    @discord_tasks.loop(hours=1)
+    async def check_schedule_deadlines(self):
+        """Post a one-time warning in any match channel whose scheduling deadline
+        has passed without an agreed time, then refresh the launchpad."""
+        try:
+            overdue = self.db.match_schedules.get_overdue(datetime.datetime.utcnow())
+        except Exception as e:
+            self.logger.error(f'Deadline check failed to query schedules: {e}')
+            return
+        changed = False
+        for o in overdue:
+            if o.get('deadline_flagged'):
+                continue
+            cid = o.get('channel_id')
+            channel = self.bot.get_channel(cid) if cid else None
+            if channel is not None:
+                try:
+                    home = self.db.teams.get_by_team_and_league(o['team_home'], o['league_id'])
+                    away = self.db.teams.get_by_team_and_league(o['team_away'], o['league_id'])
+                    mentions = ' '.join(
+                        f"<@&{t['role_id']}>" for t in (home, away) if t and t.get('role_id')
+                    )
+                    embed = discord.Embed(
+                        title='⏰ Scheduling deadline passed',
+                        description='This match has not been scheduled in time. An admin will '
+                                    'step in to set a time per the default match day/time.',
+                        color=discord.Color.red(),
+                    )
+                    await channel.send(content=mentions or None, embed=embed,
+                                       allowed_mentions=discord.AllowedMentions(roles=True))
+                except Exception as e:
+                    self.logger.error(f'Failed to post deadline warning for match {o["match_id"]}: {e}')
+            try:
+                self.db.match_schedules.set_flagged(o['match_id'])
+                changed = True
+            except Exception as e:
+                self.logger.error(f'Failed to flag match {o["match_id"]}: {e}')
+        if changed:
+            await self.update_launchpad()
+
+    @check_schedule_deadlines.before_loop
+    async def before_check_schedule_deadlines(self):
+        await self.bot.wait_until_ready()
 
     async def _assign_roles(self, league_id: int):
         # This needs a fair few requests to Citadel, unfortunately
@@ -524,6 +605,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
                     await interaction.edit_original_response(content=f'{status}\n```\n{format(last_five)}\n```')
                     break
 
+        self.db.match_schedules.delete_by_league(league_id)
         self.db.matches.delete_by_league(league_id)
         self.db.teams.delete_by_league(league_id)
         self.db.divisions.delete_by_league(league_id)
@@ -677,6 +759,40 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
                 'channel_id': match_channel.id,
                 'league_id': match.league_id
             })
+
+            # Per-match scheduling — only when enabled for this league (cups/events opt out)
+            try:
+                settings = self.db.tournament_schedule_settings.get_by_league(match.league_id)
+                if settings and settings.get('scheduling_enabled'):
+                    deadline = compute_deadline_utc(settings)
+                    self.db.match_schedules.insert({
+                        'match_id': match.id,
+                        'league_id': match.league_id,
+                        'deadline_at': deadline,
+                    })
+                    sched_embed = discord.Embed(
+                        title='🗓️ Schedule this match',
+                        description='Both teams must agree on a day and time. Use the button '
+                                    'below to propose a time; the other team then confirms.',
+                        color=discord.Color.blurple(),
+                    )
+                    if deadline:
+                        unix = int(deadline.replace(tzinfo=datetime.timezone.utc).timestamp())
+                        sched_embed.add_field(
+                            name='Deadline',
+                            value=f'Agree on a time before <t:{unix}:F> (<t:{unix}:R>), '
+                                  'or an admin will step in.',
+                            inline=False,
+                        )
+                    sched_msg = await match_channel.send(embed=sched_embed,
+                                                         view=MatchScheduleButtonView(match.id))
+                    try:
+                        await sched_msg.pin()
+                    except Exception:
+                        pass
+            except Exception as e:
+                self.logger.error(f'Failed to set up match scheduling: {e}')
+
             # Lets also say something in their team channel
             try:
                 team_home_channel = self.bot.get_channel(team_home['team_channel']) # team_channel
@@ -699,6 +815,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
             match_channel = self.bot.get_channel(match['channel_id'])
             if match_channel is not None:
                 await match_channel.delete()
+            self.db.match_schedules.delete_by_match(match_id)
             self.db.matches.delete(match_id)
 
     @app_commands.command(
@@ -867,9 +984,71 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
 
         # Update the database
         self.db.archive_match(match_id)
+        self.db.match_schedules.delete_by_match(match_id)
 
         await interaction.edit_original_response(content='Round ended. All channels have been archived.')
         await self.update_launchpad()
+
+    @app_commands.command(
+        name='schedule'
+    )
+    @log_command
+    @checks.has_roles(
+        'DIRECTOR',
+        'HEAD',
+        'DEVELOPER',
+        'ADMIN',
+        'TRIAL',
+    )
+    @app_commands.choices(day=_SCHEDULE_DAY_CHOICES, time=_SCHEDULE_TIME_CHOICES)
+    async def schedule(self, interaction: discord.Interaction, match_id: int,
+                       day: app_commands.Choice[int], time: app_commands.Choice[str]):
+        """Admin: directly set or override a match's scheduled day and time.
+
+        Parameters
+        -----------
+        match_id: int
+            The match to schedule
+        day: app_commands.Choice[int]
+            Day of week to play (AEST/AEDT)
+        time: app_commands.Choice[str]
+            Start time (AEST/AEDT)
+        """
+        await self.apply_schedule(interaction, match_id, day.value, day.name, time.value, time.name)
+
+    async def apply_schedule(self, interaction: discord.Interaction, match_id: int,
+                             day_value: int, day_name: str, time_value: str, time_name: str):
+        """Set/override a match's confirmed time, announce it, and refresh the launchpad.
+
+        Shared by /tournament schedule and the /schedule alias.
+        """
+        await interaction.response.send_message('Setting match time...', ephemeral=True)
+        match = self.db.matches.get_by_id(match_id)
+        if match is None:
+            await interaction.edit_original_response(
+                content='Match not found in the database. Generate it first with /tournament matchgen.')
+            return
+
+        scheduled = next_occurrence(day_value, time_value)
+        if self.db.match_schedules.get_by_match_id(match_id) is None:
+            self.db.match_schedules.insert({'match_id': match_id, 'league_id': match['league_id']})
+        self.db.match_schedules.set_confirmed(match_id, scheduled.replace(tzinfo=None))
+
+        unix = int(scheduled.timestamp())
+        channel = self.bot.get_channel(match['channel_id']) if match.get('channel_id') else None
+        if channel is not None:
+            try:
+                embed = discord.Embed(
+                    title='✅ Match Scheduled',
+                    description=f'An admin set this match for <t:{unix}:F> (<t:{unix}:R>).',
+                    color=discord.Color.green(),
+                )
+                await channel.send(embed=embed)
+            except Exception as e:
+                self.logger.error(f'Failed to announce admin schedule for match {match_id}: {e}')
+        await self.update_launchpad()
+        await interaction.edit_original_response(
+            content=f'Match {match_id} scheduled for {day_name} {time_name} (<t:{unix}:F>).')
 
     #Todo:
     #[x] Record all teams who succeed / fail a check
@@ -1276,9 +1455,49 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
     #         await ctx.response.send_message(content='An error occurred while running this command.', ephermeral=True)
 
 
+@discord.app_commands.guild_only()
+class ScheduleAlias(discord_commands.Cog):
+    """Top-level /schedule alias that delegates to /tournament schedule."""
+
+    def __init__(self, bot: discord_commands.Bot, tournament: Tournament) -> None:
+        self.bot = bot
+        self.tournament = tournament
+
+    @app_commands.command(
+        name='schedule',
+        description="Admin: set or override a match's scheduled day and time.",
+    )
+    @checks.has_roles(
+        'DIRECTOR',
+        'HEAD',
+        'DEVELOPER',
+        'ADMIN',
+        'TRIAL',
+    )
+    @app_commands.choices(day=_SCHEDULE_DAY_CHOICES, time=_SCHEDULE_TIME_CHOICES)
+    async def schedule(self, interaction: discord.Interaction, match_id: int,
+                       day: app_commands.Choice[int], time: app_commands.Choice[str]):
+        """Admin: directly set or override a match's scheduled day and time.
+
+        Parameters
+        -----------
+        match_id: int
+            The match to schedule
+        day: app_commands.Choice[int]
+            Day of week to play (AEST/AEDT)
+        time: app_commands.Choice[str]
+            Start time (AEST/AEDT)
+        """
+        await self.tournament.apply_schedule(
+            interaction, match_id, day.value, day.name, time.value, time.name)
+
+
 async def initialize(bot: discord_commands.Bot, db, cit, logger):
     tournament = Tournament(bot, db, cit, logger)
     await bot.add_cog(tournament, guilds=[bot.get_guild(int(os.getenv('DISCORD_GUILD_ID')))])
+    await bot.add_cog(ScheduleAlias(bot, tournament), guilds=[bot.get_guild(int(os.getenv('DISCORD_GUILD_ID')))])
+    if not tournament.check_schedule_deadlines.is_running():
+        tournament.check_schedule_deadlines.start()
     await tournament.update_launchpad() # on startup
     # list = await bot.tree.sync(guild=discord.Object(id=os.getenv('DISCORD_GUILD_ID')))
     # logger.info(f'Loaded Tournament Commands: {list}')

@@ -8,3 +8,4 @@ werkzeug==3.0.1
 aiofiles==23.2.1
 aiohttp==3.12.14
 psutil==5.9.8
+tzdata==2024.1

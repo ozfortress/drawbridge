@@ -19,6 +19,7 @@ from .repositories import (
     AwardVotesRepository, AwardVoteAuditLogRepository,
     AwardResultsRepository, AwardAdminFillOptionsRepository,
     TournamentScheduleSettingsRepository, TeamAvailabilityRepository,
+    MatchSchedulesRepository,
 )
 
 
@@ -74,6 +75,7 @@ class Database:
         self.award_admin_fill_options = AwardAdminFillOptionsRepository(self.connection)
         self.tournament_schedule_settings = TournamentScheduleSettingsRepository(self.connection)
         self.team_availability = TeamAvailabilityRepository(self.connection)
+        self.match_schedules = MatchSchedulesRepository(self.connection)
 
         # Initialize migration manager
         self.migrations = MigrationManager(self.connection)
@@ -177,6 +179,7 @@ class Database:
         """
         try:
             # Delete in order to respect foreign key constraints
+            self.match_schedules.delete_by_league(league_id)
             self.matches.delete_by_league(league_id)
             self.teams.delete_by_league(league_id)
             self.divisions.delete_by_league(league_id)

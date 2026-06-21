@@ -66,6 +66,14 @@ try:
 except Exception as e:
     logger.warning(f'Failed to register admin panel blueprint: {e}')
 
+# Register internal scheduling API blueprint (API-key auth, for external sites)
+try:
+    from web.scheduling_api import scheduling_api_bp
+    app.register_blueprint(scheduling_api_bp)
+    logger.info('Scheduling API blueprint registered')
+except Exception as e:
+    logger.warning(f'Failed to register scheduling API blueprint: {e}')
+
 # Manual CORS implementation (more reliable than quart-cors)
 @app.after_request
 async def after_request(response):
