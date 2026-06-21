@@ -14,7 +14,9 @@ import discord
 from discord.ui import View, Button, Select, Modal, TextInput
 
 from modules.Drawbridge.checks import Checks
+from modules.logging_config import get_logger
 
+logger = get_logger('drawbridge.match_schedule', 'tournament.log')
 SYDNEY = ZoneInfo('Australia/Sydney')
 _checks = Checks()
 DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -152,6 +154,40 @@ async def _refresh_launchpad():
         pass
 
 
+def log_schedule_event(db, match_id: int, action: str, *, user=None, team_id=None):
+    """Write a scheduling event into the logs table so it shows in the dashboard
+    (log type 'SCHED', filterable per match). Never raises — logging is best-effort.
+
+    ``user`` may be a discord member/user, or None for non-Discord actors (the API).
+    """
+    if not db:
+        return
+    try:
+        if user is not None:
+            uid = getattr(user, 'id', 0)
+            uname = getattr(user, 'name', 'unknown')
+            unick = getattr(user, 'display_name', None) or uname
+            avatar = getattr(user, 'display_avatar', None)
+            uavatar = str(avatar.url) if avatar else ''
+        else:
+            uid, uname, unick, uavatar = 0, 'Internal API', 'Internal API', ''
+        db.logs.insert({
+            'match_id': match_id,
+            'team_id': team_id,
+            'user_id': uid,
+            'user_name': uname[:32],
+            'user_nick': (unick or uname)[:32],
+            'user_avatar': uavatar[:255],
+            'message_id': 0,
+            'message_content': action[:3000],
+            'message_additionals': '',
+            'log_type': 'SCHED',
+            'log_timestamp': datetime.datetime.now(),
+        })
+    except Exception as e:
+        logger.error(f'Failed to log schedule event for match {match_id}: {e}')
+
+
 # ── Propose flow (transient, ephemeral) ──────────────────────
 
 class _DaySelect(Select):
@@ -243,6 +279,11 @@ class ProposeView(View):
         db.match_schedules.set_proposal(
             self.match_id, day, time,
             proposer['team_id'] if proposer else None, interaction.user.id,
+        )
+        log_schedule_event(
+            db, self.match_id,
+            f"Proposed {_slot_label(day, time)}" + (' (reschedule)' if self.current_unix else ''),
+            user=interaction.user, team_id=proposer['team_id'] if proposer else None,
         )
         embed = discord.Embed(
             title='📅 Proposed Match Time',
@@ -396,6 +437,12 @@ class ProposalDecisionView(View):
 
         scheduled = next_occurrence(sched['proposed_day'], sched['proposed_time'])
         db.match_schedules.set_confirmed(self.match_id, scheduled.replace(tzinfo=None))
+        log_schedule_event(
+            db, self.match_id,
+            f"Confirmed {_slot_label(sched['proposed_day'], sched['proposed_time'])}",
+            user=interaction.user,
+            team_id=ctx[side]['team_id'] if side in ('home', 'away') and ctx.get(side) else None,
+        )
 
         unix = int(scheduled.timestamp())
         embed = discord.Embed(

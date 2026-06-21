@@ -210,11 +210,12 @@ async def set_match_time(match_id: int):
     if not match:
         return jsonify({'error': 'Match not found — generate it first'}), 404
 
-    from web.match_schedule_discord import next_occurrence
+    from web.match_schedule_discord import next_occurrence, log_schedule_event, _fmt_time
     scheduled = next_occurrence(day, time_str)
     if not db.match_schedules.get_by_match_id(match_id):
         db.match_schedules.insert({'match_id': match_id, 'league_id': match['league_id']})
     db.match_schedules.set_confirmed(match_id, scheduled.replace(tzinfo=None))
+    log_schedule_event(db, match_id, f'Set via API: {DAY_NAMES[day]} {_fmt_time(time_str)}', user=None)
 
     notified = False
     if data.get('notify', True):

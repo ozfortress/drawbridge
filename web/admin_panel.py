@@ -337,8 +337,11 @@ async def matches_page():
 
 
 @admin_bp.route('/logs')
-async def admin_logs_redirect():
-    return redirect('/')
+async def admin_logs_page():
+    session_user = get_session_user()
+    if not session_user or not session_user.get('is_admin'):
+        return redirect('/admin/login')
+    return await render_template('admin/logs.html', user=session_user)
 
 
 @admin_bp.route('/sync')

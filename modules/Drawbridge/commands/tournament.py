@@ -17,7 +17,7 @@ from discord.ext import tasks as discord_tasks
 import asyncio
 import functools
 from web.template_helper import get_template, set_db as template_set_db
-from web.match_schedule_discord import MatchScheduleButtonView, RescheduleView, compute_deadline_utc, next_occurrence
+from web.match_schedule_discord import MatchScheduleButtonView, RescheduleView, compute_deadline_utc, next_occurrence, log_schedule_event
 
 __title__ = 'Tournament Commands'
 __description__ = 'Commands for managing tournaments.'
@@ -1080,6 +1080,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
         if self.db.match_schedules.get_by_match_id(match_id) is None:
             self.db.match_schedules.insert({'match_id': match_id, 'league_id': match['league_id']})
         self.db.match_schedules.set_confirmed(match_id, scheduled.replace(tzinfo=None))
+        log_schedule_event(self.db, match_id, f'Admin set {day_name} {time_name}', user=interaction.user)
 
         unix = int(scheduled.timestamp())
         channel = self.bot.get_channel(match['channel_id']) if match.get('channel_id') else None
