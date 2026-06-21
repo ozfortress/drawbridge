@@ -85,7 +85,8 @@
         <hr style="border-color:var(--border);margin:0.75rem 0;">
         <h3 style="font-size:0.95rem;margin-bottom:0.4rem;">Match Scheduling (per-match deadlines)</h3>
         <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:0.5rem;">
-            When enabled, every generated match gets a "Propose Match Time" button and a weekly deadline.
+            When enabled, every match channel gets a pinned "Propose Match Time" prompt and a weekly deadline —
+            saving with this on posts it to all existing match channels, turning it off removes it from them.
             Unscheduled matches past the deadline are flagged in the launchpad. Leave off for cups / one-off events.
         </p>
         <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.9rem;cursor:pointer;margin-bottom:0.6rem;">
@@ -426,8 +427,10 @@ document.getElementById('btn-save-schedule-settings').addEventListener('click', 
     };
     const result = document.getElementById('schedule-result');
     try {
-        await API.request('PUT', `/admin/api/leagues/${LEAGUE_ID}/schedule-settings`, payload);
-        result.textContent = 'Schedule settings saved.';
+        const resp = await API.request('PUT', `/admin/api/leagues/${LEAGUE_ID}/schedule-settings`, payload);
+        const synced = resp && resp.channels_synced;
+        const suffix = synced ? ` (${synced} match channel${synced === 1 ? '' : 's'} ${payload.scheduling_enabled ? 'updated' : 'cleared'})` : '';
+        result.textContent = `Schedule settings saved.${suffix}`;
         result.className = 'result-box result-success';
         API.toast('Schedule settings saved', 'success');
     } catch (e) {

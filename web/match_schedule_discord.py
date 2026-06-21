@@ -491,6 +491,88 @@ class MatchScheduleButtonView(View):
         await _open_propose(interaction, self.match_id)
 
 
+def _schedule_embed(deadline_utc: datetime.datetime | None) -> discord.Embed:
+    """The pinned scheduling prompt posted in a match channel when scheduling is on."""
+    embed = discord.Embed(
+        title='🗓️ Agree on a match time',
+        description='Use the **📅 Propose Match Time** button below — one team proposes, '
+                    'the other confirms or counter-proposes.',
+        color=discord.Color.blurple(),
+    )
+    if deadline_utc:
+        unix = int(deadline_utc.replace(tzinfo=datetime.timezone.utc).timestamp())
+        embed.add_field(
+            name='Deadline',
+            value=f'Agree before <t:{unix}:F> (<t:{unix}:R>), or an admin will step in.',
+            inline=False,
+        )
+    return embed
+
+
+async def post_schedule_message(bot, db, match: dict, settings: dict | None = None) -> bool:
+    """Post the scheduling prompt (propose button + deadline) in a match channel and
+    record its message id, so it can be removed later if scheduling is turned off.
+
+    Idempotent: skips a match that already has a tracked message. Also refreshes the
+    schedule row's deadline from the current settings. Returns True if a message was posted.
+    """
+    if not bot or not match or not match.get('channel_id'):
+        return False
+    match_id = match['match_id']
+    sched = db.match_schedules.get_by_match_id(match_id)
+    if sched and sched.get('schedule_message_id'):
+        return False  # already posted
+    channel = bot.get_channel(match['channel_id'])
+    if channel is None:
+        return False
+    if settings is None:
+        settings = db.tournament_schedule_settings.get_by_league(match['league_id'])
+    deadline = compute_deadline_utc(settings)
+    try:
+        msg = await channel.send(embed=_schedule_embed(deadline),
+                                 view=MatchScheduleButtonView(match_id))
+        try:
+            await msg.pin()
+        except Exception:
+            pass
+        # Older matches may predate the schedule row; create one so the message id sticks.
+        if not sched:
+            db.match_schedules.insert({'match_id': match_id, 'league_id': match['league_id'],
+                                       'deadline_at': deadline})
+        else:
+            db.match_schedules.update(match_id, {'deadline_at': deadline})
+        db.match_schedules.set_message_id(match_id, msg.id)
+        return True
+    except Exception as e:
+        logger.error(f'Failed to post schedule message for match {match_id}: {e}')
+        return False
+
+
+async def remove_schedule_message(bot, db, match: dict) -> bool:
+    """Delete the tracked scheduling message from a match channel (if any) and clear its
+    stored id and deadline. Returns True if a message was actually deleted."""
+    if not match:
+        return False
+    match_id = match['match_id']
+    sched = db.match_schedules.get_by_match_id(match_id)
+    if not sched:
+        return False
+    msg_id = sched.get('schedule_message_id')
+    removed = False
+    if bot and msg_id and match.get('channel_id'):
+        channel = bot.get_channel(match['channel_id'])
+        if channel is not None:
+            try:
+                msg = await channel.fetch_message(int(msg_id))
+                await msg.delete()
+                removed = True
+            except Exception as e:
+                logger.warning(f'Could not delete schedule message {msg_id} for match {match_id}: {e}')
+    db.match_schedules.set_message_id(match_id, None)
+    db.match_schedules.update(match_id, {'deadline_at': None})
+    return removed
+
+
 def register_match_schedule_views(bot, db):
     """Re-register persistent match-scheduling views so buttons survive restarts."""
     if not db:
