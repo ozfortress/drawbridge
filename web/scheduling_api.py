@@ -1,17 +1,16 @@
-"""Internal HTTP API for match scheduling, for consumption by an external website.
+"""HTTP API for match scheduling, for consumption by an external website.
 
-Server-to-server: authenticated with a static key (``INTERNAL_API_KEY``) sent as
-either ``X-API-Key: <key>`` or ``Authorization: Bearer <key>``. Returns JSON.
-
-Read endpoints expose league settings, per-match schedules, team availability and
-overdue matches. A single write endpoint lets a trusted caller set/override a
-match's confirmed time (and, if the bot is up, mirror it into Discord).
+Read endpoints are public (no auth). The single write endpoint
+(``POST /matches/<id>/set``) requires the ``INTERNAL_API_KEY`` secret, sent as
+``X-API-Key: <key>`` or ``Authorization: Bearer <key>``. If the key isn't
+configured, the write endpoint is disabled (fail-closed); reads still work.
 
 Registered as a blueprint in ``simple_web_server.py``. Shares the bot/db globals
 that ``admin_panel.initialize`` populates on bot startup.
 """
 
 import os
+import hmac
 import functools
 import datetime
 
@@ -26,20 +25,21 @@ scheduling_api_bp = Blueprint('scheduling_api', __name__, url_prefix='/api/sched
 DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
 
-# ── Auth ─────────────────────────────────────────────────────
+# ── Write auth (read endpoints stay public) ──────────────────
 
-def require_api_key(f):
+def require_write_key(f):
+    """Gate a write endpoint behind INTERNAL_API_KEY. Fail-closed if unset."""
     @functools.wraps(f)
     async def wrapper(*args, **kwargs):
         expected = os.getenv('INTERNAL_API_KEY')
         if not expected:
-            return jsonify({'error': 'Internal API not configured (INTERNAL_API_KEY unset)'}), 503
+            return jsonify({'error': 'Write endpoint disabled — set INTERNAL_API_KEY to enable it.'}), 503
         provided = request.headers.get('X-API-Key', '')
         if not provided:
             auth = request.headers.get('Authorization', '')
             if auth.startswith('Bearer '):
                 provided = auth[7:]
-        if provided != expected:
+        if not hmac.compare_digest(provided, expected):
             return jsonify({'error': 'Unauthorized'}), 401
         return await f(*args, **kwargs)
     return wrapper
@@ -130,13 +130,11 @@ def _serialize(db, s: dict) -> dict:
 # ── Read endpoints ───────────────────────────────────────────
 
 @scheduling_api_bp.route('/health')
-@require_api_key
 async def health():
     return jsonify({'ok': True, 'db': bool(_get_db()), 'bot': bool(_get_bot())})
 
 
 @scheduling_api_bp.route('/leagues/<int:league_id>/settings')
-@require_api_key
 async def league_settings(league_id: int):
     db = _get_db()
     if not db:
@@ -156,7 +154,6 @@ async def league_settings(league_id: int):
 
 
 @scheduling_api_bp.route('/leagues/<int:league_id>/matches')
-@require_api_key
 async def league_matches(league_id: int):
     db = _get_db()
     if not db:
@@ -166,7 +163,6 @@ async def league_matches(league_id: int):
 
 
 @scheduling_api_bp.route('/matches/<int:match_id>')
-@require_api_key
 async def match_detail(match_id: int):
     db = _get_db()
     if not db:
@@ -178,7 +174,6 @@ async def match_detail(match_id: int):
 
 
 @scheduling_api_bp.route('/overdue')
-@require_api_key
 async def overdue():
     """All unconfirmed matches past their deadline (across leagues)."""
     db = _get_db()
@@ -191,7 +186,7 @@ async def overdue():
 # ── Write endpoint: set/override a match's confirmed time ─────
 
 @scheduling_api_bp.route('/matches/<int:match_id>/set', methods=['POST'])
-@require_api_key
+@require_write_key
 async def set_match_time(match_id: int):
     """Set (or override) a match's scheduled time.
 
@@ -236,16 +231,18 @@ async def _notify_channel(db, match, scheduled_aware) -> bool:
         return False
     try:
         import discord
+        from web.match_schedule_discord import RescheduleView
         channel = bot.get_channel(match['channel_id'])
         if channel is None:
             return False
         unix = int(scheduled_aware.timestamp())
         embed = discord.Embed(
             title='✅ Match Scheduled',
-            description=f'An admin set this match for <t:{unix}:F> (<t:{unix}:R>).',
+            description=f'An admin set this match for <t:{unix}:F> (<t:{unix}:R>).\n'
+                        'Need to change it? Use **🔁 Reschedule** below — both teams must agree.',
             color=discord.Color.green(),
         )
-        await channel.send(embed=embed)
+        await channel.send(embed=embed, view=RescheduleView(match['match_id']))
         cog = _get_tournament_cog()
         if cog:
             await cog.update_launchpad()

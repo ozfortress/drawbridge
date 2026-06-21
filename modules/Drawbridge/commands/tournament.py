@@ -17,7 +17,7 @@ from discord.ext import tasks as discord_tasks
 import asyncio
 import functools
 from web.template_helper import get_template, set_db as template_set_db
-from web.match_schedule_discord import MatchScheduleButtonView, compute_deadline_utc, next_occurrence
+from web.match_schedule_discord import MatchScheduleButtonView, RescheduleView, compute_deadline_utc, next_occurrence
 
 __title__ = 'Tournament Commands'
 __description__ = 'Commands for managing tournaments.'
@@ -1087,10 +1087,11 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
             try:
                 embed = discord.Embed(
                     title='✅ Match Scheduled',
-                    description=f'An admin set this match for <t:{unix}:F> (<t:{unix}:R>).',
+                    description=f'An admin set this match for <t:{unix}:F> (<t:{unix}:R>).\n'
+                                'Need to change it? Use **🔁 Reschedule** below — both teams must agree.',
                     color=discord.Color.green(),
                 )
-                await channel.send(embed=embed)
+                await channel.send(embed=embed, view=RescheduleView(match_id))
             except Exception as e:
                 self.logger.error(f'Failed to announce admin schedule for match {match_id}: {e}')
         await self.update_launchpad()

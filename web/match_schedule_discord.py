@@ -187,10 +187,11 @@ class _TimeSelect(Select):
 class ProposeView(View):
     """Ephemeral editor a captain uses to choose a day + time to propose."""
 
-    def __init__(self, match_id: int, proposer_side: str):
+    def __init__(self, match_id: int, proposer_side: str, current_unix: int | None = None):
         super().__init__(timeout=300)
         self.match_id = match_id
         self.proposer_side = proposer_side  # 'home' | 'away'
+        self.current_unix = current_unix    # set when rescheduling an already-confirmed match
         self.day: int | None = None
         self.time: str | None = None
 
@@ -199,7 +200,8 @@ class ProposeView(View):
         settings = ctx['settings'] if ctx else None
         self.add_item(_DaySelect(_playable_days(settings), self.day))
         self.add_item(_TimeSelect(self.time))
-        send = Button(label='Send Proposal', style=discord.ButtonStyle.success, row=2)
+        send_label = 'Send New Time' if current_unix else 'Send Proposal'
+        send = Button(label=send_label, style=discord.ButtonStyle.success, row=2)
         send.callback = self._on_send
         self.add_item(send)
         other = Button(label='⌨️ Other time…', style=discord.ButtonStyle.secondary, row=2)
@@ -207,19 +209,25 @@ class ProposeView(View):
         self.add_item(other)
 
     def build_embed(self) -> discord.Embed:
+        rescheduling = self.current_unix is not None
         e = discord.Embed(
-            title='📅 Propose a Match Time',
-            description='Pick a day and a time, then **Send Proposal**. Need a time that '
+            title='🔁 Reschedule Match' if rescheduling else '📅 Propose a Match Time',
+            description='Pick a day and a time, then **Send**. Need a time that '
                         'isn\'t listed (e.g. 8:45pm)? Use **Other time…**. The other team '
                         'will be asked to confirm or counter-propose.',
             color=discord.Color.blurple(),
         )
+        if rescheduling:
+            e.add_field(name='Currently scheduled',
+                        value=f'<t:{self.current_unix}:F> — pick a new time below to reschedule.',
+                        inline=False)
         chosen = _slot_label(self.day, self.time) if (self.day is not None and self.day >= 0 and self.time) else 'Nothing selected yet'
         e.add_field(name='Your proposal', value=chosen, inline=False)
         e.add_field(
             name='Note', inline=False,
-            value='Times are AEST/AEDT. Days outside the listed range need an '
-                  'admin to approve — ping an admin in the channel.',
+            value='Times are AEST/AEDT. You can reschedule at any time, even after the '
+                  'deadline — both teams just need to agree. Days outside the listed range '
+                  'need an admin to approve.',
         )
         return e
 
@@ -304,6 +312,43 @@ class CustomTimeModal(Modal, title='Propose a custom time'):
             await interaction.response.send_message('This match is no longer being scheduled.', ephemeral=True)
 
 
+async def _open_propose(interaction: discord.Interaction, match_id: int):
+    """Open the (re)schedule editor for the clicking team member. Works whether the
+    match is unscheduled, mid-proposal, or already confirmed (reschedule)."""
+    db = _get_db()
+    ctx = _resolve_context(db, match_id) if db else None
+    if not ctx:
+        await interaction.response.send_message('Scheduling is not active for this match.', ephemeral=True)
+        return
+    side = _member_side(interaction.user, ctx['home'], ctx['away'])
+    if side is None:
+        await interaction.response.send_message(
+            'Only a member of one of the competing teams can propose a time. '
+            '(Admins can use /schedule.)', ephemeral=True)
+        return
+    sched = db.match_schedules.get_by_match_id(match_id)
+    current_unix = None
+    if sched and sched.get('status') == 'confirmed' and sched.get('scheduled_at'):
+        current_unix = int(sched['scheduled_at'].replace(tzinfo=datetime.timezone.utc).timestamp())
+    view = ProposeView(match_id, side, current_unix=current_unix)
+    await interaction.response.send_message(embed=view.build_embed(), view=view, ephemeral=True)
+
+
+class RescheduleView(View):
+    """Persistent Reschedule button attached to a confirmed-time message."""
+
+    def __init__(self, match_id: int):
+        super().__init__(timeout=None)
+        self.match_id = match_id
+        btn = Button(label='🔁 Reschedule', style=discord.ButtonStyle.secondary,
+                     custom_id=f'match_sched_reschedule_{match_id}')
+        btn.callback = self._callback
+        self.add_item(btn)
+
+    async def _callback(self, interaction: discord.Interaction):
+        await _open_propose(interaction, self.match_id)
+
+
 # ── Decision flow (persistent) ───────────────────────────────
 
 class ProposalDecisionView(View):
@@ -355,10 +400,11 @@ class ProposalDecisionView(View):
         unix = int(scheduled.timestamp())
         embed = discord.Embed(
             title='✅ Match Scheduled',
-            description=f'This match is locked in for <t:{unix}:F> (<t:{unix}:R>).',
+            description=f'This match is locked in for <t:{unix}:F> (<t:{unix}:R>).\n'
+                        'Need to change it? Use **🔁 Reschedule** below — both teams must agree.',
             color=discord.Color.green(),
         )
-        await interaction.response.edit_message(content=None, embed=embed, view=None)
+        await interaction.response.edit_message(content=None, embed=embed, view=RescheduleView(self.match_id))
         await _refresh_launchpad()
 
     async def _on_counter(self, interaction: discord.Interaction):
@@ -394,28 +440,8 @@ class MatchScheduleButtonView(View):
         self.add_item(btn)
 
     async def _callback(self, interaction: discord.Interaction):
-        db = _get_db()
-        ctx = _resolve_context(db, self.match_id) if db else None
-        if not ctx:
-            await interaction.response.send_message('Scheduling is not active for this match.', ephemeral=True)
-            return
-
-        side = _member_side(interaction.user, ctx['home'], ctx['away'])
-        if side is None:
-            await interaction.response.send_message(
-                'Only a member of one of the competing teams can propose a time.', ephemeral=True)
-            return
-
-        sched = db.match_schedules.get_by_match_id(self.match_id)
-        if sched and sched.get('status') == 'confirmed':
-            unix = int(sched['scheduled_at'].replace(tzinfo=datetime.timezone.utc).timestamp())
-            await interaction.response.send_message(
-                f'This match is already scheduled for <t:{unix}:F>. Ping an admin to change it.',
-                ephemeral=True)
-            return
-
-        view = ProposeView(self.match_id, side)
-        await interaction.response.send_message(embed=view.build_embed(), view=view, ephemeral=True)
+        # Works for both initial scheduling and rescheduling a confirmed match.
+        await _open_propose(interaction, self.match_id)
 
 
 def register_match_schedule_views(bot, db):
@@ -425,5 +451,6 @@ def register_match_schedule_views(bot, db):
     for sched in db.match_schedules.get_all():
         match_id = sched['match_id']
         bot.add_view(MatchScheduleButtonView(match_id))
+        bot.add_view(RescheduleView(match_id))
         if sched.get('status') == 'proposed':
             bot.add_view(ProposalDecisionView(match_id))
