@@ -17,7 +17,7 @@ from discord.ext import tasks as discord_tasks
 import asyncio
 import functools
 from web.template_helper import get_template, set_db as template_set_db
-from web.match_schedule_discord import MatchScheduleButtonView, RescheduleView, compute_deadline_utc, next_occurrence, log_schedule_event
+from web.match_schedule_discord import RescheduleView, compute_deadline_utc, next_occurrence, log_schedule_event, post_schedule_message
 
 __title__ = 'Tournament Commands'
 __description__ = 'Commands for managing tournaments.'
@@ -768,9 +768,9 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
                 self.logger.warning(f'Channel name too long when generating match {match.round_number} {team_home['team_name']} vs {team_away['team_name']}, trimming to {channel_name}')
             match_channel = await self.guild.create_text_channel(channel_name, category=cat, overwrites=overrides)
 
-            # Persist the match and its schedule row up-front so the propose button on the
-            # notice works immediately. Every match gets the button; the weekly deadline is
-            # only set when scheduling is enabled for the league (cups stay deadline-free).
+            # Persist the match and its schedule row up-front. The scheduling prompt (with
+            # the propose button) is only posted when scheduling is enabled for the league;
+            # the weekly deadline is set in the same case (cups stay deadline-free).
             self.db.insert_match({
                 'match_id': match.id,
                 'division': team_home['division'],
@@ -802,30 +802,21 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
             }))
             matchmessage['embed'] = discord.Embed(**matchmessage['embeds'][0])
             del matchmessage['embeds']
-            notice_msg = await match_channel.send(**matchmessage, view=MatchScheduleButtonView(match.id))
+            notice_msg = await match_channel.send(**matchmessage)
             try:
                 await notice_msg.pin()
             except Exception:
                 pass
 
-            # Scheduling deadline notice (only when enabled for this league)
-            if scheduling_enabled and deadline:
-                unix = int(deadline.replace(tzinfo=datetime.timezone.utc).timestamp())
-                deadline_embed = discord.Embed(
-                    title='🗓️ Agree on a match time',
-                    description='Use the **📅 Propose Match Time** button on the pinned match '
-                                'notice above — one team proposes, the other confirms.',
-                    color=discord.Color.blurple(),
-                )
-                deadline_embed.add_field(
-                    name='Deadline',
-                    value=f'Agree before <t:{unix}:F> (<t:{unix}:R>), or an admin will step in.',
-                    inline=False,
-                )
-                try:
-                    await match_channel.send(embed=deadline_embed)
-                except Exception as e:
-                    self.logger.error(f'Failed to post scheduling deadline notice: {e}')
+            # Scheduling prompt (propose button + deadline) — only when enabled for this
+            # league. The same helper is used when the admin flips the toggle later, so the
+            # message can be cleanly removed if scheduling is turned off.
+            if scheduling_enabled:
+                await post_schedule_message(self.bot, self.db, {
+                    'match_id': match.id,
+                    'channel_id': match_channel.id,
+                    'league_id': match.league_id,
+                }, settings)
 
             # Lets also say something in their team channel
             try:

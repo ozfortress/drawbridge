@@ -2115,11 +2115,36 @@ async def api_schedule_settings_update(league_id: int):
     }
     try:
         existing = _db.tournament_schedule_settings.get_by_league(league_id) if hasattr(_db, 'tournament_schedule_settings') else None
+        was_enabled = bool(existing.get('scheduling_enabled')) if existing else False
         if existing:
             _db.tournament_schedule_settings.update(existing['id'], payload)
         else:
             _db.tournament_schedule_settings.insert({'league_id': league_id, **payload})
-        return jsonify({'success': True})
+
+        # When the toggle flips, post/remove the scheduling prompt in every match channel.
+        synced = 0
+        if bool(scheduling_enabled) != was_enabled and _check_bot_ready():
+            settings = _db.tournament_schedule_settings.get_by_league(league_id)
+            from web.match_schedule_discord import post_schedule_message, remove_schedule_message
+            matches = [m for m in _db.matches.get_by_league(league_id) if not m.get('archived')]
+            for m in matches:
+                try:
+                    if scheduling_enabled:
+                        if await post_schedule_message(_bot, _db, m, settings):
+                            synced += 1
+                    else:
+                        if await remove_schedule_message(_bot, _db, m):
+                            synced += 1
+                except Exception as e:
+                    logger.error(f'Schedule message sync failed for match {m.get("match_id")}: {e}')
+            cog = _get_tournament_cog()
+            if cog:
+                try:
+                    await cog.update_launchpad()
+                except Exception as e:
+                    logger.error(f'Launchpad refresh after schedule toggle failed: {e}')
+
+        return jsonify({'success': True, 'channels_synced': synced})
     except Exception as e:
         logger.error(f'Schedule settings update error: {e}')
         return _db_error(e)

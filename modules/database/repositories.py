@@ -1423,6 +1423,13 @@ class MatchSchedulesRepository(BaseRepository):
             (scheduled_at_utc, match_id)
         ) > 0
 
+    def set_message_id(self, match_id: int, message_id) -> bool:
+        """Store (or clear, with None) the Discord message id of the scheduling prompt."""
+        return self._execute_query(
+            f"UPDATE {self.table} SET schedule_message_id = ? WHERE match_id = ?",
+            (message_id, match_id)
+        ) > 0
+
     def set_flagged(self, match_id: int) -> bool:
         """Mark that the past-deadline warning has been posted."""
         return self._execute_query(
