@@ -105,13 +105,6 @@ def initialize(bot, db, cit, tournament_cog, sync_cog):
             logger.warning(f'Failed to register awards views: {e}')
 
         try:
-            from web.schedule_discord import register_schedule_views
-            register_schedule_views(_bot, _db)
-            logger.info('Schedule persistent views registered')
-        except Exception as e:
-            logger.warning(f'Failed to register schedule views: {e}')
-
-        try:
             from web.match_schedule_discord import register_match_schedule_views
             register_match_schedule_views(_bot, _db)
             logger.info('Match schedule persistent views registered')
@@ -2128,40 +2121,6 @@ async def api_schedule_settings_update(league_id: int):
         logger.error(f'Schedule settings update error: {e}')
         return _db_error(e)
 
-
-@admin_bp.route('/api/leagues/<int:league_id>/send-schedule-messages', methods=['POST'])
-@require_admin
-async def api_send_schedule_messages(league_id: int):
-    if not _check_bot_ready():
-        return jsonify({'error': 'Bot not ready'}), 503
-    if not _db:
-        return jsonify({'error': 'Database not ready'}), 503
-    try:
-        from web.schedule_discord import ScheduleButtonView
-        teams = _db.teams.get_by_league(league_id)
-        sent = 0
-        for team in teams:
-            if not team.get('team_channel'):
-                continue
-            channel = _bot.get_channel(team['team_channel'])
-            if not channel:
-                continue
-            view = ScheduleButtonView(team['team_id'], league_id)
-            try:
-                embed = discord.Embed(
-                    title='📅 Team Availability',
-                    description='Click the button below to set your team\'s availability for this season.\nSelect days and times that work best for your team.',
-                    color=discord.Color.blue(),
-                )
-                msg = await channel.send(embed=embed, view=view)
-                await msg.pin()
-                sent += 1
-            except Exception:
-                continue
-        return jsonify({'success': True, 'messages_sent': sent})
-    except Exception as e:
-        logger.error(f'Send schedule messages error: {e}')
-        return _db_error(e)
 
 @admin_bp.route('/api/awards/events/<int:event_id>/notify-invalidation', methods=['POST'])
 @require_admin

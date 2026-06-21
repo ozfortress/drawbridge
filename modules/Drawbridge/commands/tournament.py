@@ -3,6 +3,7 @@ from ..functions import *
 from ..logging import *
 import discord
 import os
+import re
 import json
 import random
 import requests
@@ -42,6 +43,65 @@ _SCHEDULE_TIME_CHOICES = [
     app_commands.Choice(name='8:00 PM', value='20:00'),
     app_commands.Choice(name='9:00 PM', value='21:00'),
 ]
+
+
+def _parse_time(s: str) -> Optional[str]:
+    """Parse a free-text time into 'HH:MM' (24-hour), or None if invalid.
+
+    Accepts '20:30', '8:30pm', '8pm', '8 pm', '8:30 PM', etc.
+    """
+    s = s.strip().lower().replace(' ', '')
+    m = re.fullmatch(r'(\d{1,2}):(\d{2})', s)
+    if m:
+        h, mi = int(m.group(1)), int(m.group(2))
+    else:
+        m = re.fullmatch(r'(\d{1,2})(?::(\d{2}))?(am|pm)', s)
+        if not m:
+            return None
+        h = int(m.group(1)) % 12
+        mi = int(m.group(2) or 0)
+        if m.group(3) == 'pm':
+            h += 12
+    if 0 <= h <= 23 and 0 <= mi <= 59:
+        return f'{h:02d}:{mi:02d}'
+    return None
+
+
+def _time_label(hhmm: str) -> str:
+    """Render 'HH:MM' as a friendly 12-hour label, e.g. '8:30 PM'."""
+    h, mi = (int(x) for x in hhmm.split(':'))
+    ap = 'AM' if h < 12 else 'PM'
+    return f'{h % 12 or 12}:{mi:02d} {ap}'
+
+
+def _resolve_schedule_time(time_choice, custom_time: Optional[str]):
+    """Return (value 'HH:MM', label) from a preset Choice or a custom string, else None.
+
+    custom_time wins if both are supplied.
+    """
+    if custom_time:
+        norm = _parse_time(custom_time)
+        return (norm, _time_label(norm)) if norm else None
+    if time_choice is not None:
+        return (time_choice.value, time_choice.name)
+    return None
+
+
+async def _run_schedule(tournament_cog, interaction: discord.Interaction,
+                        match_id, day, time, custom_time):
+    """Shared validation for /schedule and /tournament schedule, then apply it."""
+    if day is None:
+        await interaction.response.send_message('Please choose a day.', ephemeral=True)
+        return
+    resolved = _resolve_schedule_time(time, custom_time)
+    if resolved is None:
+        await interaction.response.send_message(
+            'Provide a time: pick a preset, or set `custom_time` as HH:MM 24-hour '
+            '(e.g. `20:30`) or like `8:30pm`.', ephemeral=True)
+        return
+    time_value, time_name = resolved
+    await tournament_cog.apply_schedule(
+        interaction, match_id, day.value, day.name, time_value, time_name)
 
 def log_command(func):
     """Decorator for logging tournament commands - uses centralized logging."""
@@ -707,6 +767,30 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
                 channel_name = f'🗡️{match.id}-{trimmed_home_team}-vs-{trimmed_away_team}-{match.round_name}'
                 self.logger.warning(f'Channel name too long when generating match {match.round_number} {team_home['team_name']} vs {team_away['team_name']}, trimming to {channel_name}')
             match_channel = await self.guild.create_text_channel(channel_name, category=cat, overwrites=overrides)
+
+            # Persist the match and its schedule row up-front so the propose button on the
+            # notice works immediately. Every match gets the button; the weekly deadline is
+            # only set when scheduling is enabled for the league (cups stay deadline-free).
+            self.db.insert_match({
+                'match_id': match.id,
+                'division': team_home['division'],
+                'team_home': team_home['team_id'],
+                'team_away': team_away['team_id'],
+                'channel_id': match_channel.id,
+                'league_id': match.league_id
+            })
+            settings = self.db.tournament_schedule_settings.get_by_league(match.league_id)
+            scheduling_enabled = bool(settings and settings.get('scheduling_enabled'))
+            deadline = compute_deadline_utc(settings) if scheduling_enabled else None
+            try:
+                self.db.match_schedules.insert({
+                    'match_id': match.id,
+                    'league_id': match.league_id,
+                    'deadline_at': deadline,
+                })
+            except Exception as e:
+                self.logger.error(f'Failed to create match schedule row: {e}')
+
             rawmatchmessage = get_template('match.json')
             matchmessage = json.loads(self.functions.substitute_strings_in_embed(rawmatchmessage, {
                 '{TEAM_HOME}': f'<@&{team_home['role_id']}>', # team role as a mention
@@ -718,80 +802,30 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
             }))
             matchmessage['embed'] = discord.Embed(**matchmessage['embeds'][0])
             del matchmessage['embeds']
-            await match_channel.send(**matchmessage)
-
-            # Compare team availabilities and post summary
+            notice_msg = await match_channel.send(**matchmessage, view=MatchScheduleButtonView(match.id))
             try:
-                avail = self.db.team_availability.get_matching(
-                    team_home['team_id'], team_away['team_id'], match.league_id
-                ) if hasattr(self.db, 'team_availability') else []
-                if avail:
-                    from collections import defaultdict
-                    by_day = defaultdict(list)
-                    for a in avail:
-                        by_day[a['day_of_week']].append(a['time_slot'])
-                    day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-                    time_labels = {'19:00': '7pm', '20:00': '8pm', '21:00': '9pm'}
-                    desc_lines = []
-                    for day in sorted(by_day.keys()):
-                        times = ', '.join(time_labels.get(t, t) for t in sorted(by_day[day]))
-                        desc_lines.append(f'**{day_names[day]}**: {times}')
-                    avail_embed = discord.Embed(
-                        title='📅 Matching Availability',
-                        description='Both teams are available at these times:\n' + '\n'.join(desc_lines),
-                        color=discord.Color.green(),
-                    )
-                    avail_embed.add_field(
-                        name='Scheduling outside these times?',
-                        value='Feel free to negotiate any time that works for both teams.\nThe listed times are just what was set during registration.',
-                        inline=False,
-                    )
-                    await match_channel.send(embed=avail_embed)
-            except Exception as e:
-                self.logger.error(f'Failed to compare availabilities: {e}')
+                await notice_msg.pin()
+            except Exception:
+                pass
 
-            # Update the database
-            self.db.insert_match({
-                'match_id': match.id,
-                'division': team_home['division'], # division
-                'team_home': team_home['team_id'], # team_id
-                'team_away': team_away['team_id'], # team_id
-                'channel_id': match_channel.id,
-                'league_id': match.league_id
-            })
-
-            # Per-match scheduling — only when enabled for this league (cups/events opt out)
-            try:
-                settings = self.db.tournament_schedule_settings.get_by_league(match.league_id)
-                if settings and settings.get('scheduling_enabled'):
-                    deadline = compute_deadline_utc(settings)
-                    self.db.match_schedules.insert({
-                        'match_id': match.id,
-                        'league_id': match.league_id,
-                        'deadline_at': deadline,
-                    })
-                    sched_embed = discord.Embed(
-                        title='🗓️ Schedule this match',
-                        description='Both teams must agree on a day and time. Use the button '
-                                    'below to propose a time; the other team then confirms.',
-                        color=discord.Color.blurple(),
-                    )
-                    if deadline:
-                        unix = int(deadline.replace(tzinfo=datetime.timezone.utc).timestamp())
-                        sched_embed.add_field(
-                            name='Deadline',
-                            value=f'Agree on a time before <t:{unix}:F> (<t:{unix}:R>), '
-                                  'or an admin will step in.',
-                            inline=False,
-                        )
-                    sched_msg = await match_channel.send(embed=sched_embed,
-                                                         view=MatchScheduleButtonView(match.id))
-                    try:
-                        await sched_msg.pin()
-                    except Exception:
-                        pass
-            except Exception as e:
-                self.logger.error(f'Failed to set up match scheduling: {e}')
+            # Scheduling deadline notice (only when enabled for this league)
+            if scheduling_enabled and deadline:
+                unix = int(deadline.replace(tzinfo=datetime.timezone.utc).timestamp())
+                deadline_embed = discord.Embed(
+                    title='🗓️ Agree on a match time',
+                    description='Use the **📅 Propose Match Time** button on the pinned match '
+                                'notice above — one team proposes, the other confirms.',
+                    color=discord.Color.blurple(),
+                )
+                deadline_embed.add_field(
+                    name='Deadline',
+                    value=f'Agree before <t:{unix}:F> (<t:{unix}:R>), or an admin will step in.',
+                    inline=False,
+                )
+                try:
+                    await match_channel.send(embed=deadline_embed)
+                except Exception as e:
+                    self.logger.error(f'Failed to post scheduling deadline notice: {e}')
 
             # Lets also say something in their team channel
             try:
@@ -1000,34 +1034,47 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
         'ADMIN',
         'TRIAL',
     )
+    @app_commands.describe(
+        match_id='Match ID (optional — defaults to the match for the current channel)',
+        day='Day of week to play (AEST/AEDT)',
+        time='Preset start time',
+        custom_time='Custom start time, e.g. 20:30 or 8:30pm (overrides the preset)',
+    )
     @app_commands.choices(day=_SCHEDULE_DAY_CHOICES, time=_SCHEDULE_TIME_CHOICES)
-    async def schedule(self, interaction: discord.Interaction, match_id: int,
-                       day: app_commands.Choice[int], time: app_commands.Choice[str]):
+    async def schedule(self, interaction: discord.Interaction,
+                       match_id: Optional[int] = None,
+                       day: Optional[app_commands.Choice[int]] = None,
+                       time: Optional[app_commands.Choice[str]] = None,
+                       custom_time: Optional[str] = None):
         """Admin: directly set or override a match's scheduled day and time.
 
-        Parameters
-        -----------
-        match_id: int
-            The match to schedule
-        day: app_commands.Choice[int]
-            Day of week to play (AEST/AEDT)
-        time: app_commands.Choice[str]
-            Start time (AEST/AEDT)
+        Run inside a match channel to omit match_id. Use a preset time or
+        custom_time for any time.
         """
-        await self.apply_schedule(interaction, match_id, day.value, day.name, time.value, time.name)
+        await _run_schedule(self, interaction, match_id, day, time, custom_time)
 
-    async def apply_schedule(self, interaction: discord.Interaction, match_id: int,
+    async def apply_schedule(self, interaction: discord.Interaction, match_id: Optional[int],
                              day_value: int, day_name: str, time_value: str, time_name: str):
         """Set/override a match's confirmed time, announce it, and refresh the launchpad.
 
-        Shared by /tournament schedule and the /schedule alias.
+        Shared by /tournament schedule and the /schedule alias. If match_id is None,
+        the match is inferred from the channel the command was run in.
         """
         await interaction.response.send_message('Setting match time...', ephemeral=True)
-        match = self.db.matches.get_by_id(match_id)
-        if match is None:
-            await interaction.edit_original_response(
-                content='Match not found in the database. Generate it first with /tournament matchgen.')
-            return
+        if match_id is None:
+            match = self.db.matches.get_by_channel_id(interaction.channel_id)
+            if match is None:
+                await interaction.edit_original_response(
+                    content='No match_id given and this isn\'t a match channel. '
+                            'Run it in the match channel, or pass match_id.')
+                return
+            match_id = match['match_id']
+        else:
+            match = self.db.matches.get_by_id(match_id)
+            if match is None:
+                await interaction.edit_original_response(
+                    content='Match not found in the database. Generate it first with /tournament matchgen.')
+                return
 
         scheduled = next_occurrence(day_value, time_value)
         if self.db.match_schedules.get_by_match_id(match_id) is None:
@@ -1474,22 +1521,24 @@ class ScheduleAlias(discord_commands.Cog):
         'ADMIN',
         'TRIAL',
     )
+    @app_commands.describe(
+        match_id='Match ID (optional — defaults to the match for the current channel)',
+        day='Day of week to play (AEST/AEDT)',
+        time='Preset start time',
+        custom_time='Custom start time, e.g. 20:30 or 8:30pm (overrides the preset)',
+    )
     @app_commands.choices(day=_SCHEDULE_DAY_CHOICES, time=_SCHEDULE_TIME_CHOICES)
-    async def schedule(self, interaction: discord.Interaction, match_id: int,
-                       day: app_commands.Choice[int], time: app_commands.Choice[str]):
+    async def schedule(self, interaction: discord.Interaction,
+                       match_id: Optional[int] = None,
+                       day: Optional[app_commands.Choice[int]] = None,
+                       time: Optional[app_commands.Choice[str]] = None,
+                       custom_time: Optional[str] = None):
         """Admin: directly set or override a match's scheduled day and time.
 
-        Parameters
-        -----------
-        match_id: int
-            The match to schedule
-        day: app_commands.Choice[int]
-            Day of week to play (AEST/AEDT)
-        time: app_commands.Choice[str]
-            Start time (AEST/AEDT)
+        Run inside a match channel to omit match_id. Use a preset time or
+        custom_time for any time.
         """
-        await self.tournament.apply_schedule(
-            interaction, match_id, day.value, day.name, time.value, time.name)
+        await _run_schedule(self.tournament, interaction, match_id, day, time, custom_time)
 
 
 async def initialize(bot: discord_commands.Bot, db, cit, logger):

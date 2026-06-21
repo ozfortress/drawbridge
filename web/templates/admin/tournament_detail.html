@@ -54,9 +54,10 @@
     </div>
 
     <div class="card" style="margin-top:1rem;">
-        <h2>📅 Team Scheduling</h2>
+        <h2>📅 Match Scheduling</h2>
         <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:0.75rem;">
-            Exclude days that should not be available for scheduling. Then send the schedule messages to all team channels.
+            Exclude days that shouldn't be offered when teams propose a time. Scheduling happens in each
+            match channel — there's nothing to send to team channels.
         </p>
         <div id="schedule-excluded" style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem;">
             <label style="display:flex;align-items:center;gap:0.25rem;font-size:0.85rem;cursor:pointer;">
@@ -120,7 +121,6 @@
         </div>
         <div style="display:flex;gap:0.5rem;">
             <button class="btn btn-primary" id="btn-save-schedule-settings">💾 Save Settings</button>
-            <button class="btn btn-secondary" id="btn-send-schedule-msgs">📬 Send Schedule Messages</button>
         </div>
         <div id="schedule-result" class="result-box" style="display:none;margin-top:0.5rem;"></div>
     </div>
@@ -436,24 +436,6 @@ document.getElementById('btn-save-schedule-settings').addEventListener('click', 
         API.toast(e.message, 'error');
     }
     result.style.display = 'block';
-});
-
-document.getElementById('btn-send-schedule-msgs').addEventListener('click', async () => {
-    const btn = document.getElementById('btn-send-schedule-msgs');
-    const result = document.getElementById('schedule-result');
-    btn.disabled = true; btn.textContent = 'Sending...'; result.style.display = 'none';
-    try {
-        const r = await API.post(`/admin/api/leagues/${LEAGUE_ID}/send-schedule-messages`, {});
-        result.textContent = `Sent ${r.messages_sent || 0} schedule messages.`;
-        result.className = 'result-box result-success';
-        API.toast(`Sent ${r.messages_sent || 0} messages`, 'success');
-    } catch (e) {
-        result.textContent = e.message;
-        result.className = 'result-box result-error';
-        API.toast(e.message, 'error');
-    }
-    result.style.display = 'block';
-    btn.disabled = false; btn.textContent = '📬 Send Schedule Messages';
 });
 
 document.addEventListener('DOMContentLoaded', () => { loadDetail(); loadScheduleSettings(); });

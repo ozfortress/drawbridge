@@ -177,32 +177,6 @@ async def match_detail(match_id: int):
     return jsonify({'match': _serialize(db, s)})
 
 
-@scheduling_api_bp.route('/leagues/<int:league_id>/availability')
-@require_api_key
-async def league_availability(league_id: int):
-    """Team availability set at registration, grouped by team then day."""
-    db = _get_db()
-    if not db:
-        return jsonify({'error': 'Database not ready'}), 503
-    rows = db.team_availability.get_by_league(league_id)
-    teams: dict[int, dict] = {}
-    for r in rows:
-        t = teams.setdefault(r['team_id'], {})
-        t.setdefault(r['day_of_week'], []).append(r['time_slot'])
-    out = []
-    for team_id, days in teams.items():
-        team = db.teams.get_by_team_and_league(team_id, league_id)
-        out.append({
-            'team_id': team_id,
-            'name': team.get('team_name') if team else None,
-            'availability': [
-                {'day': d, 'day_name': DAY_NAMES[d], 'times': sorted(days[d])}
-                for d in sorted(days)
-            ],
-        })
-    return jsonify({'teams': out})
-
-
 @scheduling_api_bp.route('/overdue')
 @require_api_key
 async def overdue():

@@ -1,23 +1,23 @@
 """Discord UI for per-match scheduling (propose / confirm / counter-propose).
 
-This sits on top of the team-availability feature in ``schedule_discord.py``.
-Each generated match (in a scheduling-enabled league) gets a pinned "Propose
-Match Time" button. One captain proposes a day + time, the other team confirms
-or counter-proposes. Once confirmed, the agreed time is stored and shown to
-everyone as a Discord dynamic timestamp.
+All scheduling happens in the match channel. Each generated match gets a pinned
+"Propose Match Time" button. One captain proposes a day + time (presets or a
+free-text custom time), the other team confirms or counter-proposes. Once
+confirmed, the agreed time is stored and shown as a Discord dynamic timestamp.
 """
 
+import re
 import datetime
 from zoneinfo import ZoneInfo
 
 import discord
-from discord.ui import View, Button, Select
+from discord.ui import View, Button, Select, Modal, TextInput
 
-from web.schedule_discord import DAY_NAMES, TIME_LABELS
 from modules.Drawbridge.checks import Checks
 
 SYDNEY = ZoneInfo('Australia/Sydney')
 _checks = Checks()
+DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
 
 # ── Time helpers ─────────────────────────────────────────────
@@ -53,8 +53,42 @@ def compute_deadline_utc(settings: dict | None,
     return next_occurrence(int(dd), dt, now).replace(tzinfo=None)
 
 
+# Preset time slots offered in the dropdown (teams can also type any time).
+_TIME_PRESETS = ['19:00', '19:30', '20:00', '20:30', '21:00', '21:30', '22:00']
+
+
+def _fmt_time(time_str: str) -> str:
+    """Render 'HH:MM' as a friendly 12-hour label, e.g. '8:45 PM'."""
+    try:
+        h, mi = (int(x) for x in time_str.split(':'))
+        ap = 'AM' if h < 12 else 'PM'
+        return f'{h % 12 or 12}:{mi:02d} {ap}'
+    except Exception:
+        return time_str
+
+
+def parse_time(s: str) -> str | None:
+    """Parse free-text time into 'HH:MM' (24-hour), or None if invalid.
+
+    Accepts '20:45', '8:45pm', '8pm', '8:45 PM', etc.
+    """
+    s = s.strip().lower().replace(' ', '')
+    m = re.fullmatch(r'(\d{1,2}):(\d{2})', s)
+    if m:
+        h, mi = int(m.group(1)), int(m.group(2))
+    else:
+        m = re.fullmatch(r'(\d{1,2})(?::(\d{2}))?(am|pm)', s)
+        if not m:
+            return None
+        h = int(m.group(1)) % 12
+        mi = int(m.group(2) or 0)
+        if m.group(3) == 'pm':
+            h += 12
+    return f'{h:02d}:{mi:02d}' if 0 <= h <= 23 and 0 <= mi <= 59 else None
+
+
 def _slot_label(day: int, time_str: str) -> str:
-    return f'{DAY_NAMES[day]} {TIME_LABELS.get(time_str, time_str)}'
+    return f'{DAY_NAMES[day]} {_fmt_time(time_str)}'
 
 
 # ── DB / context helpers ─────────────────────────────────────
@@ -138,10 +172,10 @@ class _DaySelect(Select):
 class _TimeSelect(Select):
     def __init__(self, selected: str | None):
         options = [
-            discord.SelectOption(label=TIME_LABELS[t], value=t, default=(t == selected))
-            for t in ('19:00', '20:00', '21:00')
+            discord.SelectOption(label=_fmt_time(t), value=t, default=(t == selected))
+            for t in _TIME_PRESETS
         ]
-        super().__init__(placeholder='Pick a time…', options=options,
+        super().__init__(placeholder='Pick a time… (or use “Other time”)', options=options,
                          min_values=1, max_values=1)
 
     async def callback(self, interaction: discord.Interaction):
@@ -168,15 +202,19 @@ class ProposeView(View):
         send = Button(label='Send Proposal', style=discord.ButtonStyle.success, row=2)
         send.callback = self._on_send
         self.add_item(send)
+        other = Button(label='⌨️ Other time…', style=discord.ButtonStyle.secondary, row=2)
+        other.callback = self._on_other_time
+        self.add_item(other)
 
     def build_embed(self) -> discord.Embed:
         e = discord.Embed(
             title='📅 Propose a Match Time',
-            description='Pick a day and time, then **Send Proposal**. The other '
-                        'team will be asked to confirm or counter-propose.',
+            description='Pick a day and a time, then **Send Proposal**. Need a time that '
+                        'isn\'t listed (e.g. 8:45pm)? Use **Other time…**. The other team '
+                        'will be asked to confirm or counter-propose.',
             color=discord.Color.blurple(),
         )
-        chosen = _slot_label(self.day, self.time) if (self.day is not None and self.time) else 'Nothing selected yet'
+        chosen = _slot_label(self.day, self.time) if (self.day is not None and self.day >= 0 and self.time) else 'Nothing selected yet'
         e.add_field(name='Your proposal', value=chosen, inline=False)
         e.add_field(
             name='Note', inline=False,
@@ -185,29 +223,23 @@ class ProposeView(View):
         )
         return e
 
-    async def _on_send(self, interaction: discord.Interaction):
-        if self.day is None or self.day < 0 or not self.time:
-            await interaction.response.send_message(
-                'Pick a valid day and time first. (If no days are available, an admin '
-                'needs to adjust this league\'s excluded days.)', ephemeral=True)
-            return
+    async def _commit(self, interaction: discord.Interaction, day: int, time: str) -> bool:
+        """Record the proposal and post the Confirm/Counter message. No interaction
+        response is sent here — callers handle their own ack."""
         db = _get_db()
         ctx = _resolve_context(db, self.match_id) if db else None
         if not ctx:
-            await interaction.response.send_message('This match is no longer being scheduled.', ephemeral=True)
-            return
-
+            return False
         proposer = ctx[self.proposer_side]
         other = ctx['away' if self.proposer_side == 'home' else 'home']
         db.match_schedules.set_proposal(
-            self.match_id, self.day, self.time,
+            self.match_id, day, time,
             proposer['team_id'] if proposer else None, interaction.user.id,
         )
-
         embed = discord.Embed(
             title='📅 Proposed Match Time',
             description=f"**{proposer['team_name'] if proposer else 'A team'}** proposed "
-                        f"**{_slot_label(self.day, self.time)}**.",
+                        f"**{_slot_label(day, time)}**.",
             color=discord.Color.gold(),
         )
         embed.add_field(
@@ -216,15 +248,60 @@ class ProposeView(View):
             inline=False,
         )
         mention = f"<@&{other['role_id']}>" if other and other.get('role_id') else ''
-        await interaction.response.edit_message(
-            content='✅ Proposal sent.', embed=None, view=None,
-        )
         await interaction.channel.send(
             content=mention or None,
             embed=embed,
             view=ProposalDecisionView(self.match_id),
             allowed_mentions=discord.AllowedMentions(roles=True),
         )
+        return True
+
+    async def _on_send(self, interaction: discord.Interaction):
+        if self.day is None or self.day < 0 or not self.time:
+            await interaction.response.send_message(
+                'Pick a valid day and time first. (If no days are available, an admin '
+                'needs to adjust this league\'s excluded days.)', ephemeral=True)
+            return
+        if await self._commit(interaction, self.day, self.time):
+            await interaction.response.edit_message(content='✅ Proposal sent.', embed=None, view=None)
+        else:
+            await interaction.response.send_message('This match is no longer being scheduled.', ephemeral=True)
+
+    async def _on_other_time(self, interaction: discord.Interaction):
+        if self.day is None or self.day < 0:
+            await interaction.response.send_message('Pick a day first, then enter a custom time.', ephemeral=True)
+            return
+        await interaction.response.send_modal(CustomTimeModal(self))
+
+
+class CustomTimeModal(Modal, title='Propose a custom time'):
+    """Free-text time entry so teams can propose any time (e.g. 8:45pm)."""
+
+    def __init__(self, parent_view: 'ProposeView'):
+        super().__init__()
+        self.parent_view = parent_view
+        self.time_input = TextInput(
+            label='Time (AEST/AEDT)',
+            placeholder='e.g. 8:45pm or 20:45',
+            required=True, max_length=10,
+        )
+        self.add_item(self.time_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        norm = parse_time(str(self.time_input.value))
+        if not norm:
+            await interaction.response.send_message(
+                'Couldn\'t read that time. Try `8:45pm` or `20:45`.', ephemeral=True)
+            return
+        view = self.parent_view
+        if view.day is None or view.day < 0:
+            await interaction.response.send_message('Pick a day first.', ephemeral=True)
+            return
+        if await view._commit(interaction, view.day, norm):
+            await interaction.response.send_message(
+                f'✅ Proposal sent: {_slot_label(view.day, norm)}.', ephemeral=True)
+        else:
+            await interaction.response.send_message('This match is no longer being scheduled.', ephemeral=True)
 
 
 # ── Decision flow (persistent) ───────────────────────────────
