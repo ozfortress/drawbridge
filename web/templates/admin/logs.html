@@ -73,6 +73,7 @@
             </select>
         </div>
         <button class="btn btn-primary" id="f-refresh">Refresh</button>
+        <button class="btn btn-secondary" id="f-copy" title="Copy a shareable link to this filtered view">🔗</button>
         <button class="btn btn-secondary" id="f-clear">Clear</button>
     </div>
 </div>
@@ -172,6 +173,49 @@ function render(logs) {
     }));
 }
 
+// Shareable params — only the meaningful filters (not the view-only limit).
+function shareParams() {
+    const p = new URLSearchParams();
+    const type = document.getElementById('f-type').value;
+    const matchId = document.getElementById('f-match').value.trim();
+    const teamId = document.getElementById('f-team').value.trim();
+    if (type && type !== 'all') p.set('type', type);
+    if (matchId) p.set('match_id', matchId);
+    if (teamId) p.set('team_id', teamId);
+    return p;
+}
+
+function shareUrl() {
+    const p = shareParams();
+    return location.origin + location.pathname + (p.toString() ? `?${p}` : '');
+}
+
+function syncUrl() {
+    const p = shareParams();
+    history.replaceState(null, '', location.pathname + (p.toString() ? `?${p}` : ''));
+}
+
+async function copyText(text) {
+    try {
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(text);
+            return true;
+        }
+    } catch (e) { /* fall through to the legacy path below */ }
+    try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        return ok;
+    } catch (e) { return false; }
+}
+
 async function loadLogs() {
     const meta = document.getElementById('logs-meta');
     meta.textContent = 'Loading…';
@@ -179,6 +223,8 @@ async function loadLogs() {
     const limit = document.getElementById('f-limit').value;
     const matchId = document.getElementById('f-match').value.trim();
     const teamId = document.getElementById('f-team').value.trim();
+
+    syncUrl();  // keep the address bar shareable as filters change
 
     const params = new URLSearchParams({ type, limit });
     if (matchId) params.set('match_id', matchId);
@@ -200,6 +246,12 @@ async function loadLogs() {
 }
 
 document.getElementById('f-refresh').addEventListener('click', loadLogs);
+document.getElementById('f-copy').addEventListener('click', async () => {
+    const ok = await copyText(shareUrl());
+    if (window.API && API.toast) {
+        API.toast(ok ? 'Link copied to clipboard' : 'Copy failed — copy it from the address bar', ok ? 'success' : 'error');
+    }
+});
 document.getElementById('f-type').addEventListener('change', loadLogs);
 document.getElementById('f-limit').addEventListener('change', loadLogs);
 ['f-match', 'f-team'].forEach(id => document.getElementById(id).addEventListener('change', loadLogs));

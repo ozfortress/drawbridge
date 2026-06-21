@@ -11,6 +11,12 @@ const API = {
             opts.body = JSON.stringify(body);
         }
         const resp = await fetch(path, opts);
+        if (resp.status === 401) {
+            // Session expired or not authenticated — bounce to login instead of
+            // leaving the page showing an "Unauthorized" error.
+            window.location.href = '/admin/login';
+            throw new Error('Session expired — please log in again.');
+        }
         const data = await resp.json();
         if (!resp.ok && !data.warned) {
             throw new Error(data.error || `HTTP ${resp.status}`);
