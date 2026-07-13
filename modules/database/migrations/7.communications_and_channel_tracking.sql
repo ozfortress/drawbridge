@@ -1,8 +1,8 @@
 ALTER TABLE `logs`
-  ADD COLUMN `role_type` varchar(20) DEFAULT NULL COMMENT 'admin, staff, caster, captain_home, captain_away, player, unknown' AFTER `log_type`,
-  ADD COLUMN `channel_id` bigint(20) DEFAULT NULL COMMENT 'Discord channel snowflake' AFTER `role_type`;
+  ADD COLUMN IF NOT EXISTS `role_type` varchar(20) DEFAULT NULL COMMENT 'admin, staff, caster, captain_home, captain_away, player, unknown' AFTER `log_type`,
+  ADD COLUMN IF NOT EXISTS `channel_id` bigint(20) DEFAULT NULL COMMENT 'Discord channel snowflake' AFTER `role_type`;
 
-CREATE TABLE `tracked_channels` (
+CREATE TABLE IF NOT EXISTS `tracked_channels` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `channel_id` bigint(20) NOT NULL COMMENT 'Discord channel snowflake',
   `channel_type` varchar(10) NOT NULL COMMENT 'match or team',
