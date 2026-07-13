@@ -18,9 +18,25 @@
             <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
                 <button class="btn btn-secondary" id="btn-gen-launchpad">Update Launchpad</button>
                 <button class="btn btn-secondary" id="btn-assign-roles">Assign Roles</button>
-                <button class="btn btn-primary" id="btn-awards" style="display:none;">🏆 Awards</button>
                 <button class="btn btn-danger" id="btn-end-tournament">End Tournament</button>
             </div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top:1rem;">
+        <h2>🏆 Awards</h2>
+        <div id="awards-section">
+            <div id="awards-loading" style="color:var(--text-secondary);font-size:0.85rem;">Loading awards...</div>
+            <div id="awards-list" style="margin-top:0.5rem;"></div>
+            <button class="btn btn-primary" id="btn-create-award" style="margin-top:0.5rem;">+ New Award Event</button>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top:1rem;">
+        <h2>📋 Match Generation Status</h2>
+        <div id="matchgen-status">
+            <div id="matchgen-loading" style="color:var(--text-secondary);font-size:0.85rem;">Loading rounds...</div>
+            <div id="matchgen-rounds" style="margin-top:0.5rem;"></div>
         </div>
     </div>
 
@@ -56,8 +72,7 @@
     <div class="card" style="margin-top:1rem;">
         <h2>📅 Match Scheduling</h2>
         <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:0.75rem;">
-            Exclude days that shouldn't be offered when teams propose a time. Scheduling happens in each
-            match channel — there's nothing to send to team channels.
+            Exclude days that shouldn't be offered when teams propose a time.
         </p>
         <div id="schedule-excluded" style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem;">
             <label style="display:flex;align-items:center;gap:0.25rem;font-size:0.85rem;cursor:pointer;">
@@ -87,7 +102,6 @@
         <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:0.5rem;">
             When enabled, every match channel gets a pinned "Propose Match Time" prompt and a weekly deadline —
             saving with this on posts it to all existing match channels, turning it off removes it from them.
-            Unscheduled matches past the deadline are flagged in the launchpad. Leave off for cups / one-off events.
         </p>
         <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.9rem;cursor:pointer;margin-bottom:0.6rem;">
             <input type="checkbox" id="sched-enabled"> Enable match scheduling
@@ -130,17 +144,13 @@
 </div>
 
 <div id="division-template" style="display:none;">
-    <div class="card division-card">
+    <div class="card division-card" style="margin-top:1rem;">
         <h2 class="division-name"></h2>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:0.5rem;">
-            <div>
-                <h3 style="font-size:0.9rem;color:var(--text-secondary);margin-bottom:0.5rem;">Teams</h3>
-                <div class="team-list"></div>
-            </div>
-            <div>
-                <h3 style="font-size:0.9rem;color:var(--text-secondary);margin-bottom:0.5rem;">Matches</h3>
-                <div class="match-list"></div>
-            </div>
+        <div style="margin-top:0.5rem;">
+            <h3 style="font-size:0.9rem;color:var(--text-secondary);margin-bottom:0.5rem;">Teams</h3>
+            <div class="team-list"></div>
+            <h3 style="font-size:0.9rem;color:var(--text-secondary);margin-bottom:0.5rem;margin-top:1rem;">Matches</h3>
+            <div class="match-rounds"></div>
         </div>
     </div>
 </div>
@@ -148,6 +158,7 @@
 {% block scripts %}
 <script>
 const LEAGUE_ID = {{ league_id }};
+let detailData = null;
 
 async function loadDetail() {
     const bar = API.createProgressBar('detail-progress');
@@ -156,13 +167,18 @@ async function loadDetail() {
         bar.setStatus('success');
         bar.update(100, 'Loaded');
         document.getElementById('detail-content').style.display = 'block';
+        detailData = resp;
         renderDetail(resp);
+        renderMatchgenStatus(resp);
+        renderAwards(resp);
     } catch (e) {
         bar.setStatus('error');
         bar.update(100, e.message);
         document.getElementById('detail-content').innerHTML = `<div class="result-box result-error">${e.message}</div>`;
     }
 }
+
+function esc(s) { if (!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 function renderDetail(data) {
     document.getElementById('tournament-title').textContent = `${data.name} (${data.shortcode || 'No shortcode'})`;
@@ -171,11 +187,7 @@ function renderDetail(data) {
     statusEl.textContent = data.status || 'unknown';
     statusEl.className = data.status === 'active' ? 'result-info' : 'result-warning';
 
-    // Show awards button
-    const awardsBtn = document.getElementById('btn-awards');
-    awardsBtn.style.display = '';
-    awardsBtn.onclick = () => { window.location.href = `/admin/awards?league=${data.id}`; };
-
+    const guildId = data.discord_guild_id;
     const container = document.getElementById('divisions-container');
     const template = document.getElementById('division-template');
     container.innerHTML = '';
@@ -189,11 +201,13 @@ function renderDetail(data) {
         const teamList = clone.querySelector('.team-list');
         (d.teams || []).forEach(t => {
             const el = document.createElement('div');
-            el.style.cssText = 'padding:0.35rem 0;font-size:0.85rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;';
+            el.style.cssText = 'padding:0.35rem 0;font-size:0.85rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;';
+            const ozfUrl = t.ozf_team_id ? `https://ozfortress.com/teams/${t.ozf_team_id}` : null;
             el.innerHTML = `
-                <span>${t.name}</span>
-                <span style="color:var(--text-muted);font-size:0.75rem;">
-                    ${t.channel_id ? `<a href="https://discord.com/channels/@me/${t.channel_id}" target="_blank" style="color:var(--accent);">Channel</a>` : '—'}
+                <span><strong>${esc(t.name)}</strong></span>
+                <span style="font-size:0.75rem;display:flex;gap:6px;align-items:center;">
+                    ${t.channel_id ? `<a href="https://discord.com/channels/${guildId}/${t.channel_id}" target="_blank" style="color:var(--accent);" title="Team Discord Channel">💬</a>` : ''}
+                    ${ozfUrl ? `<a href="${ozfUrl}" target="_blank" style="color:var(--accent);" title="OZF Team Page">🅾️</a>` : ''}
                 </span>
             `;
             teamList.appendChild(el);
@@ -202,35 +216,162 @@ function renderDetail(data) {
             teamList.innerHTML = '<div style="font-size:0.85rem;color:var(--text-muted);padding:0.5rem 0;">No teams.</div>';
         }
 
-        const matchList = clone.querySelector('.match-list');
-        (d.matches || []).forEach(m => {
-            const el = document.createElement('div');
-            el.style.cssText = 'padding:0.35rem 0;font-size:0.85rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;';
-            const isBye = m.away_team === 'Bye';
-            const icon = isBye ? '🔄' : (m.archived ? '📁' : '⚔️');
-            el.innerHTML = `
-                <span>
-                    ${icon} ${m.home_team} vs ${m.away_team}
-                    ${m.archived ? '<span style="color:var(--text-muted);font-size:0.75rem;"> (archived)</span>' : ''}
-                </span>
-                <span style="font-size:0.75rem;">
-                    ${m.channel_id && m.channel_id !== 0 ? `<a href="https://discord.com/channels/@me/${m.channel_id}" target="_blank" style="color:var(--accent);">Channel</a> · ` : ''}
-                    <a href="https://ozfortress.com/matches/${m.match_id}" target="_blank" style="color:var(--accent);">OZF</a>
-                </span>
-            `;
-            matchList.appendChild(el);
+        const matchRounds = clone.querySelector('.match-rounds');
+        const matches = d.matches || [];
+
+        const roundGroups = {};
+        matches.forEach(m => {
+            const rn = m.round_number || 0;
+            if (!roundGroups[rn]) roundGroups[rn] = { round_number: rn, round_name: m.round_name || `Round ${rn}`, matches: [] };
+            roundGroups[rn].matches.push(m);
         });
-        if (!d.matches.length) {
-            matchList.innerHTML = '<div style="font-size:0.85rem;color:var(--text-muted);padding:0.5rem 0;">No matches.</div>';
+        const sortedRounds = Object.keys(roundGroups).sort((a,b) => Number(a)-Number(b));
+
+        if (sortedRounds.length === 0) {
+            matchRounds.innerHTML = '<div style="font-size:0.85rem;color:var(--text-muted);padding:0.5rem 0;">No matches.</div>';
+        } else {
+            sortedRounds.forEach(rn => {
+                const rg = roundGroups[rn];
+                const roundDiv = document.createElement('div');
+                roundDiv.style.cssText = 'margin-bottom:0.75rem;';
+                roundDiv.innerHTML = `<div style="font-weight:600;font-size:0.9rem;color:var(--accent);margin-bottom:0.3rem;">${esc(rg.round_name || `Round ${rn}`)}</div>`;
+                rg.matches.forEach(m => {
+                    const isBye = m.away_team === 'Bye';
+                    const logCount = parseInt(data.log_counts?.[String(m.match_id)] || 0);
+                    const el = document.createElement('div');
+                    el.style.cssText = 'padding:0.5rem 0.6rem;font-size:0.85rem;border:1px solid var(--border);border-radius:6px;margin-bottom:0.3rem;display:flex;justify-content:space-between;align-items:center;background:' + (m.archived ? 'var(--bg-secondary)' : 'var(--bg)') + ';';
+                    const statusBadge = m.archived ? '<span style="background:var(--danger);color:#fff;padding:0 5px;border-radius:3px;font-size:0.7rem;font-weight:600;">ARCHIVED</span>' : '';
+                    el.innerHTML = `
+                        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                            <span>${isBye ? '🔄' : '⚔️'} <strong>${esc(m.home_team)}</strong> vs <strong>${esc(m.away_team)}</strong></span>
+                            ${statusBadge}
+                        </div>
+                        <div style="display:flex;gap:6px;align-items:center;font-size:0.75rem;flex-shrink:0;">
+                            ${m.channel_id && m.channel_id !== 0 ? `<a href="https://discord.com/channels/${guildId}/${m.channel_id}" target="_blank" style="color:var(--accent);" title="Discord Channel">💬</a>` : '<span title="No channel" style="opacity:0.3;">💬</span>'}
+                            <a href="https://ozfortress.com/matches/${m.match_id}" target="_blank" style="color:var(--accent);" title="OZF Match Page">🅾️</a>
+                            <a href="/admin/match/${m.match_id}" style="color:var(--accent);" title="Match Detail">🔍</a>
+                            ${logCount > 0 ? `<span style="background:var(--success);color:#fff;padding:0 5px;border-radius:3px;font-weight:600;" title="Submitted Logs">📋${logCount}</span>` : '<span title="No logs" style="opacity:0.3;">📋</span>'}
+                        </div>
+                    `;
+                    roundDiv.appendChild(el);
+                });
+                matchRounds.appendChild(roundDiv);
+            });
         }
 
         container.appendChild(clone);
     });
 
     if (!data.divisions.length) {
-        container.innerHTML = '<div class="card"><p style="color:var(--text-secondary);">This tournament has no divisions set up yet. Start the tournament from the <a href="/admin/tournaments" style="color:var(--accent);">Tournaments page</a>.</p></div>';
+        container.innerHTML = '<div class="card" style="margin-top:1rem;"><p style="color:var(--text-secondary);">This tournament has no divisions set up yet. Start the tournament from the <a href="/admin/launchpad" style="color:var(--accent);">Launchpad</a>.</p></div>';
     }
 }
+
+function renderMatchgenStatus(data) {
+    const container = document.getElementById('matchgen-rounds');
+    const loading = document.getElementById('matchgen-loading');
+    loading.style.display = 'none';
+
+    const citRounds = data.citadel_rounds || [];
+    const dbMatches = {};
+    (data.divisions || []).forEach(d => (d.matches || []).forEach(m => { dbMatches[m.match_id] = m; }));
+
+    if (citRounds.length === 0) {
+        container.innerHTML = '<div style="color:var(--text-secondary);font-size:0.85rem;">No citadel rounds found for this league.</div>';
+        return;
+    }
+
+    const totalGenerated = Object.keys(dbMatches).length;
+    const totalCitadel = citRounds.reduce((s, r) => s + (r.matches || []).length, 0);
+
+    const summary = document.createElement('div');
+    summary.style.cssText = 'display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:0.75rem;padding:0.5rem 0;border-bottom:1px solid var(--border);';
+    summary.innerHTML = `
+        <span style="font-size:0.85rem;"><strong>${totalCitadel}</strong> citadel matches</span>
+        <span style="font-size:0.85rem;"><strong>${totalGenerated}</strong> generated in Drawbridge</span>
+        <span style="font-size:0.85rem;color:${totalGenerated >= totalCitadel ? 'var(--success)' : 'var(--warning)'};">${totalGenerated >= totalCitadel ? '✅ All generated' : `⏳ ${totalCitadel - totalGenerated} remaining`}</span>
+    `;
+    container.appendChild(summary);
+
+    citRounds.forEach(r => {
+        const citCount = (r.matches || []).length;
+        let genCount = 0;
+        let chanCount = 0;
+        (r.matches || []).forEach(cm => {
+            if (dbMatches[cm.id]) {
+                genCount++;
+                if (dbMatches[cm.id].channel_id && dbMatches[cm.id].channel_id !== 0) chanCount++;
+            }
+        });
+
+        const done = genCount >= citCount;
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:0.4rem 0.6rem;border-bottom:1px solid var(--border);font-size:0.85rem;';
+        row.innerHTML = `
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+                <span style="font-weight:600;">${esc(r.round_name || `Round ${r.round_number}`)}</span>
+                <span style="color:var(--text-secondary);font-size:0.8rem;">(${citCount} match${citCount > 1 ? 'es' : ''})</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+                ${done ? '<span style="color:var(--success);">✅</span>' : '<span style="color:var(--warning);">⏳</span>'}
+                <span style="color:var(--text-secondary);">${genCount}/${citCount} generated</span>
+                ${genCount > 0 ? `<span style="color:${chanCount >= genCount ? 'var(--success)' : 'var(--warning)'};">· ${chanCount}/${genCount} channels</span>` : ''}
+                ${!done ? `<button class="btn btn-secondary gen-round-btn" data-round="${r.round_number}" style="padding:0.2rem 0.6rem;font-size:0.75rem;margin-left:0.5rem;">Generate</button>` : ''}
+            </div>
+        `;
+        container.appendChild(row);
+
+        const genBtn = row.querySelector('.gen-round-btn');
+        if (genBtn) {
+            genBtn.addEventListener('click', () => {
+                document.getElementById('mg-round').value = r.round_number;
+                document.getElementById('btn-gen-round').click();
+            });
+        }
+    });
+}
+
+function renderAwards(data) {
+    const container = document.getElementById('awards-list');
+    const loading = document.getElementById('awards-loading');
+    loading.style.display = 'none';
+
+    const events = data.award_events || [];
+    if (events.length === 0) {
+        container.innerHTML = '<div style="color:var(--text-secondary);font-size:0.85rem;">No award events for this tournament.</div>';
+        return;
+    }
+
+    const statusColors = {
+        pending: 'var(--text-muted)',
+        nominations: 'var(--accent)',
+        nominations_closed: 'var(--warning)',
+        voting: 'var(--success)',
+        voting_closed: 'var(--warning)',
+        calculating: 'var(--warning)',
+        complete: 'var(--success)',
+        cancelled: 'var(--danger)',
+    };
+
+    events.forEach(ae => {
+        const el = document.createElement('div');
+        el.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:0.4rem 0.6rem;border-bottom:1px solid var(--border);font-size:0.85rem;';
+        el.innerHTML = `
+            <div>
+                <a href="/admin/awards/${ae.id}" style="color:var(--accent);text-decoration:none;font-weight:600;">${esc(ae.name)}</a>
+                <span style="display:inline-block;margin-left:0.5rem;padding:0.1rem 0.4rem;border-radius:3px;font-size:0.75rem;background:rgba(0,0,0,0.2);color:${statusColors[ae.status] || 'var(--text-primary)'};">${ae.status || 'pending'}</span>
+            </div>
+            <div style="font-size:0.75rem;color:var(--text-secondary);">
+                ${ae.nomination_deadline ? `📅 ${ae.nomination_deadline}` : ''}
+            </div>
+        `;
+        container.appendChild(el);
+    });
+}
+
+document.getElementById('btn-create-award').addEventListener('click', () => {
+    window.location.href = `/admin/awards?league=${LEAGUE_ID}`;
+});
 
 document.getElementById('btn-gen-launchpad').addEventListener('click', async () => {
     const btn = document.getElementById('btn-gen-launchpad');

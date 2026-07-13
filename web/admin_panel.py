@@ -321,10 +321,7 @@ async def launchpad_page():
 
 @admin_bp.route('/tournaments')
 async def tournaments_page():
-    session_user = get_session_user()
-    if not session_user or not session_user.get('is_admin'):
-        return redirect('/admin/login')
-    return await render_template('admin/tournaments.html', user=session_user)
+    return redirect('/admin/launchpad')
 
 
 @admin_bp.route('/tournament/<int:league_id>')
@@ -1213,15 +1210,60 @@ async def api_tournament_detail(league_id: int):
         if not league:
             return jsonify({'error': 'League not found in Citadel'}), 404
         db_league = _db.leagues.get_by_id(league_id)
+
+        roster_map = {}
+        if hasattr(league, 'rosters') and league.rosters:
+            for r in league.rosters:
+                roster_map[r.id] = {'team_id': r.team_id, 'name': r.name}
+
+        citadel_matches = []
+        if hasattr(league, 'matches') and league.matches:
+            for m in league.matches:
+                citadel_matches.append({
+                    'id': m.id,
+                    'round_number': m.round_number,
+                    'round_name': m.round_name,
+                    'status': m.status,
+                })
+
+        cm_by_round = {}
+        for cm in citadel_matches:
+            cm_by_round.setdefault(cm['round_number'], []).append(cm)
+
+        award_events_raw = _db.award_events.get_by_league(league_id) or []
+        award_events = []
+        for ae in award_events_raw:
+            award_events.append({
+                'id': ae['id'],
+                'name': ae['name'],
+                'status': ae['status'],
+                'nomination_deadline': ae.get('nomination_deadline'),
+                'voting_deadline': ae.get('voting_deadline'),
+                'created_at': ae.get('created_at'),
+            })
+
         divisions = _db.divisions.get_by_league(league_id)
         div_list = []
+        all_match_ids = []
         for d in divisions:
-            teams = _db.teams.get_by_division(d['id'])
             matches = _db.matches.get_by_division(d['id'])
-            matches_rich = []
             for m in matches:
+                all_match_ids.append(m['match_id'])
+            teams = _db.teams.get_by_division(d['id'])
+            matches_rich = []
+            cit_match_lookup = {cm['id']: cm for cm in citadel_matches}
+            for m in matches:
+                cit_info = cit_match_lookup.get(m['match_id'], {})
                 home_team = _db.teams.get_by_team_id(m['team_home']) if m['team_home'] else None
                 away_team = _db.teams.get_by_team_id(m['team_away']) if m.get('team_away') else None
+                home_roster_id = home_team['roster_id'] if home_team else None
+                away_roster_id = away_team['roster_id'] if away_team else None
+                home_ozf_team_id = None
+                away_ozf_team_id = None
+                if home_roster_id and home_roster_id in roster_map:
+                    home_ozf_team_id = roster_map[home_roster_id]['team_id']
+                if away_roster_id and away_roster_id in roster_map:
+                    away_ozf_team_id = roster_map[away_roster_id]['team_id']
                 matches_rich.append({
                     'match_id': m['match_id'],
                     'home_team': home_team['team_name'] if home_team else f"Team {m['team_home']}",
@@ -1230,8 +1272,21 @@ async def api_tournament_detail(league_id: int):
                     'away_team_id': m.get('team_away'),
                     'channel_id': m['channel_id'],
                     'archived': m['archived'],
+                    'round_number': cit_info.get('round_number'),
+                    'round_name': cit_info.get('round_name'),
+                    'home_ozf_team_id': home_ozf_team_id,
+                    'away_ozf_team_id': away_ozf_team_id,
+                    'home_roster_id': home_roster_id,
+                    'away_roster_id': away_roster_id,
                 })
-            team_list = [{'roster_id': t['roster_id'], 'team_id': t['team_id'], 'name': t['team_name'], 'channel_id': t['team_channel'], 'role_id': t['role_id']} for t in teams]
+            team_list = [{
+                'roster_id': t['roster_id'],
+                'team_id': t['team_id'],
+                'name': t['team_name'],
+                'channel_id': t['team_channel'],
+                'role_id': t['role_id'],
+                'ozf_team_id': roster_map.get(t['roster_id'], {}).get('team_id'),
+            } for t in teams]
             div_list.append({
                 'id': d['id'],
                 'name': d['division_name'],
@@ -1240,12 +1295,23 @@ async def api_tournament_detail(league_id: int):
                 'teams': team_list,
                 'matches': matches_rich,
             })
+
+        log_counts = {}
+        for mid in all_match_ids:
+            log_counts[str(mid)] = _db.match_logs.count_by_match(mid)
+
         return jsonify({
             'id': league.id,
             'name': league.name,
             'shortcode': league.shortcode if hasattr(league, 'shortcode') else '',
             'status': db_league.get('status', 'active') if db_league else 'unknown',
             'divisions': div_list,
+            'citadel_matches': citadel_matches,
+            'citadel_rounds': [{'round_number': rn, 'matches': msgs} for rn, msgs in sorted(cm_by_round.items())],
+            'award_events': award_events,
+            'discord_guild_id': os.getenv('DISCORD_GUILD_ID', ''),
+            'log_counts': log_counts,
+            'roster_map': roster_map,
         })
     except Exception as e:
         logger.error(f'Tournament detail error: {e}', exc_info=True)
@@ -1532,7 +1598,8 @@ async def api_award_events_list():
     if not _db:
         return jsonify({'error': 'Database not ready'}), 503
     try:
-        events = _db.award_events.get_all()
+        league_filter = request.args.get('league_id', type=int)
+        events = _db.award_events.get_by_league(league_filter) if league_filter else _db.award_events.get_all()
         enriched = []
         for ev in events:
             league = _db.leagues.get_by_id(ev['league_id']) if _db.leagues else None

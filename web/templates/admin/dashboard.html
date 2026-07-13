@@ -9,7 +9,7 @@
     <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;">
             <h2>🏆 Running Tournaments</h2>
-            <a href="/admin/tournaments" class="btn btn-secondary" style="text-decoration:none;">New Tournament</a>
+            <a href="/admin/launchpad" class="btn btn-secondary" style="text-decoration:none;">Launchpad</a>
         </div>
         <div id="tournaments-loading" style="padding:1rem 0;color:var(--text-secondary);">Loading...</div>
         <div id="tournaments-container"></div>
@@ -35,7 +35,7 @@ async function renderTournaments() {
         const leagues = resp.leagues || [];
         loading.style.display = 'none';
         if (!leagues.length) {
-            container.innerHTML = '<div style="padding:2rem 0;text-align:center;color:var(--text-muted);">No active tournaments. <a href="/admin/tournaments" style="color:var(--accent);">Start one →</a></div>';
+            container.innerHTML = '<div style="padding:2rem 0;text-align:center;color:var(--text-muted);">No active tournaments. <a href="/admin/launchpad" style="color:var(--accent);">Go to Launchpad →</a></div>';
             return;
         }
         container.innerHTML = leagues.map(l => `
