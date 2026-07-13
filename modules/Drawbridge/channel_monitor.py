@@ -94,6 +94,13 @@ async def rebuild_match_channel(bot, db, match, tracked):
     if not role_away:
         raise RuntimeError(f'Away team role {team_away["role_id"]} not found in guild')
 
+    # Deactivate the old tracked entry so the monitor doesn't rebuild again
+    if tracked and tracked.get('channel_id'):
+        try:
+            db.tracked_channels.deactivate(tracked['channel_id'])
+        except Exception:
+            pass
+
     overrides = {
         guild.default_role: discord.PermissionOverwrite(view_channel=False, send_messages=False),
         role_home: discord.PermissionOverwrite(view_channel=True, send_messages=True),
@@ -244,6 +251,13 @@ async def rebuild_team_channel(bot, db, team, tracked):
     cat = guild.get_channel(category_id)
     if not cat:
         raise RuntimeError(f'Division category channel {category_id} not found in guild')
+
+    # Deactivate the old tracked entry so the monitor doesn't rebuild again
+    if tracked and tracked.get('channel_id'):
+        try:
+            db.tracked_channels.deactivate(tracked['channel_id'])
+        except Exception:
+            pass
 
     overrides = {
         guild.default_role: discord.PermissionOverwrite(view_channel=False, send_messages=False),
