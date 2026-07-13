@@ -834,7 +834,7 @@ async def api_tournament_matchend():
                 if role.id != guild.default_role.id:
                     overwrites[role] = discord.PermissionOverwrite(read_messages=True, send_messages=False)
             await channel.edit(overwrites=overwrites)
-        _db.matches.archive_match(match_id)
+        _db.matches.archive(match_id)
         try:
             if match.get('channel_id'):
                 _db.tracked_channels.deactivate(match['channel_id'])
