@@ -56,9 +56,14 @@ async def rebuild_match_channel(bot, db, match, tracked):
         if role:
             overrides[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
 
-    new_channel = await guild.create_text_channel(
-        f'🗡️-{match["match_id"]}-rebuilt', category=cat, overwrites=overrides
-    )
+    # Build original channel name format
+    home_name = team_home.get('team_name', 'Home')
+    away_name = team_away.get('team_name', 'Away')
+    channel_name = f'🗡️-{match["match_id"]}-{home_name}-vs-{away_name}'
+    if len(channel_name) > 100:
+        channel_name = f'🗡️{match["match_id"]}-{home_name[:10]}-vs-{away_name[:10]}'
+
+    new_channel = await guild.create_text_channel(channel_name, category=cat, overwrites=overrides)
 
     db.tracked_channels.upsert_by_channel({
         'channel_id': new_channel.id,
@@ -69,11 +74,13 @@ async def rebuild_match_channel(bot, db, match, tracked):
     })
     db.matches.update(match['match_id'], {'channel_id': new_channel.id})
 
+    # Post rebuilt notice first
     await new_channel.send(
-        '🔄 **This channel was automatically rebuilt** because the original was deleted. '
-        'Captains, please continue your match coordination here.'
+        '🔄 **Channel Rebuilt** — The original was deleted and has been recreated. '
+        'Message history is replayed below as embeds.'
     )
 
+    # Replay message history as embeds
     logs = db.logs.get_by_match_id(match['match_id'])
     for log_entry in logs:
         if log_entry['log_type'] != 'CREATE':
@@ -105,16 +112,53 @@ async def rebuild_match_channel(bot, db, match, tracked):
         except Exception:
             continue
 
+    # Send match intro embed from template (same as original channel creation)
     try:
-        notice = await new_channel.send(
-            '📋 **Channel Rebuilt** — The original message history has been replayed above as embeds. '
-            'Use the 📋 Submit Match Log button below once you play your match.'
-        )
+        from web.template_helper import get_template
+        raw = get_template('match.json')
+        if raw:
+            import json
+            content = raw
+            for k, v in {
+                '{TEAM_HOME}': f'<@&{team_home["role_id"]}>',
+                '{TEAM_AWAY}': f'<@&{team_away["role_id"]}>',
+                '{ROUND_NAME}': f'Match {match["match_id"]}',
+                '{MATCH_ID}': match['match_id'],
+                '{CHANNEL_ID}': str(new_channel.id),
+                '{CHANNEL_LINK}': f'<#{new_channel.id}>',
+            }.items():
+                content = content.replace(k, str(v))
+            msg_data = json.loads(content)
+            msg_data['embed'] = discord.Embed(**msg_data['embeds'][0])
+            del msg_data['embeds']
+            notice_msg = await new_channel.send(**msg_data)
+            try:
+                await notice_msg.pin()
+            except Exception:
+                pass
+    except Exception as e:
+        logger.warning(f'Failed to send match intro template: {e}')
+
+    # Log submission button
+    try:
         from web.match_log_discord import MatchLogSubmitView
         await new_channel.send('Submit your match logs below once the match is complete.',
                                view=MatchLogSubmitView(match['match_id']))
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f'Failed to send log submission view: {e}')
+
+    # Scheduling button (if enabled for this league)
+    try:
+        settings = db.tournament_schedule_settings.get_by_league(match['league_id'])
+        if settings and settings.get('scheduling_enabled'):
+            from web.match_schedule_discord import post_schedule_message
+            await post_schedule_message(bot, db, {
+                'match_id': match['match_id'],
+                'channel_id': new_channel.id,
+                'league_id': match['league_id'],
+            }, settings)
+    except Exception as e:
+        logger.warning(f'Failed to send schedule message: {e}')
 
     logger.info(f'Rebuilt match channel for match {match["match_id"]} (new channel: {new_channel.id})')
     return new_channel
