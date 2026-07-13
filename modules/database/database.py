@@ -85,7 +85,23 @@ class Database:
 
         # Run migrations if enabled
         if auto_migrate:
+            from modules.logging_config import get_logger
+            _log = get_logger('drawbridge.database')
             self.migrations.run_migrations()
+            # Verify expected tables exist; if any are missing (old migrations were recorded
+            # but never actually executed due to prior bugs), re-run all migrations from scratch.
+            expected = {'match_logs', 'award_events', 'tracked_channels', 'match_schedules',
+                        'team_availability', 'tournament_schedule_settings'}
+            try:
+                missing = []
+                for tbl in expected:
+                    if not self.connection.table_exists(tbl):
+                        missing.append(tbl)
+                if missing:
+                    _log.warning(f'Expected tables missing: {missing} — re-running all migrations')
+                    self.migrations.run_migrations(reset=True)
+            except Exception as e:
+                _log.warning(f'Table verification failed: {e}')
 
     def health_check(self) -> bool:
         """Check if database connection is healthy."""

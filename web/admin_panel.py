@@ -1241,7 +1241,11 @@ async def api_tournament_detail(league_id: int):
         for cm in citadel_matches:
             cm_by_round.setdefault(cm['round_number'], []).append(cm)
 
-        award_events_raw = _db.award_events.get_by_league(league_id) or []
+        award_events_raw = []
+        try:
+            award_events_raw = _db.award_events.get_by_league(league_id) or []
+        except Exception:
+            pass
         award_events = []
         for ae in award_events_raw:
             award_events.append({
@@ -1309,7 +1313,10 @@ async def api_tournament_detail(league_id: int):
 
         log_counts = {}
         for mid in all_match_ids:
-            log_counts[str(mid)] = _db.match_logs.count_by_match(mid)
+            try:
+                log_counts[str(mid)] = _db.match_logs.count_by_match(mid)
+            except Exception:
+                log_counts[str(mid)] = 0
 
         return jsonify({
             'id': league.id,
