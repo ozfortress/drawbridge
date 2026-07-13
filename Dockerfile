@@ -29,7 +29,7 @@ RUN set -ex; \
 EXPOSE 8080
 
 # Health check using the Python script
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD python healthcheck.py || exit 1
 
 CMD [ "python", "./app.py" ]
