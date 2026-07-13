@@ -22,6 +22,8 @@ _cit = None
 _tournament_cog = None
 _sync_cog = None
 
+_IS_DEV = os.getenv('ENVIRONMENT', 'production') == 'development'
+
 # Warned users tracking for tournament end
 _warned_users: dict[str, float] = {}
 
@@ -308,7 +310,7 @@ async def dashboard_page():
     session_user = get_session_user()
     if not session_user or not session_user.get('is_admin'):
         return redirect('/admin/login')
-    return await render_template('admin/dashboard.html', user=session_user)
+    return await render_template('admin/dashboard.html', user=session_user, is_dev=_IS_DEV)
 
 
 @admin_bp.route('/launchpad')
@@ -1347,38 +1349,50 @@ async def api_tournament_detail(league_id: int):
     if not _cit or not _db:
         return jsonify({'error': 'Not ready'}), 503
     try:
-        league = _cit.getLeague(league_id)
-        if not league:
-            return jsonify({'error': 'League not found in Citadel'}), 404
+        league = None
+        if _cit and league_id != 99999:
+            league = _cit.getLeague(league_id)
+
         db_league = _db.leagues.get_by_id(league_id)
 
-        roster_map = {}
-        if hasattr(league, 'rosters') and league.rosters:
-            for r in league.rosters:
-                if isinstance(r, dict):
-                    roster_map[r['id']] = {'team_id': r.get('team_id'), 'name': r.get('name', '')}
-                else:
-                    roster_map[r.id] = {'team_id': r.team_id, 'name': r.name}
+        is_fake = (league_id == 99999) and (league is None)
 
+        if not league and not is_fake:
+            return jsonify({'error': 'League not found in Citadel'}), 404
+
+        roster_map = {}
         citadel_matches = []
-        if hasattr(league, 'matches') and league.matches:
-            for m in league.matches:
-                if isinstance(m, dict):
-                    citadel_matches.append({
-                        'id': m['id'],
-                        'round_number': m.get('round_number', 0),
-                        'round_name': m.get('round_name', ''),
-                        'status': m.get('status', ''),
-                        'forfeit_by': m.get('forfeit_by', ''),
-                    })
-                else:
-                    citadel_matches.append({
-                        'id': m.id,
-                        'round_number': m.round_number,
-                        'round_name': m.round_name,
-                        'status': m.status,
-                        'forfeit_by': getattr(m, 'forfeit_by', ''),
-                    })
+
+        if is_fake:
+            from .dev_fake_tournament import generate_fake_citadel_data
+            fake_data = generate_fake_citadel_data(_db)
+            citadel_matches = fake_data['citadel_matches']
+            roster_map = fake_data['roster_map']
+        elif league:
+            if hasattr(league, 'rosters') and league.rosters:
+                for r in league.rosters:
+                    if isinstance(r, dict):
+                        roster_map[r['id']] = {'team_id': r.get('team_id'), 'name': r.get('name', '')}
+                    else:
+                        roster_map[r.id] = {'team_id': r.team_id, 'name': r.name}
+            if hasattr(league, 'matches') and league.matches:
+                for m in league.matches:
+                    if isinstance(m, dict):
+                        citadel_matches.append({
+                            'id': m['id'],
+                            'round_number': m.get('round_number', 0),
+                            'round_name': m.get('round_name', ''),
+                            'status': m.get('status', ''),
+                            'forfeit_by': m.get('forfeit_by', ''),
+                        })
+                    else:
+                        citadel_matches.append({
+                            'id': m.id,
+                            'round_number': m.round_number,
+                            'round_name': m.round_name,
+                            'status': m.status,
+                            'forfeit_by': getattr(m, 'forfeit_by', ''),
+                        })
 
         cm_by_round = {}
         for cm in citadel_matches:
@@ -1463,10 +1477,14 @@ async def api_tournament_detail(league_id: int):
             except Exception:
                 log_counts[str(mid)] = 0
 
+        league_id_display = league.id if league else league_id
+        league_name = league.name if league else (db_league.get('league_name') if db_league else f'League {league_id}')
+        league_shortcode = (league.shortcode if hasattr(league, 'shortcode') else '') if league else (db_league.get('league_shortcode', '') if db_league else '')
+
         return jsonify({
-            'id': league.id,
-            'name': league.name,
-            'shortcode': league.shortcode if hasattr(league, 'shortcode') else '',
+            'id': league_id_display,
+            'name': league_name,
+            'shortcode': league_shortcode,
             'status': db_league.get('status', 'active') if db_league else 'unknown',
             'divisions': div_list,
             'citadel_matches': citadel_matches,
@@ -1478,6 +1496,26 @@ async def api_tournament_detail(league_id: int):
         })
     except Exception as e:
         logger.error(f'Tournament detail error: {e}', exc_info=True)
+        return _db_error(e)
+
+
+# ── Dev-only: fake tournament generator ────────────────────────
+
+@admin_bp.route('/api/dev/generate-fake-tournament', methods=['POST'])
+@require_admin
+async def api_dev_generate_fake():
+    if not _IS_DEV:
+        return jsonify({'error': 'Only available in dev environment'}), 403
+    if not _db:
+        return jsonify({'error': 'Not ready'}), 503
+    try:
+        data = await request.get_json() or {}
+        force = data.get('force', False)
+        from .dev_fake_tournament import generate_fake_tournament
+        league_id, message = generate_fake_tournament(_db, force=force)
+        return jsonify({'success': True, 'league_id': league_id, 'message': message})
+    except Exception as e:
+        logger.error(f'Fake tournament error: {e}', exc_info=True)
         return _db_error(e)
 
 
