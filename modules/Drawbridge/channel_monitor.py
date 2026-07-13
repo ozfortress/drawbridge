@@ -94,12 +94,14 @@ async def rebuild_match_channel(bot, db, match, tracked):
     if not role_away:
         raise RuntimeError(f'Away team role {team_away["role_id"]} not found in guild')
 
-    # Deactivate the old tracked entry so the monitor doesn't rebuild again
-    if tracked and tracked.get('channel_id'):
-        try:
-            db.tracked_channels.deactivate(tracked['channel_id'])
-        except Exception:
-            pass
+    # Deactivate ALL old tracked entries for this match so the monitor
+    # doesn't rebuild again from stale entries left by prior cycles.
+    try:
+        for old in (db.tracked_channels.get_by_match(match['match_id']) or []):
+            if old.get('active'):
+                db.tracked_channels.deactivate(old['channel_id'])
+    except Exception:
+        pass
 
     overrides = {
         guild.default_role: discord.PermissionOverwrite(view_channel=False, send_messages=False),
@@ -320,6 +322,8 @@ def start_channel_monitor(bot, db):
             return
 
         tracked_list = db.tracked_channels.get_active()
+        rebuilt_matches = set()
+        rebuilt_teams = set()
         for tracked in tracked_list:
             channel = guild.get_channel(tracked['channel_id'])
             if channel is not None:
@@ -333,6 +337,12 @@ def start_channel_monitor(bot, db):
             if channel is not None:
                 continue
 
+            # Skip if already rebuilt in this cycle (stale duplicate entry)
+            if tracked['channel_type'] == 'match' and tracked.get('match_id') in rebuilt_matches:
+                continue
+            if tracked['channel_type'] == 'team' and tracked.get('team_id') in rebuilt_teams:
+                continue
+
             logger.warning(
                 f'Tracked {tracked["channel_type"]} channel {tracked["channel_id"]} '
                 f'is missing — auto-rebuilding.'
@@ -343,10 +353,12 @@ def start_channel_monitor(bot, db):
                     match = db.matches.get_by_id(tracked['match_id'])
                     if match and not match.get('archived'):
                         await rebuild_match_channel(bot, db, match, tracked)
+                        rebuilt_matches.add(tracked['match_id'])
                 elif tracked['channel_type'] == 'team':
                     team = db.teams.get_by_id(tracked['team_id'])
                     if team:
                         await rebuild_team_channel(bot, db, team, tracked)
+                        rebuilt_teams.add(tracked['team_id'])
             except Exception:
                 logger.exception(f'Error rebuilding {tracked["channel_type"]} channel {tracked["channel_id"]}')
 
