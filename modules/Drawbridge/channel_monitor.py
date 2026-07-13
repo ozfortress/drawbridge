@@ -116,8 +116,8 @@ async def rebuild_match_channel(bot, db, match, tracked):
         logger.info(f'Rebuilt match channel for match {match["match_id"]} (new channel: {new_channel.id})')
         return new_channel
     except Exception as e:
-        logger.error(f'Failed to rebuild match channel for match {match["match_id"]}: {e}')
-        return None
+        logger.error(f'Failed to rebuild match channel for match {match["match_id"]}: {e}', exc_info=True)
+        raise
 
 
 async def rebuild_team_channel(bot, db, team, tracked):
@@ -173,9 +173,9 @@ async def rebuild_team_channel(bot, db, team, tracked):
 
         logger.info(f'Rebuilt team channel for team {team["team_id"]} (new channel: {new_channel.id})')
         return new_channel
-    except Exception as e:
-        logger.error(f'Failed to rebuild team channel for team {team["team_id"]}: {e}')
-        return None
+    except Exception:
+        logger.exception(f'Failed to rebuild team channel for team {team["team_id"]}')
+        raise
 
 
 def _get_role_ids(*keywords):
@@ -225,14 +225,17 @@ def start_channel_monitor(bot, db):
                 f'is missing — auto-rebuilding.'
             )
 
-            if tracked['channel_type'] == 'match':
-                match = db.matches.get_by_id(tracked['match_id'])
-                if match and not match.get('archived'):
-                    await rebuild_match_channel(bot, db, match, tracked)
-            elif tracked['channel_type'] == 'team':
-                team = db.teams.get_by_id(tracked['team_id'])
-                if team:
-                    await rebuild_team_channel(bot, db, team, tracked)
+            try:
+                if tracked['channel_type'] == 'match':
+                    match = db.matches.get_by_id(tracked['match_id'])
+                    if match and not match.get('archived'):
+                        await rebuild_match_channel(bot, db, match, tracked)
+                elif tracked['channel_type'] == 'team':
+                    team = db.teams.get_by_id(tracked['team_id'])
+                    if team:
+                        await rebuild_team_channel(bot, db, team, tracked)
+            except Exception:
+                logger.exception(f'Error rebuilding {tracked["channel_type"]} channel {tracked["channel_id"]}')
 
     _initialized = True
     _monitor_task = monitor_loop
