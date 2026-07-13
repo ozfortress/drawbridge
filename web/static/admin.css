@@ -281,6 +281,11 @@ body {
     background: var(--border);
 }
 
+.btn-sm {
+    padding: 2px 8px;
+    font-size: 0.75rem;
+}
+
 .btn-danger {
     background: var(--danger);
     color: var(--bg-primary);

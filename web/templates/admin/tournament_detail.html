@@ -234,7 +234,11 @@ function renderDetail(data) {
                 const rg = roundGroups[rn];
                 const roundDiv = document.createElement('div');
                 roundDiv.style.cssText = 'margin-bottom:0.75rem;';
-                roundDiv.innerHTML = `<div style="font-weight:600;font-size:0.9rem;color:var(--accent);margin-bottom:0.3rem;">${esc(rg.round_name || `Round ${rn}`)}</div>`;
+                roundDiv.innerHTML = `<div style="font-weight:600;font-size:0.9rem;color:var(--accent);margin-bottom:0.3rem;display:flex;align-items:center;gap:8px;">
+                    <span>${esc(rg.round_name || `Round ${rn}`)}</span>
+                    <button class="btn btn-sm btn-secondary" onclick="bulkArchiveRound(${rn})" title="Archive all matches in this round">🗄️ Archive</button>
+                    <button class="btn btn-sm btn-danger" onclick="bulkDeleteRound(${rn})" title="Delete all matches in this round">🗑️ Delete</button>
+                </div>`;
                 rg.matches.forEach(m => {
                     const isBye = m.away_team === 'Bye';
                     const logCount = parseInt(data.log_counts?.[String(m.match_id)] || 0);
@@ -581,6 +585,38 @@ document.getElementById('btn-save-schedule-settings').addEventListener('click', 
     }
     result.style.display = 'block';
 });
+
+async function bulkArchiveRound(roundNumber) {
+    const msg = `Archive all matches in round ${roundNumber}?\nChannels will be set to read-only.`;
+    if (!confirm(msg)) return;
+    try {
+        const resp = await API.post('/admin/api/tournament/round-archive', {
+            league_id: LEAGUE_ID,
+            round_number: roundNumber,
+        });
+        API.toast(resp.message || 'Done', 'success');
+        loadDetail();
+    } catch (e) {
+        API.toast(e.message, 'error');
+    }
+}
+
+async function bulkDeleteRound(roundNumber) {
+    const msg = `DELETE all matches in round ${roundNumber}?\nThis will delete Discord channels and match data. This cannot be undone.`;
+    if (!confirm(msg)) return;
+    const really = prompt(`Type DELETE to confirm deleting round ${roundNumber}:`);
+    if (really !== 'DELETE') { API.toast('Cancelled', 'warning'); return; }
+    try {
+        const resp = await API.post('/admin/api/tournament/round-delete', {
+            league_id: LEAGUE_ID,
+            round_number: roundNumber,
+        });
+        API.toast(resp.message || 'Done', 'success');
+        loadDetail();
+    } catch (e) {
+        API.toast(e.message, 'error');
+    }
+}
 
 document.addEventListener('DOMContentLoaded', () => { loadDetail(); loadScheduleSettings(); });
 </script>

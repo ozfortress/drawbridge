@@ -847,6 +847,109 @@ async def api_tournament_matchend():
         return _db_error(e)
 
 
+@admin_bp.route('/api/tournament/round-archive', methods=['POST'])
+@require_admin
+async def api_tournament_round_archive():
+    if not _check_bot_ready() or not _get_tournament_cog():
+        return jsonify({'error': 'Bot not ready'}), 503
+    data = await request.get_json()
+    league_id = data.get('league_id')
+    round_number = data.get('round_number')
+    if not league_id or round_number is None:
+        return jsonify({'error': 'league_id and round_number required'}), 400
+    try:
+        league = _cit.getLeague(league_id)
+        if not league:
+            return jsonify({'error': 'League not found'}), 404
+        cit_matches = getattr(league, 'matches', []) or []
+        round_ids = set()
+        for m in cit_matches:
+            rn = m['round_number'] if isinstance(m, dict) else m.round_number
+            if rn == round_number:
+                round_ids.add(m['id'] if isinstance(m, dict) else m.id)
+
+        guild = _get_guild()
+        archived = 0
+        for mid in round_ids:
+            match = _db.matches.get_by_id(mid)
+            if not match or match.get('archived'):
+                continue
+            channel = guild.get_channel(match['channel_id']) if match.get('channel_id') else None
+            if channel:
+                try:
+                    await channel.send('Match has ended. This channel will now be archived.')
+                    overwrites = channel.overwrites
+                    for role, perm in overwrites.items():
+                        if role.id != guild.default_role.id:
+                            overwrites[role] = discord.PermissionOverwrite(read_messages=True, send_messages=False)
+                    await channel.edit(overwrites=overwrites)
+                except Exception:
+                    pass
+            _db.matches.archive(mid)
+            try:
+                if match.get('channel_id'):
+                    _db.tracked_channels.deactivate(match['channel_id'])
+            except Exception:
+                pass
+            archived += 1
+        await _get_tournament_cog().update_launchpad()
+        return jsonify({'success': True, 'message': f'Archived {archived} match(es) in round {round_number}.'})
+    except Exception as e:
+        logger.error(f'Round archive error: {e}')
+        return _db_error(e)
+
+
+@admin_bp.route('/api/tournament/round-delete', methods=['POST'])
+@require_admin
+async def api_tournament_round_delete():
+    if not _check_bot_ready() or not _get_tournament_cog():
+        return jsonify({'error': 'Bot not ready'}), 503
+    data = await request.get_json()
+    league_id = data.get('league_id')
+    round_number = data.get('round_number')
+    if not league_id or round_number is None:
+        return jsonify({'error': 'league_id and round_number required'}), 400
+    try:
+        league = _cit.getLeague(league_id)
+        if not league:
+            return jsonify({'error': 'League not found'}), 404
+        cit_matches = getattr(league, 'matches', []) or []
+        round_ids = set()
+        for m in cit_matches:
+            rn = m['round_number'] if isinstance(m, dict) else m.round_number
+            if rn == round_number:
+                round_ids.add(m['id'] if isinstance(m, dict) else m.id)
+
+        guild = _get_guild()
+        deleted = 0
+        for mid in round_ids:
+            match = _db.matches.get_by_id(mid)
+            if not match:
+                continue
+            channel = guild.get_channel(match['channel_id']) if match.get('channel_id') else None
+            if channel:
+                try:
+                    await channel.delete(reason=f'Bulk round {round_number} delete')
+                except Exception:
+                    pass
+            try:
+                if match.get('channel_id'):
+                    _db.tracked_channels.deactivate(match['channel_id'])
+            except Exception:
+                pass
+            try:
+                _db.match_schedules.delete_by_match(mid)
+            except Exception:
+                pass
+            _db.matches.delete(mid)
+            deleted += 1
+        await _get_tournament_cog().update_launchpad()
+        return jsonify({'success': True, 'message': f'Deleted {deleted} match(es) in round {round_number}.'})
+    except Exception as e:
+        logger.error(f'Round delete error: {e}')
+        return _db_error(e)
+
+
 @admin_bp.route('/match/<int:match_id>')
 @require_admin
 async def match_detail_page(match_id: int):
