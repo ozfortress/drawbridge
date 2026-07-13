@@ -24,7 +24,7 @@
     </div>
 
     <div class="card" style="margin-top:1rem;">
-        <h2>🏆 Awards</h2>
+        <h2>Awards</h2>
         <div id="awards-section">
             <div id="awards-loading" style="color:var(--text-secondary);font-size:0.85rem;">Loading awards...</div>
             <div id="awards-list" style="margin-top:0.5rem;"></div>
@@ -33,7 +33,7 @@
     </div>
 
     <div class="card" style="margin-top:1rem;">
-        <h2>📋 Match Generation Status</h2>
+        <h2>Match Generation Status</h2>
         <div id="matchgen-status">
             <div id="matchgen-loading" style="color:var(--text-secondary);font-size:0.85rem;">Loading rounds...</div>
             <div id="matchgen-rounds" style="margin-top:0.5rem;"></div>
@@ -41,7 +41,7 @@
     </div>
 
     <div class="card" id="matchgen-section" style="margin-top:1rem;">
-        <h2>Generate Matches</h2>
+        <h2>Match Generation Controls</h2>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
             <div>
                 <label style="font-size:0.85rem;color:var(--text-secondary);">Generate by Round</label>
@@ -70,7 +70,7 @@
     </div>
 
     <div class="card" style="margin-top:1rem;">
-        <h2>📅 Match Scheduling</h2>
+        <h2>Match Scheduling</h2>
         <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:0.75rem;">
             Exclude days that shouldn't be offered when teams propose a time.
         </p>
@@ -135,7 +135,7 @@
             </label>
         </div>
         <div style="display:flex;gap:0.5rem;">
-            <button class="btn btn-primary" id="btn-save-schedule-settings">💾 Save Settings</button>
+            <button class="btn btn-primary" id="btn-save-schedule-settings">Save Settings</button>
         </div>
         <div id="schedule-result" class="result-box" style="display:none;margin-top:0.5rem;"></div>
     </div>
@@ -233,30 +233,42 @@ function renderDetail(data) {
             sortedRounds.forEach(rn => {
                 const rg = roundGroups[rn];
                 const roundDiv = document.createElement('div');
-                roundDiv.style.cssText = 'margin-bottom:0.75rem;';
-                roundDiv.innerHTML = `<div style="font-weight:600;font-size:0.9rem;color:var(--accent);margin-bottom:0.3rem;display:flex;align-items:center;gap:8px;">
-                    <span>${esc(rg.round_name || `Round ${rn}`)}</span>
-                    <button class="btn btn-sm btn-secondary" onclick="bulkArchiveRound(${rn})" title="Archive all matches in this round">🗄️ Archive</button>
-                    <button class="btn btn-sm btn-danger" onclick="bulkDeleteRound(${rn})" title="Delete all matches in this round">🗑️ Delete</button>
-                </div>`;
+                roundDiv.style.cssText = 'margin-bottom:0.75rem;border:1px solid var(--border);border-radius:6px;overflow:hidden;';
+
+                const statusCounts = {pending:0,submitted:0,confirmed:0,forfeit:0};
+                rg.matches.forEach(m => {
+                    const s = m.status || 'pending';
+                    if (s.startsWith('submitted')) statusCounts.submitted++;
+                    else if (s === 'confirmed') statusCounts.confirmed++;
+                    else if (s === 'forfeit') statusCounts.forfeit++;
+                    else statusCounts.pending++;
+                });
+                const statusSummary = Object.entries(statusCounts)
+                    .filter(([_,c]) => c > 0)
+                    .map(([k,c]) => `<span style="font-size:0.7rem;padding:0 4px;border-radius:2px;background:var(--bg-secondary);color:var(--text-secondary);">${k} ${c}</span>`)
+                    .join(' ');
+
+                const header = document.createElement('div');
+                header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:0.5rem 0.6rem;background:var(--bg-secondary);border-bottom:1px solid var(--border);';
+                header.innerHTML = `
+                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                        <span style="font-weight:600;font-size:0.85rem;color:var(--accent);">${esc(rg.round_name || `Round ${rn}`)}</span>
+                        ${statusSummary}
+                    </div>
+                    <div style="display:flex;gap:4px;">
+                        <button class="btn btn-sm btn-secondary" onclick="bulkArchiveRound(${rn})">Archive Round</button>
+                        <button class="btn btn-sm btn-danger" onclick="bulkDeleteRound(${rn})">Clean Round</button>
+                    </div>
+                `;
+                roundDiv.appendChild(header);
+
                 rg.matches.forEach(m => {
                     const isBye = m.away_team === 'Bye';
                     const logCount = parseInt(data.log_counts?.[String(m.match_id)] || 0);
                     const el = document.createElement('div');
-                    el.style.cssText = 'padding:0.5rem 0.6rem;font-size:0.85rem;border:1px solid var(--border);border-radius:6px;margin-bottom:0.3rem;display:flex;justify-content:space-between;align-items:center;background:' + (m.archived ? 'var(--bg-secondary)' : 'var(--bg)') + ';';
-                    const statusBadge = m.archived ? '<span style="background:var(--danger);color:#fff;padding:0 5px;border-radius:3px;font-size:0.7rem;font-weight:600;">ARCHIVED</span>' : '';
-                    el.innerHTML = `
-                        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-                            <span>${isBye ? '🔄' : '⚔️'} <strong>${esc(m.home_team)}</strong> vs <strong>${esc(m.away_team)}</strong></span>
-                            ${statusBadge}
-                        </div>
-                        <div style="display:flex;gap:6px;align-items:center;font-size:0.75rem;flex-shrink:0;">
-                            ${m.channel_id && m.channel_id !== 0 ? `<a href="https://discord.com/channels/${guildId}/${m.channel_id}" target="_blank" style="color:var(--accent);" title="Discord Channel">💬</a>` : '<span title="No channel" style="opacity:0.3;">💬</span>'}
-                            <a href="https://ozfortress.com/matches/${m.match_id}" target="_blank" style="color:var(--accent);" title="OZF Match Page">🅾️</a>
-                            <a href="/admin/match/${m.match_id}" style="color:var(--accent);" title="Match Detail">🔍</a>
-                            ${logCount > 0 ? `<span style="background:var(--success);color:#fff;padding:0 5px;border-radius:3px;font-weight:600;" title="Submitted Logs">📋${logCount}</span>` : '<span title="No logs" style="opacity:0.3;">📋</span>'}
-                        </div>
-                    `;
+                    const bgColor = m.archived ? 'var(--bg-secondary)' : (m.channel_id ? 'var(--bg)' : 'var(--bg-secondary)');
+                    el.style.cssText = 'padding:0.4rem 0.6rem;font-size:0.8rem;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);background:' + bgColor + ';';
+                    el.innerHTML = matchRowHTML(m, isBye, logCount, guildId);
                     roundDiv.appendChild(el);
                 });
                 matchRounds.appendChild(roundDiv);
@@ -271,10 +283,40 @@ function renderDetail(data) {
     }
 }
 
+function citadelStatusBadge(m) {
+    const s = m.status || 'pending';
+    const forfeit = s === 'forfeit' || (m.forfeit_by && m.forfeit_by !== 'no_forfeit' && m.forfeit_by !== '');
+    if (forfeit) return '<span style="color:var(--danger);font-weight:600;font-size:0.7rem;">FORFEIT</span>';
+    if (s === 'confirmed') return '<span style="color:var(--success);font-weight:600;font-size:0.7rem;">CONFIRMED</span>';
+    if (s.startsWith('submitted')) return '<span style="color:var(--warning);font-weight:600;font-size:0.7rem;">SUBMITTED</span>';
+    return '<span style="color:var(--text-muted);font-weight:600;font-size:0.7rem;">PENDING</span>';
+}
+
+function matchRowHTML(m, isBye, logCount, guildId) {
+    const statusBadge = m.archived ? '<span style="background:var(--danger);color:#fff;padding:0 5px;border-radius:3px;font-size:0.7rem;font-weight:600;">ARCHIVED</span>' : citadelStatusBadge(m);
+    return `
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0;">
+            <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong>${esc(m.home_team)}</strong> vs <strong>${esc(m.away_team)}</strong></span>
+            ${statusBadge}
+        </div>
+        <div style="display:flex;gap:4px;align-items:center;flex-shrink:0;">
+            ${m.channel_id && m.channel_id !== 0
+                ? `<a href="https://discord.com/channels/${guildId}/${m.channel_id}" target="_blank" class="btn btn-sm btn-secondary" style="text-decoration:none;padding:0.15rem 0.4rem;font-size:0.7rem;">Channel</a>`
+                : '<span class="btn btn-sm btn-secondary" style="opacity:0.3;cursor:default;padding:0.15rem 0.4rem;font-size:0.7rem;">No Ch</span>'}
+            <a href="https://ozfortress.com/matches/${m.match_id}" target="_blank" class="btn btn-sm btn-secondary" style="text-decoration:none;padding:0.15rem 0.4rem;font-size:0.7rem;">OZF</a>
+            <a href="/admin/match/${m.match_id}" class="btn btn-sm btn-secondary" style="text-decoration:none;padding:0.15rem 0.4rem;font-size:0.7rem;">Detail</a>
+            ${logCount > 0
+                ? `<span style="background:var(--success);color:#fff;padding:0.1rem 0.35rem;border-radius:3px;font-size:0.7rem;font-weight:600;">Logs ${logCount}</span>`
+                : '<span class="btn btn-sm btn-secondary" style="opacity:0.3;cursor:default;padding:0.15rem 0.4rem;font-size:0.7rem;">No Logs</span>'}
+        </div>
+    `;
+}
+
 function renderMatchgenStatus(data) {
     const container = document.getElementById('matchgen-rounds');
     const loading = document.getElementById('matchgen-loading');
     loading.style.display = 'none';
+    container.innerHTML = '';
 
     const citRounds = data.citadel_rounds || [];
     const dbMatches = {};
@@ -290,10 +332,11 @@ function renderMatchgenStatus(data) {
 
     const summary = document.createElement('div');
     summary.style.cssText = 'display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:0.75rem;padding:0.5rem 0;border-bottom:1px solid var(--border);';
+    const allDone = totalGenerated >= totalCitadel;
     summary.innerHTML = `
         <span style="font-size:0.85rem;"><strong>${totalCitadel}</strong> citadel matches</span>
         <span style="font-size:0.85rem;"><strong>${totalGenerated}</strong> generated in Drawbridge</span>
-        <span style="font-size:0.85rem;color:${totalGenerated >= totalCitadel ? 'var(--success)' : 'var(--warning)'};">${totalGenerated >= totalCitadel ? '✅ All generated' : `⏳ ${totalCitadel - totalGenerated} remaining`}</span>
+        <span style="font-size:0.85rem;color:${allDone ? 'var(--success)' : 'var(--warning)'};">${allDone ? 'All generated' : `${totalCitadel - totalGenerated} remaining`}</span>
     `;
     container.appendChild(summary);
 
@@ -310,17 +353,16 @@ function renderMatchgenStatus(data) {
 
         const done = genCount >= citCount;
         const row = document.createElement('div');
-        row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:0.4rem 0.6rem;border-bottom:1px solid var(--border);font-size:0.85rem;';
+        row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:0.3rem 0.6rem;border-bottom:1px solid var(--border);font-size:0.85rem;';
         row.innerHTML = `
             <div style="display:flex;align-items:center;gap:0.5rem;">
                 <span style="font-weight:600;">${esc(r.round_name || `Round ${r.round_number}`)}</span>
                 <span style="color:var(--text-secondary);font-size:0.8rem;">(${citCount} match${citCount > 1 ? 'es' : ''})</span>
             </div>
             <div style="display:flex;align-items:center;gap:6px;">
-                ${done ? '<span style="color:var(--success);">✅</span>' : '<span style="color:var(--warning);">⏳</span>'}
-                <span style="color:var(--text-secondary);">${genCount}/${citCount} generated</span>
-                ${genCount > 0 ? `<span style="color:${chanCount >= genCount ? 'var(--success)' : 'var(--warning)'};">· ${chanCount}/${genCount} channels</span>` : ''}
-                ${!done ? `<button class="btn btn-secondary gen-round-btn" data-round="${r.round_number}" style="padding:0.2rem 0.6rem;font-size:0.75rem;margin-left:0.5rem;">Generate</button>` : ''}
+                <span style="color:var(--text-secondary);font-size:0.8rem;">${genCount}/${citCount} generated</span>
+                ${genCount > 0 ? `<span style="color:${chanCount >= genCount ? 'var(--success)' : 'var(--warning)'};font-size:0.8rem;">· ${chanCount}/${genCount} channels</span>` : ''}
+                ${!done ? `<button class="btn btn-sm btn-primary gen-round-btn" data-round="${r.round_number}">Generate</button>` : ''}
             </div>
         `;
         container.appendChild(row);
@@ -602,10 +644,10 @@ async function bulkArchiveRound(roundNumber) {
 }
 
 async function bulkDeleteRound(roundNumber) {
-    const msg = `DELETE all matches in round ${roundNumber}?\nThis will delete Discord channels and match data. This cannot be undone.`;
+    const msg = `Clean round ${roundNumber}?\nDiscord channels will be deleted but matches remain visible (archived).`;
     if (!confirm(msg)) return;
-    const really = prompt(`Type DELETE to confirm deleting round ${roundNumber}:`);
-    if (really !== 'DELETE') { API.toast('Cancelled', 'warning'); return; }
+    const really = prompt(`Type CLEAN to confirm cleaning round ${roundNumber}:`);
+    if (really !== 'CLEAN') { API.toast('Cancelled', 'warning'); return; }
     try {
         const resp = await API.post('/admin/api/tournament/round-delete', {
             league_id: LEAGUE_ID,

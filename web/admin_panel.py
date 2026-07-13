@@ -941,10 +941,10 @@ async def api_tournament_round_delete():
                 _db.match_schedules.delete_by_match(mid)
             except Exception:
                 pass
-            _db.matches.delete(mid)
+            _db.matches.update(mid, {'channel_id': None, 'archived': 1})
             deleted += 1
         await _get_tournament_cog().update_launchpad()
-        return jsonify({'success': True, 'message': f'Deleted {deleted} match(es) in round {round_number}.'})
+        return jsonify({'success': True, 'message': f'Cleaned {deleted} match(es) in round {round_number}.'})
     except Exception as e:
         logger.error(f'Round delete error: {e}')
         return _db_error(e)
@@ -1369,6 +1369,7 @@ async def api_tournament_detail(league_id: int):
                         'round_number': m.get('round_number', 0),
                         'round_name': m.get('round_name', ''),
                         'status': m.get('status', ''),
+                        'forfeit_by': m.get('forfeit_by', ''),
                     })
                 else:
                     citadel_matches.append({
@@ -1376,6 +1377,7 @@ async def api_tournament_detail(league_id: int):
                         'round_number': m.round_number,
                         'round_name': m.round_name,
                         'status': m.status,
+                        'forfeit_by': getattr(m, 'forfeit_by', ''),
                     })
 
         cm_by_round = {}
@@ -1430,6 +1432,8 @@ async def api_tournament_detail(league_id: int):
                     'archived': m['archived'],
                     'round_number': cit_info.get('round_number'),
                     'round_name': cit_info.get('round_name'),
+                    'status': cit_info.get('status', ''),
+                    'forfeit_by': cit_info.get('forfeit_by', ''),
                     'home_ozf_team_id': home_ozf_team_id,
                     'away_ozf_team_id': away_ozf_team_id,
                     'home_roster_id': home_roster_id,
