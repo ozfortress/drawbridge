@@ -1214,17 +1214,28 @@ async def api_tournament_detail(league_id: int):
         roster_map = {}
         if hasattr(league, 'rosters') and league.rosters:
             for r in league.rosters:
-                roster_map[r.id] = {'team_id': r.team_id, 'name': r.name}
+                if isinstance(r, dict):
+                    roster_map[r['id']] = {'team_id': r.get('team_id'), 'name': r.get('name', '')}
+                else:
+                    roster_map[r.id] = {'team_id': r.team_id, 'name': r.name}
 
         citadel_matches = []
         if hasattr(league, 'matches') and league.matches:
             for m in league.matches:
-                citadel_matches.append({
-                    'id': m.id,
-                    'round_number': m.round_number,
-                    'round_name': m.round_name,
-                    'status': m.status,
-                })
+                if isinstance(m, dict):
+                    citadel_matches.append({
+                        'id': m['id'],
+                        'round_number': m.get('round_number', 0),
+                        'round_name': m.get('round_name', ''),
+                        'status': m.get('status', ''),
+                    })
+                else:
+                    citadel_matches.append({
+                        'id': m.id,
+                        'round_number': m.round_number,
+                        'round_name': m.round_name,
+                        'status': m.status,
+                    })
 
         cm_by_round = {}
         for cm in citadel_matches:
