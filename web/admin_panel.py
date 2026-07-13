@@ -838,11 +838,139 @@ async def api_tournament_matchend():
                     overwrites[role] = discord.PermissionOverwrite(read_messages=True, send_messages=False)
             await channel.edit(overwrites=overwrites)
         _db.matches.archive_match(match_id)
+        try:
+            if match.get('channel_id'):
+                _db.tracked_channels.deactivate(match['channel_id'])
+        except Exception:
+            pass
         await _get_tournament_cog().update_launchpad()
         return jsonify({'success': True, 'message': 'Match ended and archived.'})
     except Exception as e:
         logger.error(f'Matchend error: {e}')
         return _db_error(e)
+
+
+@admin_bp.route('/match/<int:match_id>')
+@require_admin
+async def match_detail_page(match_id: int):
+    return await render_template('admin/match_detail.html', user=get_session_user(), match_id=match_id)
+
+
+@admin_bp.route('/api/match/<int:match_id>')
+@require_admin
+async def api_match_detail(match_id: int):
+    try:
+        m = _db.matches.get_by_id(match_id)
+        if not m:
+            return jsonify({'error': 'Match not found'}), 404
+        home_team = _db.teams.get_by_team_id(m['team_home']) if m.get('team_home') else None
+        away_team = _db.teams.get_by_team_id(m['team_away']) if m.get('team_away') else None
+        try:
+            div = _db.divisions.get_by_id(m['division']) if m.get('division') else None
+        except Exception:
+            div = None
+        log_count = len(_db.logs.get_by_match_id(match_id))
+        return jsonify({'match': {
+            'match_id': m['match_id'],
+            'league_id': m['league_id'],
+            'division': m.get('division'),
+            'division_name': div.get('division_name') if div else None,
+            'team_home': m.get('team_home'),
+            'team_home_name': home_team.get('team_name') if home_team else None,
+            'team_away': m.get('team_away'),
+            'team_away_name': away_team.get('team_name') if away_team else None,
+            'channel_id': m.get('channel_id'),
+            'archived': m.get('archived', False),
+        }, 'log_count': log_count})
+    except Exception as e:
+        return _db_error(e)
+
+
+@admin_bp.route('/api/match/<int:match_id>/logs')
+@require_admin
+async def api_match_logs(match_id: int):
+    try:
+        role_type = request.args.get('role_type', 'all')
+        logs = _db.logs.get_by_match_id(match_id)
+        if role_type != 'all':
+            logs = [l for l in logs if l.get('role_type', 'unknown') == role_type]
+        if not logs:
+            return jsonify({'logs': []})
+        result = []
+        for l in logs:
+            result.append({
+                'log_id': l['log_id'],
+                'log_type': l.get('log_type'),
+                'message_content': l.get('message_content'),
+                'message_additionals': l.get('message_additionals'),
+                'user_name': l.get('user_name'),
+                'user_nick': l.get('user_nick'),
+                'user_avatar': l.get('user_avatar'),
+                'role_type': l.get('role_type', 'unknown'),
+                'log_timestamp': l.get('log_timestamp').isoformat() if hasattr(l.get('log_timestamp'), 'isoformat') else str(l.get('log_timestamp', '')),
+            })
+        return jsonify({'logs': result})
+    except Exception as e:
+        return _db_error(e)
+
+
+@admin_bp.route('/api/match/<int:match_id>/delete-channel', methods=['POST'])
+@require_admin
+async def api_match_delete_channel(match_id: int):
+    if not _check_bot_ready():
+        return jsonify({'error': 'Bot not ready', 'success': False}), 503
+    try:
+        m = _db.matches.get_by_id(match_id)
+        if not m:
+            return jsonify({'error': 'Match not found', 'success': False}), 404
+        ch_id = m.get('channel_id')
+        if not ch_id:
+            return jsonify({'message': 'No channel to delete', 'success': True})
+        guild = _bot.get_guild(int(os.getenv('DISCORD_GUILD_ID')))
+        if not guild:
+            return jsonify({'error': 'Guild not found', 'success': False}), 500
+        ch = guild.get_channel(int(ch_id))
+        if ch:
+            await ch.delete(reason='Admin requested channel deletion')
+        _db.matches.update(match_id, {'channel_id': None})
+        try:
+            tracked = _db.tracked_channels.get_by_channel_id(int(ch_id))
+            if tracked:
+                _db.tracked_channels.deactivate(int(ch_id))
+        except Exception:
+            pass
+        return jsonify({'message': 'Channel deleted', 'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e), 'success': False}), 500
+
+
+@admin_bp.route('/api/match/<int:match_id>/rebuild-channel', methods=['POST'])
+@require_admin
+async def api_match_rebuild_channel(match_id: int):
+    if not _check_bot_ready():
+        return jsonify({'error': 'Bot not ready', 'success': False}), 503
+    try:
+        from modules.Drawbridge.channel_monitor import rebuild_match_channel
+        m = _db.matches.get_by_id(match_id)
+        if not m:
+            return jsonify({'error': 'Match not found', 'success': False}), 404
+        if m.get('channel_id'):
+            ch = _bot.get_guild(int(os.getenv('DISCORD_GUILD_ID'))).get_channel(int(m['channel_id']))
+            if ch:
+                await ch.delete(reason='Rebuilding channel')
+        tracked_entry = None
+        if m.get('channel_id'):
+            try:
+                tracked_entry = _db.tracked_channels.get_by_channel_id(int(m['channel_id']))
+            except Exception:
+                pass
+        new_ch = await rebuild_match_channel(_bot, _db, m, tracked_entry)
+        if new_ch:
+            return jsonify({'message': f'Channel rebuilt as #{new_ch.name}', 'success': True, 'channel_id': new_ch.id})
+        else:
+            return jsonify({'error': 'Failed to rebuild channel', 'success': False}), 500
+    except Exception as e:
+        return jsonify({'error': str(e), 'success': False}), 500
 
 
 @admin_bp.route('/api/tournament/random-demo-check', methods=['POST'])

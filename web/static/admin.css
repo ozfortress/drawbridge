@@ -458,3 +458,11 @@ body {
 .status-calculating { background: rgba(249, 226, 175, 0.15); color: var(--warning); border: 1px solid var(--warning); }
 .status-complete { background: rgba(166, 227, 161, 0.15); color: var(--success); border: 1px solid var(--success); }
 .status-cancelled { background: rgba(243, 139, 168, 0.15); color: var(--danger); border: 1px solid var(--danger); }
+.status-active { background: rgba(166, 227, 161, 0.15); color: var(--success); border: 1px solid var(--success); }
+.status-archived { background: rgba(243, 139, 168, 0.15); color: var(--danger); border: 1px solid var(--danger); }
+
+.stats-table { width:100%; border-collapse:collapse; }
+.stats-table td { padding:6px 12px; border-bottom:1px solid var(--border); }
+.stats-table td:first-child { width:140px; color:var(--text-secondary); }
+
+.role-badge { display:inline-block; padding:0 6px; border-radius:3px; font-size:0.75em; font-weight:600; }

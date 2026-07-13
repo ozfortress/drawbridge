@@ -371,13 +371,18 @@ class LogsRepository(BaseRepository):
 
     def get_by_match_id(self, match_id: int) -> List[Dict[str, Any]]:
         """Get all logs for a match."""
-        query = f"SELECT * FROM {self.table} WHERE match_id = ?"
+        query = f"SELECT * FROM {self.table} WHERE match_id = ? ORDER BY log_timestamp ASC"
         return self._fetch_all(query, (match_id,))
 
     def get_by_team_id(self, team_id: int) -> List[Dict[str, Any]]:
         """Get all logs for a team."""
-        query = f"SELECT * FROM {self.table} WHERE team_id = ?"
+        query = f"SELECT * FROM {self.table} WHERE team_id = ? ORDER BY log_timestamp ASC"
         return self._fetch_all(query, (team_id,))
+
+    def get_by_channel_id(self, channel_id: int) -> List[Dict[str, Any]]:
+        """Get all logs for a channel."""
+        query = f"SELECT * FROM {self.table} WHERE channel_id = ? ORDER BY log_timestamp ASC"
+        return self._fetch_all(query, (channel_id,))
 
     def get_all(self) -> List[Dict[str, Any]]:
         """Get all logs."""
@@ -391,21 +396,23 @@ class LogsRepository(BaseRepository):
             'team_id', 'message_id', 'message_content', 'message_additionals',
             'log_type', 'log_timestamp'
         ]
-
         if not all(field in log for field in required_fields):
             raise ValueError(f"Missing required fields: {required_fields}")
 
         query = f"""
             INSERT INTO {self.table}
             (match_id, user_id, user_name, user_nick, user_avatar, team_id,
-             message_id, message_content, message_additionals, log_type, log_timestamp)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             message_id, message_content, message_additionals, log_type, log_timestamp,
+             role_type, channel_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?)
         """
         return self._execute_query(query, (
             log['match_id'], log['user_id'], log['user_name'], log['user_nick'],
             log['user_avatar'], log['team_id'], log['message_id'],
             log['message_content'], log['message_additionals'],
-            log['log_type'], log['log_timestamp']
+            log['log_type'], log['log_timestamp'],
+            log.get('role_type'), log.get('channel_id'),
         ))
 
     def update(self, log_id: int, log: Dict[str, Any]) -> bool:
@@ -1462,6 +1469,87 @@ class MatchSchedulesRepository(BaseRepository):
 
     def delete_by_league(self, league_id: int) -> bool:
         return self._execute_query(f"DELETE FROM {self.table} WHERE league_id = ?", (league_id,)) > 0
+
+
+class TrackedChannelsRepository(BaseRepository):
+    """Repository for tracked_channels table (channel monitoring)."""
+
+    def __init__(self, db_connection):
+        super().__init__(db_connection, 'tracked_channels')
+
+    def get_by_id(self, chan_id: int) -> Optional[Dict[str, Any]]:
+        return self._fetch_one(f"SELECT * FROM {self.table} WHERE id = ?", (chan_id,))
+
+    def get_by_channel_id(self, channel_id: int) -> Optional[Dict[str, Any]]:
+        return self._fetch_one(f"SELECT * FROM {self.table} WHERE channel_id = ?", (channel_id,))
+
+    def get_active(self) -> List[Dict[str, Any]]:
+        return self._fetch_all(f"SELECT * FROM {self.table} WHERE active = 1")
+
+    def get_by_type(self, channel_type: str) -> List[Dict[str, Any]]:
+        return self._fetch_all(f"SELECT * FROM {self.table} WHERE channel_type = ?", (channel_type,))
+
+    def get_by_match(self, match_id: int) -> Optional[Dict[str, Any]]:
+        return self._fetch_one(f"SELECT * FROM {self.table} WHERE match_id = ?", (match_id,))
+
+    def get_by_team(self, team_id: int) -> Optional[Dict[str, Any]]:
+        return self._fetch_one(f"SELECT * FROM {self.table} WHERE team_id = ?", (team_id,))
+
+    def get_by_league(self, league_id: int) -> List[Dict[str, Any]]:
+        return self._fetch_all(f"SELECT * FROM {self.table} WHERE league_id = ?", (league_id,))
+
+    def get_all(self) -> List[Dict[str, Any]]:
+        return self._fetch_all(f"SELECT * FROM {self.table}")
+
+    def insert(self, data: Dict[str, Any]) -> Optional[int]:
+        required = ['channel_id', 'channel_type']
+        for f in required:
+            if f not in data:
+                raise ValueError(f"Missing required field: {f}")
+        return self._execute_query(
+            f"""INSERT INTO {self.table}
+                (channel_id, channel_type, match_id, team_id, league_id, active)
+                VALUES (?, ?, ?, ?, ?, ?)""",
+            (data['channel_id'], data['channel_type'],
+             data.get('match_id'), data.get('team_id'), data.get('league_id'),
+             data.get('active', 1))
+        )
+
+    def update(self, chan_id: int, data: Dict[str, Any]) -> bool:
+        sets = []
+        vals = []
+        for col in ('channel_id', 'active', 'channel_type', 'match_id', 'team_id', 'league_id'):
+            if col in data:
+                sets.append(f"{col} = ?")
+                vals.append(data[col])
+        if not sets:
+            return False
+        vals.append(chan_id)
+        return self._execute_query(
+            f"UPDATE {self.table} SET {', '.join(sets)} WHERE id = ?", tuple(vals)
+        ) > 0
+
+    def delete(self, chan_id: int) -> bool:
+        return self._execute_query(f"DELETE FROM {self.table} WHERE id = ?", (chan_id,)) > 0
+
+    def delete_by_channel(self, channel_id: int) -> bool:
+        return self._execute_query(f"DELETE FROM {self.table} WHERE channel_id = ?", (channel_id,)) > 0
+
+    def delete_by_league(self, league_id: int) -> bool:
+        return self._execute_query(f"DELETE FROM {self.table} WHERE league_id = ?", (league_id,)) > 0
+
+    def upsert_by_channel(self, data: Dict[str, Any]) -> bool:
+        existing = self.get_by_channel_id(data['channel_id'])
+        if existing:
+            return self.update(existing['id'], data)
+        self.insert(data)
+        return True
+
+    def deactivate(self, channel_id: int) -> bool:
+        existing = self.get_by_channel_id(channel_id)
+        if not existing:
+            return False
+        return self.update(existing['id'], {'active': 0})
 
 
 class MatchLogsRepository(BaseRepository):

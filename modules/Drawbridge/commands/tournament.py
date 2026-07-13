@@ -444,6 +444,16 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
                         channel_name = f'🛡️{roster_name[:20]} ({league_shortcode})'
                         self.logger.warning(f'Channel name for {roster_name} is too long, trimming to {channel_name}')
                     teamchannel = await interaction.guild.create_text_channel(channel_name, category=channelcategory, overwrites=overwrites)
+                    try:
+                        self.db.tracked_channels.upsert_by_channel({
+                            'channel_id': teamchannel.id,
+                            'channel_type': 'team',
+                            'team_id': roster['team_id'],
+                            'league_id': league_id,
+                            'active': 1,
+                        })
+                    except Exception:
+                        pass
                     team_id = roster['team_id']
                     subsitutions = {
                         '{TEAM_MENTION}': f'<@&{role.id}>',
@@ -779,6 +789,16 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
                 'channel_id': match_channel.id,
                 'league_id': match.league_id
             })
+            try:
+                self.db.tracked_channels.upsert_by_channel({
+                    'channel_id': match_channel.id,
+                    'channel_type': 'match',
+                    'match_id': match.id,
+                    'league_id': match.league_id,
+                    'active': 1,
+                })
+            except Exception:
+                pass
             settings = self.db.tournament_schedule_settings.get_by_league(match.league_id)
             scheduling_enabled = bool(settings and settings.get('scheduling_enabled'))
             deadline = compute_deadline_utc(settings) if scheduling_enabled else None
@@ -846,6 +866,10 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
             match_channel = self.bot.get_channel(match['channel_id'])
             if match_channel is not None:
                 await match_channel.delete()
+            try:
+                self.db.tracked_channels.deactivate(match['channel_id'])
+            except Exception:
+                pass
             self.db.match_schedules.delete_by_match(match_id)
             self.db.matches.delete(match_id)
 

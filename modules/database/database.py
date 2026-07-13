@@ -20,6 +20,7 @@ from .repositories import (
     AwardResultsRepository, AwardAdminFillOptionsRepository,
     TournamentScheduleSettingsRepository, TeamAvailabilityRepository,
     MatchSchedulesRepository, MatchLogsRepository,
+    TrackedChannelsRepository,
 )
 
 
@@ -77,6 +78,7 @@ class Database:
         self.team_availability = TeamAvailabilityRepository(self.connection)
         self.match_schedules = MatchSchedulesRepository(self.connection)
         self.match_logs = MatchLogsRepository(self.connection)
+        self.tracked_channels = TrackedChannelsRepository(self.connection)
 
         # Initialize migration manager
         self.migrations = MigrationManager(self.connection)
