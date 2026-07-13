@@ -207,50 +207,87 @@ def generate_fake_tournament(db, force=False):
                 'team_idx': team_idx,
             })
 
-    conn = db.connection.get_connection()
-    cursor = conn.cursor()
-    match_id_counter = 0
-    all_match_ids = []
-    round_match_map = {}
+    with db.connection.get_connection() as conn:
+        cursor = conn.cursor()
+        match_id_counter = 0
+        all_match_ids = []
+        round_match_map = {}
 
-    week_statuses = [
-        {'completed': 1.0, 'submitted': 0.0, 'past': True},
-        {'completed': 0.78, 'submitted': 0.11, 'past': True},
-        {'completed': 0.33, 'submitted': 0.33, 'past': False},
-        {'completed': 0.0, 'submitted': 0.0, 'past': False},
-        {'completed': 0.0, 'submitted': 0.0, 'past': False},
-    ]
+        week_statuses = [
+            {'completed': 1.0, 'submitted': 0.0, 'past': True},
+            {'completed': 0.78, 'submitted': 0.11, 'past': True},
+            {'completed': 0.33, 'submitted': 0.33, 'past': False},
+            {'completed': 0.0, 'submitted': 0.0, 'past': False},
+            {'completed': 0.0, 'submitted': 0.0, 'past': False},
+        ]
 
-    for round_idx, matchups in enumerate(RR_MATCHUPS):
-        round_number = round_idx + 1
-        status_info = week_statuses[round_idx] if round_idx < len(week_statuses) else {'completed': 0.0, 'submitted': 0.0, 'past': False}
-        round_matches = []
-        for div_idx in range(3):
-            div_id = div_ids[div_idx]
-            for home_rel, away_rel in matchups:
+        for round_idx, matchups in enumerate(RR_MATCHUPS):
+            round_number = round_idx + 1
+            status_info = week_statuses[round_idx] if round_idx < len(week_statuses) else {'completed': 0.0, 'submitted': 0.0, 'past': False}
+            round_matches = []
+            for div_idx in range(3):
+                div_id = div_ids[div_idx]
+                for home_rel, away_rel in matchups:
+                    match_id_counter += 1
+                    mid = BASE_MATCH_ID + match_id_counter
+                    home_roster = team_roster_ids.get((div_idx, home_rel))
+                    away_roster = team_roster_ids.get((div_idx, away_rel))
+                    channel_id = 100000000000000000 + mid if random.random() > 0.15 else None
+
+                    r = random.random()
+                    if r < status_info['completed']:
+                        archived = 0
+                        cit_status = 'confirmed'
+                        cit_forfeit = 'no_forfeit'
+                    elif r < status_info['completed'] + status_info['submitted']:
+                        archived = 0
+                        cit_status = random.choice(['submitted_by_home_team', 'submitted_by_away_team'])
+                        cit_forfeit = 'no_forfeit'
+                    else:
+                        archived = 0
+                        cit_status = 'pending'
+                        cit_forfeit = 'no_forfeit'
+
+                    cursor.execute(
+                        "INSERT INTO matches (match_id, division, team_home, team_away, channel_id, archived, league_id, round_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        (mid, div_id, home_roster, away_roster, channel_id, archived, FAKE_LEAGUE_ID, round_number)
+                    )
+
+                    round_matches.append({
+                        'id': mid,
+                        'div_idx': div_idx,
+                        'div_name': DIV_NAMES[div_idx],
+                        'home': TEAM_NAMES_PER_DIV[div_idx][home_rel],
+                        'away': TEAM_NAMES_PER_DIV[div_idx][away_rel],
+                        'home_roster': home_roster,
+                        'away_roster': away_roster,
+                        'status': cit_status,
+                        'forfeit_by': cit_forfeit,
+                        'channel_id': channel_id,
+                        'completed': cit_status == 'confirmed',
+                        'submitted': cit_status.startswith('submitted'),
+                        'pending': cit_status == 'pending',
+                        'round_number': round_number,
+                    })
+                    all_match_ids.append(mid)
+
+            round_match_map[round_number] = round_matches
+
+        for semi_idx in range(2):
+            round_number = 6
+            round_matches = []
+            for div_idx in range(3):
+                div_id = div_ids[div_idx]
+                home_rel, away_rel = PLAYOFF_MATCHUPS[0][semi_idx]
                 match_id_counter += 1
                 mid = BASE_MATCH_ID + match_id_counter
-                home_roster = team_roster_ids[(div_idx, home_rel)]
-                away_roster = team_roster_ids[(div_idx, away_rel)]
-                channel_id = 100000000000000000 + mid if random.random() > 0.15 else None
-
-                r = random.random()
-                if r < status_info['completed']:
-                    archived = 0
-                    cit_status = 'confirmed'
-                    cit_forfeit = 'no_forfeit'
-                elif r < status_info['completed'] + status_info['submitted']:
-                    archived = 0
-                    cit_status = random.choice(['submitted_by_home_team', 'submitted_by_away_team'])
-                    cit_forfeit = 'no_forfeit'
-                else:
-                    archived = 0
-                    cit_status = 'pending'
-                    cit_forfeit = 'no_forfeit'
+                home_roster = team_roster_ids.get((div_idx, home_rel))
+                away_roster = team_roster_ids.get((div_idx, away_rel))
+                channel_id = 100000000000000000 + mid if random.random() > 0.3 else None
 
                 cursor.execute(
                     "INSERT INTO matches (match_id, division, team_home, team_away, channel_id, archived, league_id, round_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                    (mid, div_id, home_roster, away_roster, channel_id, archived, FAKE_LEAGUE_ID, round_number)
+                    (mid, div_id, home_roster, away_roster, channel_id, 0, FAKE_LEAGUE_ID, round_number)
                 )
 
                 round_matches.append({
@@ -261,29 +298,28 @@ def generate_fake_tournament(db, force=False):
                     'away': TEAM_NAMES_PER_DIV[div_idx][away_rel],
                     'home_roster': home_roster,
                     'away_roster': away_roster,
-                    'status': cit_status,
-                    'forfeit_by': cit_forfeit,
+                    'status': 'pending',
+                    'forfeit_by': 'no_forfeit',
                     'channel_id': channel_id,
-                    'completed': cit_status == 'confirmed',
-                    'submitted': cit_status.startswith('submitted'),
-                    'pending': cit_status == 'pending',
+                    'completed': False,
+                    'submitted': False,
+                    'pending': True,
                     'round_number': round_number,
                 })
                 all_match_ids.append(mid)
 
-        round_match_map[round_number] = round_matches
+            round_match_map.setdefault(round_number, []).extend(round_matches)
 
-    for semi_idx in range(2):
-        round_number = 6
+        round_number = 7
         round_matches = []
         for div_idx in range(3):
             div_id = div_ids[div_idx]
-            home_rel, away_rel = PLAYOFF_MATCHUPS[0][semi_idx]
+            home_rel, away_rel = PLAYOFF_MATCHUPS[1][0]
             match_id_counter += 1
             mid = BASE_MATCH_ID + match_id_counter
-            home_roster = team_roster_ids[(div_idx, home_rel)]
-            away_roster = team_roster_ids[(div_idx, away_rel)]
-            channel_id = 100000000000000000 + mid if random.random() > 0.3 else None
+            home_roster = team_roster_ids.get((div_idx, home_rel))
+            away_roster = team_roster_ids.get((div_idx, away_rel))
+            channel_id = 100000000000000000 + mid if random.random() > 0.5 else None
 
             cursor.execute(
                 "INSERT INTO matches (match_id, division, team_home, team_away, channel_id, archived, league_id, round_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -310,89 +346,52 @@ def generate_fake_tournament(db, force=False):
 
         round_match_map.setdefault(round_number, []).extend(round_matches)
 
-    round_number = 7
-    round_matches = []
-    for div_idx in range(3):
-        div_id = div_ids[div_idx]
-        home_rel, away_rel = PLAYOFF_MATCHUPS[1][0]
-        match_id_counter += 1
-        mid = BASE_MATCH_ID + match_id_counter
-        home_roster = team_roster_ids[(div_idx, home_rel)]
-        away_roster = team_roster_ids[(div_idx, away_rel)]
-        channel_id = 100000000000000000 + mid if random.random() > 0.5 else None
-
-        cursor.execute(
-            "INSERT INTO matches (match_id, division, team_home, team_away, channel_id, archived, league_id, round_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (mid, div_id, home_roster, away_roster, channel_id, 0, FAKE_LEAGUE_ID, round_number)
-        )
-
-        round_matches.append({
-            'id': mid,
-            'div_idx': div_idx,
-            'div_name': DIV_NAMES[div_idx],
-            'home': TEAM_NAMES_PER_DIV[div_idx][home_rel],
-            'away': TEAM_NAMES_PER_DIV[div_idx][away_rel],
-            'home_roster': home_roster,
-            'away_roster': away_roster,
-            'status': 'pending',
-            'forfeit_by': 'no_forfeit',
-            'channel_id': channel_id,
-            'completed': False,
-            'submitted': False,
-            'pending': True,
-            'round_number': round_number,
-        })
-        all_match_ids.append(mid)
-
-    round_match_map.setdefault(round_number, []).extend(round_matches)
-
-    log_id_counter = 4000000
-    for round_number, matches in round_match_map.items():
-        is_past = round_number <= 3
-        for m in matches:
-            if m['completed'] or m['submitted']:
-                num_maps = 2 if round_number <= 5 else 3
-                map_pool = MAPS_RR if round_number <= 5 else MAPS_PLAYOFF
-                for map_i in range(num_maps):
-                    map_name = random.choice(map_pool)
-                    log_id_counter += 1
-                    red_score = random.randint(0, 5)
-                    blu_score = random.randint(0, 5)
-                    while red_score == blu_score:
+        log_id_counter = 4000000
+        for round_number, matches in round_match_map.items():
+            is_past = round_number <= 3
+            for m in matches:
+                if m['completed'] or m['submitted']:
+                    num_maps = 2 if round_number <= 5 else 3
+                    map_pool = MAPS_RR if round_number <= 5 else MAPS_PLAYOFF
+                    for map_i in range(num_maps):
+                        map_name = random.choice(map_pool)
+                        log_id_counter += 1
+                        red_score = random.randint(0, 5)
                         blu_score = random.randint(0, 5)
-                    played_at = datetime.datetime(2026, 6, 1, 18, 0, 0) - datetime.timedelta(
-                        days=random.randint(0, 30),
-                        hours=random.randint(0, 5)
-                    )
-                    cursor.execute(
-                        """INSERT INTO match_logs (match_id, log_id, map_name, submitted_by, submitted_at, red_team_id, blu_team_id, red_score, blu_score, played_at, home_overlap, home_roster_size, away_overlap, away_roster_size, verified)
-                           VALUES (?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                        (m['id'], str(log_id_counter), map_name, random.choice([111111111111111111, 222222222222222222, 333333333333333333]),
-                         m['home_roster'] if random.random() > 0.5 else m['away_roster'],
-                         m['away_roster'] if random.random() > 0.5 else m['home_roster'],
-                         red_score, blu_score,
-                         played_at.strftime('%Y-%m-%d %H:%M:%S'),
-                         random.randint(5, 9), 9, random.randint(5, 9), 9,
-                         1 if m['completed'] else 0)
-                    )
+                        while red_score == blu_score:
+                            blu_score = random.randint(0, 5)
+                        played_at = datetime.datetime(2026, 6, 1, 18, 0, 0) - datetime.timedelta(
+                            days=random.randint(0, 30),
+                            hours=random.randint(0, 5)
+                        )
+                        cursor.execute(
+                            """INSERT INTO match_logs (match_id, log_id, map_name, submitted_by, submitted_at, red_team_id, blu_team_id, red_score, blu_score, played_at, home_overlap, home_roster_size, away_overlap, away_roster_size, verified)
+                               VALUES (?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                            (m['id'], str(log_id_counter), map_name, random.choice([111111111111111111, 222222222222222222, 333333333333333333]),
+                             m['home_roster'] if random.random() > 0.5 else m['away_roster'],
+                             m['away_roster'] if random.random() > 0.5 else m['home_roster'],
+                             red_score, blu_score,
+                             played_at.strftime('%Y-%m-%d %H:%M:%S'),
+                             random.randint(5, 9), 9, random.randint(5, 9), 9,
+                             1 if m['completed'] else 0)
+                        )
 
-            if m['completed'] or m['submitted'] or m['pending']:
-                num_logs = random.randint(8, 20) if m['completed'] else (random.randint(3, 10) if m['submitted'] else random.randint(1, 4))
-                comms_logs = generate_logs_text(m['id'], m['div_name'], m['home'], m['away'], num_logs, is_past)
-                for cl in comms_logs:
-                    cursor.execute(
-                        """INSERT INTO logs (match_id, team_id, user_id, user_name, user_nick, user_avatar, message_id, message_content, message_additionals, log_type, log_timestamp, role_type, channel_id)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                        (cl['match_id'], m['home_roster'] if cl['role_type'] in ['player_home', 'home'] else m['away_roster'],
-                         cl['user_id'], cl['user_name'], cl['user_name'], '',
-                         random.randint(100000000000000000, 999999999999999999),
-                         cl['message_content'], '',
-                         cl['log_type'], cl['log_timestamp'],
-                         cl['role_type'], m.get('channel_id'))
-                    )
+                if m['completed'] or m['submitted'] or m['pending']:
+                    num_logs = random.randint(8, 20) if m['completed'] else (random.randint(3, 10) if m['submitted'] else random.randint(1, 4))
+                    comms_logs = generate_logs_text(m['id'], m['div_name'], m['home'], m['away'], num_logs, is_past)
+                    for cl in comms_logs:
+                        cursor.execute(
+                            """INSERT INTO logs (match_id, team_id, user_id, user_name, user_nick, user_avatar, message_id, message_content, message_additionals, log_type, log_timestamp, role_type, channel_id)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                            (cl['match_id'], m['home_roster'] if cl['role_type'] in ['player_home', 'home'] else m['away_roster'],
+                             cl['user_id'], cl['user_name'], cl['user_name'], '',
+                             random.randint(100000000000000000, 999999999999999999),
+                             cl['message_content'], '',
+                             cl['log_type'], cl['log_timestamp'],
+                             cl['role_type'], m.get('channel_id'))
+                        )
 
-    conn.commit()
-    conn.close()
+        conn.commit()
 
     total_matches = match_id_counter
     total_logs = sum(
