@@ -4,7 +4,7 @@ LABEL org.opencontainers.image.source https://github.com/ozfortress/drawbridge
 ARG GIT_COMMIT
 ENV GIT_COMMIT=${GIT_COMMIT}
 
-RUN apt update && apt install -y socat
+RUN apt update && apt install -y socat libmariadb-dev libmariadb-dev-compat gcc
 WORKDIR /usr/src/app
 
 COPY requirements.txt ./
