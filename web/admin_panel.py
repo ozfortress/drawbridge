@@ -887,14 +887,51 @@ async def api_match_detail(match_id: int):
 @require_admin
 async def api_match_logs(match_id: int):
     try:
-        role_type = request.args.get('role_type', 'all')
+        role_type_filter = request.args.get('role_type', 'all')
         logs = _db.logs.get_by_match_id(match_id)
-        if role_type != 'all':
-            logs = [l for l in logs if l.get('role_type', 'unknown') == role_type]
-        if not logs:
-            return jsonify({'logs': []})
+        if role_type_filter != 'all':
+            logs = [l for l in logs if l.get('role_type', 'unknown') == role_type_filter]
+
+        # Resolve team info for role labeling
+        match = _db.matches.get_by_id(match_id)
+        home_role_id = away_role_id = None
+        home_name = away_name = ''
+        if match:
+            th = _db.teams.get_by_team_id(match.get('team_home'))
+            ta = _db.teams.get_by_team_id(match.get('team_away'))
+            if th:
+                home_role_id = th.get('role_id')
+                home_name = th.get('team_name', '')
+            if ta:
+                away_role_id = ta.get('role_id')
+                away_name = ta.get('team_name', '')
+
+        # Resolve role for each unique user using the same logic as channel_monitor
+        from modules.Drawbridge.channel_monitor import _resolve_member_role as _resolve_role
+        guild = _bot.get_guild(int(os.getenv('DISCORD_GUILD_ID'))) if _bot else None
+        _role_cache = {}
+
+        def _resolve_web_role(uid):
+            if uid in _role_cache:
+                return _role_cache[uid]
+            member = guild.get_member(int(uid)) if guild and uid else None
+            role_key, role_label = _resolve_role(member, home_role_id, away_role_id)
+            if role_key == 'player_home':
+                role_label = f'Home team: {home_name}'
+            elif role_key == 'player_away':
+                role_label = f'Away team: {away_name}'
+            _role_cache[uid] = (role_key, role_label)
+            return _role_cache[uid]
+
         result = []
         for l in logs:
+            uid = l.get('user_id')
+            if uid is not None:
+                role_key, role_label = _resolve_web_role(uid)
+            else:
+                role_key = l.get('role_type', 'unknown')
+                role_label = role_key.capitalize()
+
             result.append({
                 'log_id': l['id'],
                 'log_type': l.get('log_type'),
@@ -903,7 +940,8 @@ async def api_match_logs(match_id: int):
                 'user_name': l.get('user_name'),
                 'user_nick': l.get('user_nick'),
                 'user_avatar': l.get('user_avatar'),
-                'role_type': l.get('role_type', 'unknown'),
+                'role_type': role_key,
+                'role_label': role_label,
                 'log_timestamp': l.get('log_timestamp').isoformat() if hasattr(l.get('log_timestamp'), 'isoformat') else str(l.get('log_timestamp', '')),
             })
         return jsonify({'logs': result})

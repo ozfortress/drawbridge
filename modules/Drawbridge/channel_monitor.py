@@ -11,6 +11,55 @@ logger = get_logger('drawbridge.channel_monitor')
 _initialized = False
 _monitor_task = None
 
+ROLE_STYLES = {
+    'player_home': 0x3498db,   # blue
+    'player_away': 0xe74c3c,   # red
+    'director':    0x8e44ad,   # dark purple
+    'head_admin':  0xe67e22,   # orange-red
+    'admin':       0xf1c40f,   # yellow
+    'staff':       0x1abc9c,   # teal
+    'caster':      0x9b59b6,   # purple
+    'unknown':     0x7f8c8d,   # grey
+}
+
+_ROLE_ID_CACHE = {}
+
+
+def _get_role_set(*keywords):
+    """Get a set of role IDs matching the given keywords (cached)."""
+    key = frozenset(keywords)
+    if key not in _ROLE_ID_CACHE:
+        _ROLE_ID_CACHE[key] = set(_get_role_ids(*keywords))
+    return _ROLE_ID_CACHE[key]
+
+
+def _resolve_member_role(member, home_role_id, away_role_id):
+    """Determine a member's highest-priority role category.
+    Priority: home team > away team > director > head_admin > admin > staff > caster.
+    Returns (key, label) where key is one of the ROLE_STYLES keys.
+    """
+    if not member:
+        return ('unknown', 'Unknown')
+    role_ids = {r.id for r in member.roles}
+
+    if home_role_id and home_role_id in role_ids:
+        return ('player_home', 'Home team')
+    if away_role_id and away_role_id in role_ids:
+        return ('player_away', 'Away team')
+
+    if role_ids & _get_role_set('DIRECTOR'):
+        return ('director', 'Director')
+    if role_ids & _get_role_set('HEAD'):
+        return ('head_admin', 'Head Admin')
+    if role_ids & _get_role_set('ADMIN', 'TRIAL', '!HEAD'):
+        return ('admin', 'Admin')
+    if role_ids & _get_role_set('DEVELOPER', 'APPROVED', 'STAFF', '!UNAPPROVED'):
+        return ('staff', 'Staff')
+    if role_ids & _get_role_set('CASTER'):
+        return ('caster', 'Caster')
+
+    return ('unknown', 'Unknown')
+
 
 async def rebuild_match_channel(bot, db, match, tracked):
     """Rebuild a deleted match channel. Returns the new channel."""
@@ -74,45 +123,13 @@ async def rebuild_match_channel(bot, db, match, tracked):
     })
     db.matches.update(match['match_id'], {'channel_id': new_channel.id})
 
-    # Post rebuilt notice first
+    # Send bot setup messages first
     await new_channel.send(
         '🔄 **Channel Rebuilt** — The original was deleted and has been recreated. '
         'Message history is replayed below as embeds.'
     )
 
-    # Replay message history as embeds
-    logs = db.logs.get_by_match_id(match['match_id'])
-    for log_entry in logs:
-        if log_entry['log_type'] != 'CREATE':
-            continue
-        color_map = {
-            'admin': discord.Color.red(),
-            'staff': discord.Color.orange(),
-            'caster': discord.Color.purple(),
-            'player_home': discord.Color.blue(),
-            'player_away': discord.Color.green(),
-        }
-        color = color_map.get(log_entry.get('role_type', ''), discord.Color.dark_grey())
-        embed = discord.Embed(
-            description=log_entry['message_content'][:2000] if log_entry['message_content'] else '*no text*',
-            timestamp=log_entry['log_timestamp'] if hasattr(log_entry['log_timestamp'], 'timestamp') else None,
-            color=color,
-        )
-        embed.set_author(
-            name=log_entry['user_nick'] or log_entry['user_name'],
-            icon_url=log_entry['user_avatar'],
-        )
-        footer_parts = [log_entry.get('role_type', 'player')]
-        if log_entry['message_additionals']:
-            embed.add_field(name='Attachments', value=log_entry['message_additionals'][:500], inline=False)
-            footer_parts.append('📎')
-        embed.set_footer(text=' | '.join(footer_parts))
-        try:
-            await new_channel.send(embed=embed)
-        except Exception:
-            continue
-
-    # Send match intro embed from template (same as original channel creation)
+    # Match intro embed from template (same as original channel creation)
     try:
         from web.template_helper import get_template
         raw = get_template('match.json')
@@ -159,6 +176,46 @@ async def rebuild_match_channel(bot, db, match, tracked):
             }, settings)
     except Exception as e:
         logger.warning(f'Failed to send schedule message: {e}')
+
+    # Replay message history as embeds (chat + scheduling events)
+    _role_cache = {}
+    home_role_id = team_home['role_id']
+    away_role_id = team_away['role_id']
+
+    logs = db.logs.get_by_match_id(match['match_id'])
+    for log_entry in logs:
+        if log_entry['log_type'] not in ('CREATE', 'SCHED'):
+            continue
+        uid = log_entry.get('user_id')
+        if uid not in _role_cache:
+            member = guild.get_member(int(uid)) if uid else None
+            _role_cache[uid] = _resolve_member_role(member, home_role_id, away_role_id)
+        role_key, role_label = _role_cache[uid]
+        if role_key == 'player_home':
+            role_label = f'Home team: {home_name}'
+        elif role_key == 'player_away':
+            role_label = f'Away team: {away_name}'
+        color_val = ROLE_STYLES.get(role_key, 0x7f8c8d)
+        embed = discord.Embed(
+            description=log_entry['message_content'][:2000] if log_entry['message_content'] else '*no text*',
+            timestamp=log_entry['log_timestamp'] if hasattr(log_entry['log_timestamp'], 'timestamp') else None,
+            color=discord.Color(color_val),
+        )
+        embed.set_author(
+            name=log_entry['user_nick'] or log_entry['user_name'],
+            icon_url=log_entry['user_avatar'],
+        )
+        footer_parts = [role_label]
+        if log_entry['message_additionals']:
+            embed.add_field(name='Attachments', value=log_entry['message_additionals'][:500], inline=False)
+            footer_parts.append('📎')
+        if log_entry['log_type'] == 'SCHED':
+            footer_parts.append('📅')
+        embed.set_footer(text=' | '.join(footer_parts))
+        try:
+            await new_channel.send(embed=embed)
+        except Exception:
+            continue
 
     logger.info(f'Rebuilt match channel for match {match["match_id"]} (new channel: {new_channel.id})')
     return new_channel

@@ -57,38 +57,53 @@ class Functions:
             log['log_timestamp'] = datetime.datetime.now()
 
         if isinstance(message.author, discord.Member):
-            role_ids = {r.id for r in message.author.roles}
-            checks_roles = {}
+            author_roles = {r.id for r in message.author.roles}
+            role_sets = {}
             try:
-                checks_roles = {
-                    'ADMIN': set(self.checks._get_role_ids('ADMIN')),
-                    'TRIAL': set(self.checks._get_role_ids('TRIAL')),
+                role_sets = {
+                    'DIRECTOR': set(self.checks._get_role_ids('DIRECTOR')),
                     'HEAD': set(self.checks._get_role_ids('HEAD')),
-                    'STAFF': set(self.checks._get_role_ids('STAFF')),
+                    'ADMIN': set(self.checks._get_role_ids('ADMIN', 'TRIAL', '!HEAD')),
+                    'STAFF': set(self.checks._get_role_ids('DEVELOPER', 'APPROVED', 'STAFF', '!UNAPPROVED')),
                     'CASTER': set(self.checks._get_role_ids('CASTER')),
                 }
             except Exception:
                 pass
 
-            author_roles = {r.id for r in message.author.roles}
-
-            if any(author_roles & checks_roles.get(k, set()) for k in ('ADMIN', 'TRIAL', 'HEAD')):
-                log['role_type'] = 'admin'
-            elif author_roles & checks_roles.get('STAFF', set()):
-                log['role_type'] = 'staff'
-            elif author_roles & checks_roles.get('CASTER', set()):
-                log['role_type'] = 'caster'
-            elif not is_team and match:
+            # Priority order: team > director > head_admin > admin > staff > caster
+            if not is_team and match:
                 home_team = self.db.teams.get_by_team_id(match['team_home'])
                 away_team = self.db.teams.get_by_team_id(match['team_away'])
                 if home_team and author_roles & {home_team.get('role_id', 0)}:
                     log['role_type'] = 'player_home'
                 elif away_team and author_roles & {away_team.get('role_id', 0)}:
                     log['role_type'] = 'player_away'
+                elif role_sets.get('DIRECTOR') and author_roles & role_sets['DIRECTOR']:
+                    log['role_type'] = 'director'
+                elif role_sets.get('HEAD') and author_roles & role_sets['HEAD']:
+                    log['role_type'] = 'head_admin'
+                elif role_sets.get('ADMIN') and author_roles & role_sets['ADMIN']:
+                    log['role_type'] = 'admin'
+                elif role_sets.get('STAFF') and author_roles & role_sets['STAFF']:
+                    log['role_type'] = 'staff'
+                elif role_sets.get('CASTER') and author_roles & role_sets['CASTER']:
+                    log['role_type'] = 'caster'
                 else:
                     log['role_type'] = 'unknown'
             else:
-                log['role_type'] = 'unknown'
+                # Team channel or no match context
+                if role_sets.get('DIRECTOR') and author_roles & role_sets['DIRECTOR']:
+                    log['role_type'] = 'director'
+                elif role_sets.get('HEAD') and author_roles & role_sets['HEAD']:
+                    log['role_type'] = 'head_admin'
+                elif role_sets.get('ADMIN') and author_roles & role_sets['ADMIN']:
+                    log['role_type'] = 'admin'
+                elif role_sets.get('STAFF') and author_roles & role_sets['STAFF']:
+                    log['role_type'] = 'staff'
+                elif role_sets.get('CASTER') and author_roles & role_sets['CASTER']:
+                    log['role_type'] = 'caster'
+                else:
+                    log['role_type'] = 'unknown'
         else:
             log['role_type'] = 'unknown'
 

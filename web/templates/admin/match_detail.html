@@ -29,11 +29,13 @@
         <label>Filter by role</label>
         <select id="log-role-filter" class="form-input" style="max-width:300px;">
             <option value="all">All</option>
+            <option value="player_home">Home Team</option>
+            <option value="player_away">Away Team</option>
+            <option value="director">Director</option>
+            <option value="head_admin">Head Admin</option>
             <option value="admin">Admin</option>
             <option value="staff">Staff</option>
             <option value="caster">Caster</option>
-            <option value="player_home">Home Team</option>
-            <option value="player_away">Away Team</option>
             <option value="unknown">Unknown</option>
         </select>
     </div>
@@ -45,12 +47,14 @@
 const MATCH_ID = {{ match_id }};
 
 const ROLE_COLORS = {
-    admin: { bg: '#2d1b1b', border: '#e74c3c', label: 'Admin' },
-    staff: { bg: '#2d2418', border: '#e67e22', label: 'Staff' },
-    caster: { bg: '#1e1d2e', border: '#9b59b6', label: 'Caster' },
-    player_home: { bg: '#1b1d2e', border: '#3498db', label: 'Home' },
-    player_away: { bg: '#1b2e1d', border: '#2ecc71', label: 'Away' },
-    unknown: { bg: '#1e1e1e', border: '#7f8c8d', label: 'Player' },
+    player_home: { bg: '#1b1d2e', border: '#3498db' },
+    player_away: { bg: '#2d1b1b', border: '#e74c3c' },
+    director:    { bg: '#1e1b2e', border: '#8e44ad' },
+    head_admin:  { bg: '#2d1b1b', border: '#e67e22' },
+    admin:       { bg: '#2d2418', border: '#f1c40f' },
+    staff:       { bg: '#1b2e1d', border: '#1abc9c' },
+    caster:      { bg: '#1e1d2e', border: '#9b59b6' },
+    unknown:     { bg: '#1e1e1e', border: '#7f8c8d' },
 };
 
 async function loadMatch() {
@@ -82,6 +86,7 @@ async function loadMatch() {
 
 function renderLogEntry(log) {
     const roleInfo = ROLE_COLORS[log.role_type] || ROLE_COLORS.unknown;
+    const roleLabel = log.role_label || log.role_type || 'Unknown';
     const ts = log.log_timestamp ? new Date(log.log_timestamp + 'Z').toLocaleString() : '';
     const content = (log.message_content || '').substring(0, 2000);
     const attachments = log.message_additionals || '';
@@ -92,10 +97,11 @@ function renderLogEntry(log) {
     html += `<span style="font-size:0.8em;color:#aaa;">${ts}</span>`;
     html += `</div>`;
     html += `<div style="display:flex;gap:6px;margin-bottom:4px;">`;
-    html += `<span class="role-badge" style="background:${roleInfo.border};color:#fff;padding:0 6px;border-radius:3px;font-size:0.75em;">${roleInfo.label}</span>`;
+    html += `<span class="role-badge" style="background:${roleInfo.border};color:#fff;padding:0 6px;border-radius:3px;font-size:0.75em;">${escHtml(roleLabel)}</span>`;
     if (log.log_type === 'CREATE') html += `<span class="role-badge" style="background:#27ae60;color:#fff;padding:0 6px;border-radius:3px;font-size:0.75em;">Message</span>`;
     else if (log.log_type === 'EDIT') html += `<span class="role-badge" style="background:#f39c12;color:#fff;padding:0 6px;border-radius:3px;font-size:0.75em;">Edited</span>`;
     else if (log.log_type === 'DELETE') html += `<span class="role-badge" style="background:#e74c3c;color:#fff;padding:0 6px;border-radius:3px;font-size:0.75em;">Deleted</span>`;
+    else if (log.log_type === 'SCHED') html += `<span class="role-badge" style="background:#3498db;color:#fff;padding:0 6px;border-radius:3px;font-size:0.75em;">📅 Schedule</span>`;
     else html += `<span class="role-badge" style="background:#95a5a6;color:#fff;padding:0 6px;border-radius:3px;font-size:0.75em;">${escHtml(log.log_type)}</span>`;
     html += `</div>`;
     if (content) html += `<div style="white-space:pre-wrap;font-size:0.9em;">${escHtml(content)}</div>`;
