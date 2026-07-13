@@ -14,7 +14,6 @@ _monitor_task = None
 
 async def rebuild_match_channel(bot, db, match, tracked):
     """Rebuild a deleted match channel. Returns the new channel or None."""
-    from modules.Drawbridge.commands.tournament import _get_role_ids
     try:
         guild = bot.get_guild(int(os.getenv('DISCORD_GUILD_ID')))
         if not guild:

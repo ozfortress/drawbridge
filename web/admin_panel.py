@@ -896,7 +896,7 @@ async def api_match_logs(match_id: int):
         result = []
         for l in logs:
             result.append({
-                'log_id': l['log_id'],
+                'log_id': l['id'],
                 'log_type': l.get('log_type'),
                 'message_content': l.get('message_content'),
                 'message_additionals': l.get('message_additionals'),
