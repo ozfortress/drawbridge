@@ -802,11 +802,17 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
             }))
             matchmessage['embed'] = discord.Embed(**matchmessage['embeds'][0])
             del matchmessage['embeds']
+            from web.match_log_discord import MatchLogSubmitView
             notice_msg = await match_channel.send(**matchmessage)
             try:
                 await notice_msg.pin()
             except Exception:
                 pass
+            try:
+                log_view = MatchLogSubmitView(match.id)
+                log_msg = await match_channel.send('Submit your match logs below once the match is complete.', view=log_view)
+            except Exception as e:
+                self.logger.error(f'Failed to send log submission view: {e}')
 
             # Scheduling prompt (propose button + deadline) — only when enabled for this
             # league. The same helper is used when the admin flips the toggle later, so the

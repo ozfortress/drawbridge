@@ -111,6 +111,13 @@ def initialize(bot, db, cit, tournament_cog, sync_cog):
         except Exception as e:
             logger.warning(f'Failed to register match schedule views: {e}')
 
+        try:
+            from web.match_log_discord import register_match_log_views
+            register_match_log_views(_bot, _db)
+            logger.info('Match log persistent views registered')
+        except Exception as e:
+            logger.warning(f'Failed to register match log views: {e}')
+
 
 # ── Session helpers ──────────────────────────────────────────
 from web.admin_auth import create_session, verify_session, get_oauth2_url, exchange_code, fetch_discord_user

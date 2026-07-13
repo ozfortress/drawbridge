@@ -1462,3 +1462,74 @@ class MatchSchedulesRepository(BaseRepository):
 
     def delete_by_league(self, league_id: int) -> bool:
         return self._execute_query(f"DELETE FROM {self.table} WHERE league_id = ?", (league_id,)) > 0
+
+
+class MatchLogsRepository(BaseRepository):
+    """Repository for match_logs table (ingested logs.tf data)."""
+
+    def __init__(self, db_connection):
+        super().__init__(db_connection, 'match_logs')
+
+    def get_by_id(self, log_id: int) -> Optional[Dict[str, Any]]:
+        return self._fetch_one(f"SELECT * FROM {self.table} WHERE id = ?", (log_id,))
+
+    def get_by_match(self, match_id: int) -> List[Dict[str, Any]]:
+        return self._fetch_all(f"SELECT * FROM {self.table} WHERE match_id = ? ORDER BY map_name, id", (match_id,))
+
+    def get_by_log_id(self, log_id: str) -> Optional[Dict[str, Any]]:
+        return self._fetch_one(f"SELECT * FROM {self.table} WHERE log_id = ?", (log_id,))
+
+    def get_by_match_and_map(self, match_id: int, map_name: str) -> Optional[Dict[str, Any]]:
+        return self._fetch_one(
+            f"SELECT * FROM {self.table} WHERE match_id = ? AND map_name = ?",
+            (match_id, map_name)
+        )
+
+    def get_all(self) -> List[Dict[str, Any]]:
+        return self._fetch_all(f"SELECT * FROM {self.table} ORDER BY id")
+
+    def insert(self, data: Dict[str, Any]) -> Optional[int]:
+        required = ['match_id', 'log_id', 'map_name', 'submitted_by']
+        for f in required:
+            if f not in data:
+                raise ValueError(f"Missing required field: {f}")
+        query = f"""INSERT INTO {self.table}
+            (match_id, log_id, map_name, submitted_by, submitted_at,
+             red_team_id, blu_team_id, red_score, blu_score, played_at,
+             home_overlap, home_roster_size, away_overlap, away_roster_size, verified)
+            VALUES (?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?)"""
+        return self._execute_query(query, (
+            data['match_id'], data['log_id'], data['map_name'],
+            data['submitted_by'], data.get('submitted_at'),
+            data.get('red_team_id'), data.get('blu_team_id'),
+            data.get('red_score', 0), data.get('blu_score', 0),
+            data.get('played_at'),
+            data.get('home_overlap', 0), data.get('home_roster_size', 0),
+            data.get('away_overlap', 0), data.get('away_roster_size', 0),
+            data.get('verified', 0),
+        ))
+
+    def update(self, log_id: int, data: Dict[str, Any]) -> bool:
+        sets = []
+        vals = []
+        for col in ('verified', 'red_team_id', 'blu_team_id', 'red_score', 'blu_score',
+                     'home_overlap', 'home_roster_size', 'away_overlap', 'away_roster_size'):
+            if col in data:
+                sets.append(f"{col} = ?")
+                vals.append(data[col])
+        if not sets:
+            return False
+        vals.append(log_id)
+        query = f"UPDATE {self.table} SET {', '.join(sets)} WHERE id = ?"
+        return self._execute_query(query, tuple(vals)) > 0
+
+    def delete(self, log_id: int) -> bool:
+        return self._execute_query(f"DELETE FROM {self.table} WHERE id = ?", (log_id,)) > 0
+
+    def delete_by_match(self, match_id: int) -> bool:
+        return self._execute_query(f"DELETE FROM {self.table} WHERE match_id = ?", (match_id,)) > 0
+
+    def count_by_match(self, match_id: int) -> int:
+        return self._fetch_scalar(f"SELECT COUNT(*) FROM {self.table} WHERE match_id = ?", (match_id,)) or 0
