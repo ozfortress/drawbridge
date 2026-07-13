@@ -13,169 +13,165 @@ _monitor_task = None
 
 
 async def rebuild_match_channel(bot, db, match, tracked):
-    """Rebuild a deleted match channel. Returns the new channel or None."""
-    try:
-        guild = bot.get_guild(int(os.getenv('DISCORD_GUILD_ID')))
-        if not guild:
-            return None
+    """Rebuild a deleted match channel. Returns the new channel."""
+    guild = bot.get_guild(int(os.getenv('DISCORD_GUILD_ID')))
+    if not guild:
+        raise RuntimeError('Discord guild not found')
 
-        team_home = db.teams.get_by_team_id(match['team_home'])
-        team_away = db.teams.get_by_team_id(match['team_away'])
-        if not team_home or not team_away:
-            return None
+    team_home = db.teams.get_by_team_id(match['team_home'])
+    team_away = db.teams.get_by_team_id(match['team_away'])
+    if not team_home:
+        raise RuntimeError(f'Home team {match["team_home"]} not found in database')
+    if not team_away:
+        raise RuntimeError(f'Away team {match["team_away"]} not found in database')
 
-        divs = db.divisions.get_by_league(match['league_id'])
-        category_id = None
-        for d in divs:
-            if d['id'] == match.get('division') or d['division_name'] == str(match.get('division')):
-                category_id = d['category_id']
-                break
-        if not category_id:
-            return None
+    divs = db.divisions.get_by_league(match['league_id'])
+    category_id = None
+    for d in divs:
+        if d['id'] == match.get('division') or d['division_name'] == str(match.get('division')):
+            category_id = d['category_id']
+            break
+    if not category_id:
+        raise RuntimeError(f'Division category not found for match division={match.get("division")}')
 
-        cat = guild.get_channel(category_id)
-        if not cat:
-            return None
+    cat = guild.get_channel(category_id)
+    if not cat:
+        raise RuntimeError(f'Division category channel {category_id} not found in guild')
 
-        role_home = guild.get_role(team_home['role_id'])
-        role_away = guild.get_role(team_away['role_id'])
-        if not role_home or not role_away:
-            return None
+    role_home = guild.get_role(team_home['role_id'])
+    role_away = guild.get_role(team_away['role_id'])
+    if not role_home:
+        raise RuntimeError(f'Home team role {team_home["role_id"]} not found in guild')
+    if not role_away:
+        raise RuntimeError(f'Away team role {team_away["role_id"]} not found in guild')
 
-        overrides = {
-            guild.default_role: discord.PermissionOverwrite(view_channel=False, send_messages=False),
-            role_home: discord.PermissionOverwrite(view_channel=True, send_messages=True),
-            role_away: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+    overrides = {
+        guild.default_role: discord.PermissionOverwrite(view_channel=False, send_messages=False),
+        role_home: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+        role_away: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+    }
+    all_access_ids = _get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'APPROVED', '!UNAPPROVED', 'BOT', 'STAFF')
+    for role_id in all_access_ids:
+        role = guild.get_role(role_id)
+        if role:
+            overrides[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
+
+    new_channel = await guild.create_text_channel(
+        f'🗡️-{match["match_id"]}-rebuilt', category=cat, overwrites=overrides
+    )
+
+    db.tracked_channels.upsert_by_channel({
+        'channel_id': new_channel.id,
+        'channel_type': 'match',
+        'match_id': match['match_id'],
+        'league_id': match['league_id'],
+        'active': 1,
+    })
+    db.matches.update(match['match_id'], {'channel_id': new_channel.id})
+
+    await new_channel.send(
+        '🔄 **This channel was automatically rebuilt** because the original was deleted. '
+        'Captains, please continue your match coordination here.'
+    )
+
+    logs = db.logs.get_by_match_id(match['match_id'])
+    for log_entry in logs:
+        if log_entry['log_type'] != 'CREATE':
+            continue
+        color_map = {
+            'admin': discord.Color.red(),
+            'staff': discord.Color.orange(),
+            'caster': discord.Color.purple(),
+            'player_home': discord.Color.blue(),
+            'player_away': discord.Color.green(),
         }
-        all_access_ids = _get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'APPROVED', '!UNAPPROVED', 'BOT', 'STAFF')
-        for role_id in all_access_ids:
-            role = guild.get_role(role_id)
-            if role:
-                overrides[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
-
-        new_channel = await guild.create_text_channel(
-            f'🗡️-{match["match_id"]}-rebuilt', category=cat, overwrites=overrides
+        color = color_map.get(log_entry.get('role_type', ''), discord.Color.dark_grey())
+        embed = discord.Embed(
+            description=log_entry['message_content'][:2000] if log_entry['message_content'] else '*no text*',
+            timestamp=log_entry['log_timestamp'] if hasattr(log_entry['log_timestamp'], 'timestamp') else None,
+            color=color,
         )
-
-        db.tracked_channels.upsert_by_channel({
-            'channel_id': new_channel.id,
-            'channel_type': 'match',
-            'match_id': match['match_id'],
-            'league_id': match['league_id'],
-            'active': 1,
-        })
-        db.matches.update(match['match_id'], {'channel_id': new_channel.id})
-
-        await new_channel.send(
-            '🔄 **This channel was automatically rebuilt** because the original was deleted. '
-            'Captains, please continue your match coordination here.'
+        embed.set_author(
+            name=log_entry['user_nick'] or log_entry['user_name'],
+            icon_url=log_entry['user_avatar'],
         )
-
-        logs = db.logs.get_by_match_id(match['match_id'])
-        for log_entry in logs:
-            if log_entry['log_type'] != 'CREATE':
-                continue
-            color_map = {
-                'admin': discord.Color.red(),
-                'staff': discord.Color.orange(),
-                'caster': discord.Color.purple(),
-                'player_home': discord.Color.blue(),
-                'player_away': discord.Color.green(),
-            }
-            color = color_map.get(log_entry.get('role_type', ''), discord.Color.dark_grey())
-            embed = discord.Embed(
-                description=log_entry['message_content'][:2000] if log_entry['message_content'] else '*no text*',
-                timestamp=log_entry['log_timestamp'] if hasattr(log_entry['log_timestamp'], 'timestamp') else None,
-                color=color,
-            )
-            embed.set_author(
-                name=log_entry['user_nick'] or log_entry['user_name'],
-                icon_url=log_entry['user_avatar'],
-            )
-            footer_parts = [log_entry.get('role_type', 'player')]
-            if log_entry['message_additionals']:
-                embed.add_field(name='Attachments', value=log_entry['message_additionals'][:500], inline=False)
-                footer_parts.append('📎')
-            embed.set_footer(text=' | '.join(footer_parts))
-            try:
-                await new_channel.send(embed=embed)
-            except Exception:
-                continue
-
+        footer_parts = [log_entry.get('role_type', 'player')]
+        if log_entry['message_additionals']:
+            embed.add_field(name='Attachments', value=log_entry['message_additionals'][:500], inline=False)
+            footer_parts.append('📎')
+        embed.set_footer(text=' | '.join(footer_parts))
         try:
-            notice = await new_channel.send(
-                '📋 **Channel Rebuilt** — The original message history has been replayed above as embeds. '
-                'Use the 📋 Submit Match Log button below once you play your match.'
-            )
-            from web.match_log_discord import MatchLogSubmitView
-            await new_channel.send('Submit your match logs below once the match is complete.',
-                                   view=MatchLogSubmitView(match['match_id']))
+            await new_channel.send(embed=embed)
         except Exception:
-            pass
+            continue
 
-        logger.info(f'Rebuilt match channel for match {match["match_id"]} (new channel: {new_channel.id})')
-        return new_channel
-    except Exception as e:
-        logger.error(f'Failed to rebuild match channel for match {match["match_id"]}: {e}', exc_info=True)
-        raise
+    try:
+        notice = await new_channel.send(
+            '📋 **Channel Rebuilt** — The original message history has been replayed above as embeds. '
+            'Use the 📋 Submit Match Log button below once you play your match.'
+        )
+        from web.match_log_discord import MatchLogSubmitView
+        await new_channel.send('Submit your match logs below once the match is complete.',
+                               view=MatchLogSubmitView(match['match_id']))
+    except Exception:
+        pass
+
+    logger.info(f'Rebuilt match channel for match {match["match_id"]} (new channel: {new_channel.id})')
+    return new_channel
 
 
 async def rebuild_team_channel(bot, db, team, tracked):
     """Rebuild a deleted team channel."""
-    try:
-        guild = bot.get_guild(int(os.getenv('DISCORD_GUILD_ID')))
-        if not guild:
-            return None
+    guild = bot.get_guild(int(os.getenv('DISCORD_GUILD_ID')))
+    if not guild:
+        raise RuntimeError('Discord guild not found')
 
-        role = guild.get_role(team['role_id'])
-        if not role:
-            return None
+    role = guild.get_role(team['role_id'])
+    if not role:
+        raise RuntimeError(f'Team role {team["role_id"]} not found in guild')
 
-        divs = db.divisions.get_by_league(team['league_id'])
-        category_id = None
-        for d in divs:
-            if d['id'] == team.get('division'):
-                category_id = d['category_id']
-                break
-        if not category_id:
-            return None
-        cat = guild.get_channel(category_id)
-        if not cat:
-            return None
+    divs = db.divisions.get_by_league(team['league_id'])
+    category_id = None
+    for d in divs:
+        if d['id'] == team.get('division'):
+            category_id = d['category_id']
+            break
+    if not category_id:
+        raise RuntimeError(f'Division category not found for team division={team.get("division")}')
+    cat = guild.get_channel(category_id)
+    if not cat:
+        raise RuntimeError(f'Division category channel {category_id} not found in guild')
 
-        overrides = {
-            guild.default_role: discord.PermissionOverwrite(view_channel=False, send_messages=False),
-            role: discord.PermissionOverwrite(view_channel=True, send_messages=True),
-        }
-        all_access_ids = _get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'APPROVED', '!UNAPPROVED', 'BOT', 'STAFF')
-        for role_id in all_access_ids:
-            r = guild.get_role(role_id)
-            if r:
-                overrides[r] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
+    overrides = {
+        guild.default_role: discord.PermissionOverwrite(view_channel=False, send_messages=False),
+        role: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+    }
+    all_access_ids = _get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'APPROVED', '!UNAPPROVED', 'BOT', 'STAFF')
+    for role_id in all_access_ids:
+        r = guild.get_role(role_id)
+        if r:
+            overrides[r] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
 
-        new_channel = await guild.create_text_channel(
-            f'🛡️{team["team_name"]}', category=cat, overwrites=overrides
-        )
+    new_channel = await guild.create_text_channel(
+        f'🛡️{team["team_name"]}', category=cat, overwrites=overrides
+    )
 
-        db.tracked_channels.upsert_by_channel({
-            'channel_id': new_channel.id,
-            'channel_type': 'team',
-            'team_id': team['team_id'],
-            'league_id': team['league_id'],
-            'active': 1,
-        })
-        db.teams.update(team['roster_id'], {'team_channel': new_channel.id})
+    db.tracked_channels.upsert_by_channel({
+        'channel_id': new_channel.id,
+        'channel_type': 'team',
+        'team_id': team['team_id'],
+        'league_id': team['league_id'],
+        'active': 1,
+    })
+    db.teams.update(team['roster_id'], {'team_channel': new_channel.id})
 
-        await new_channel.send(
-            '🔄 **Team channel automatically rebuilt.** The original was deleted. '
-            'All functions have been restored.'
-        )
+    await new_channel.send(
+        '🔄 **Team channel automatically rebuilt.** The original was deleted. '
+        'All functions have been restored.'
+    )
 
-        logger.info(f'Rebuilt team channel for team {team["team_id"]} (new channel: {new_channel.id})')
-        return new_channel
-    except Exception:
-        logger.exception(f'Failed to rebuild team channel for team {team["team_id"]}')
-        raise
+    logger.info(f'Rebuilt team channel for team {team["team_id"]} (new channel: {new_channel.id})')
+    return new_channel
 
 
 def _get_role_ids(*keywords):
