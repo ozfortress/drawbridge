@@ -1,4 +1,4 @@
-CREATE TABLE `match_logs` (
+CREATE TABLE IF NOT EXISTS `match_logs` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `match_id` int(11) NOT NULL,
   `log_id` varchar(20) NOT NULL COMMENT 'logs.tf numeric identifier',

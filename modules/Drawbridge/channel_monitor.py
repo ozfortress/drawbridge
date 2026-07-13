@@ -31,8 +31,8 @@ async def rebuild_match_channel(bot, db, match, tracked):
         if d['id'] == match.get('division') or d['division_name'] == str(match.get('division')):
             category_id = d['category_id']
             break
-    if not category_id:
-        raise RuntimeError(f'Division category not found for match division={match.get("division")}')
+    if not category_id and divs:
+        category_id = divs[0]['category_id']
 
     cat = guild.get_channel(category_id)
     if not cat:
@@ -136,6 +136,8 @@ async def rebuild_team_channel(bot, db, team, tracked):
         if d['id'] == team.get('division'):
             category_id = d['category_id']
             break
+    if not category_id and divs:
+        category_id = divs[0]['category_id']
     if not category_id:
         raise RuntimeError(f'Division category not found for team division={team.get("division")}')
     cat = guild.get_channel(category_id)

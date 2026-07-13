@@ -4,7 +4,7 @@ ALTER TABLE `tournament_schedule_settings`
   ADD COLUMN `deadline_day` tinyint(4) DEFAULT NULL COMMENT '0=Mon..6=Sun',
   ADD COLUMN `deadline_time` varchar(10) DEFAULT NULL COMMENT 'e.g. 19:00';
 
-CREATE TABLE `match_schedules` (
+CREATE TABLE IF NOT EXISTS `match_schedules` (
   `match_id` int(11) NOT NULL,
   `league_id` int(11) NOT NULL,
   `status` varchar(20) NOT NULL DEFAULT 'pending' COMMENT 'pending | proposed | confirmed',

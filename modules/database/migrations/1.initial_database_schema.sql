@@ -5,7 +5,7 @@
 
 -- leagues definition
 
-CREATE TABLE `leagues` (
+CREATE TABLE IF NOT EXISTS `leagues` (
   `league_id` int(11) NOT NULL,
   `league_name` varchar(100) DEFAULT NULL,
   `league_shortcode` varchar(100) DEFAULT NULL,
@@ -14,7 +14,7 @@ CREATE TABLE `leagues` (
 
 -- divisions definition
 
-CREATE TABLE `divisions` (
+CREATE TABLE IF NOT EXISTS `divisions` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `division_name` varchar(100) DEFAULT NULL,
   `league_id` int(11) DEFAULT NULL,
@@ -25,7 +25,7 @@ CREATE TABLE `divisions` (
 
 -- teams definition
 
-CREATE TABLE `teams` (
+CREATE TABLE IF NOT EXISTS `teams` (
   `roster_id` int(11) NOT NULL,
   `team_id` int(11) DEFAULT NULL,
   `league_id` int(11) DEFAULT NULL,
@@ -38,7 +38,7 @@ CREATE TABLE `teams` (
 
 -- matches definition
 
-CREATE TABLE `matches` (
+CREATE TABLE IF NOT EXISTS `matches` (
   `match_id` int(11) NOT NULL,
   `division` int(11) DEFAULT NULL,
   `team_home` int(11) DEFAULT NULL,
@@ -51,7 +51,7 @@ CREATE TABLE `matches` (
 
 -- users definition
 
-CREATE TABLE `users` (
+CREATE TABLE IF NOT EXISTS `users` (
   `discord_id` bigint(20) NOT NULL,
   `steam_id` varchar(255) NOT NULL,
   `ozfortress_id` int(11) NOT NULL,
@@ -60,7 +60,7 @@ CREATE TABLE `users` (
 
 -- logs definition
 
-CREATE TABLE `logs` (
+CREATE TABLE IF NOT EXISTS `logs` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `match_id` int(11) DEFAULT NULL,
   `team_id` int(11) DEFAULT NULL,

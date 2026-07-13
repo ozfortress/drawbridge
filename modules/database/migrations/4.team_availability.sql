@@ -1,4 +1,4 @@
-CREATE TABLE `tournament_schedule_settings` (
+CREATE TABLE IF NOT EXISTS `tournament_schedule_settings` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `league_id` int(11) NOT NULL,
   `excluded_days` varchar(50) DEFAULT NULL COMMENT 'Comma-separated day numbers (0=Mon,6=Sun)',
@@ -8,7 +8,7 @@ CREATE TABLE `tournament_schedule_settings` (
   UNIQUE KEY `league_id` (`league_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-CREATE TABLE `team_availability` (
+CREATE TABLE IF NOT EXISTS `team_availability` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `team_id` int(11) NOT NULL,
   `league_id` int(11) NOT NULL,

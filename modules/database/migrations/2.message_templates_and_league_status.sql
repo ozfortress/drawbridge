@@ -1,6 +1,6 @@
 -- Add message templates table and league status
 
-CREATE TABLE `message_templates` (
+CREATE TABLE IF NOT EXISTS `message_templates` (
   `template_name` varchar(50) NOT NULL,
   `content` text NOT NULL,
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
