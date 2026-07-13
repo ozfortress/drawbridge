@@ -172,8 +172,9 @@ class MigrationManager:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("SHOW TABLES LIKE 'schema_migrations'")
+                table_found = cursor.fetchone()
 
-                if cursor.rowcount == 0:
+                if not table_found:
                     # Create migrations table
                     cursor.execute("""
                         CREATE TABLE schema_migrations (
@@ -219,10 +220,10 @@ class MigrationManager:
                     with open(filepath, 'r') as f:
                         migration_sql = f.read()
 
-                    # Execute migration
+                    # Execute migration (MariaDB handles SQL comments natively)
                     for statement in migration_sql.split(';'):
                         statement = statement.strip()
-                        if statement and not statement.startswith('--'):
+                        if statement:
                             cursor.execute(statement)
 
                     # Record migration

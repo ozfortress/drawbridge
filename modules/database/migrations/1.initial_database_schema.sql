@@ -1,13 +1,7 @@
 -- Initial Database Schema for Drawbridge
 -- Assumes an empty database
 
--- schema_migrations definition
-
-CREATE TABLE `schema_migrations` (
-  `version` int(11) NOT NULL,
-  `applied_at` datetime NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`version`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+-- schema_migrations is created by MigrationManager.get_current_version() if needed
 
 -- leagues definition
 
