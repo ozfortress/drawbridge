@@ -1454,6 +1454,7 @@ class MatchSchedulesRepository(BaseRepository):
                 FROM {self.table} ms
                 JOIN matches m ON ms.match_id = m.match_id
                 WHERE ms.status != 'confirmed'
+                  AND ms.scheduled_at IS NULL
                   AND ms.deadline_at IS NOT NULL
                   AND ms.deadline_at < ?
                   AND m.archived = 0
@@ -1489,8 +1490,8 @@ class TrackedChannelsRepository(BaseRepository):
     def get_by_type(self, channel_type: str) -> List[Dict[str, Any]]:
         return self._fetch_all(f"SELECT * FROM {self.table} WHERE channel_type = ?", (channel_type,))
 
-    def get_by_match(self, match_id: int) -> Optional[Dict[str, Any]]:
-        return self._fetch_one(f"SELECT * FROM {self.table} WHERE match_id = ?", (match_id,))
+    def get_by_match(self, match_id: int) -> List[Dict[str, Any]]:
+        return self._fetch_all(f"SELECT * FROM {self.table} WHERE match_id = ?", (match_id,))
 
     def get_by_team(self, team_id: int) -> Optional[Dict[str, Any]]:
         return self._fetch_one(f"SELECT * FROM {self.table} WHERE team_id = ?", (team_id,))

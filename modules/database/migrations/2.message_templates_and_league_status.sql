@@ -15,5 +15,5 @@ INSERT IGNORE INTO `message_templates` (`template_name`, `content`) VALUES
 
 -- Add status and updated_at to leagues
 ALTER TABLE `leagues`
-  ADD COLUMN `status` varchar(20) DEFAULT 'active',
-  ADD COLUMN `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp();
+  ADD COLUMN IF NOT EXISTS `status` varchar(20) DEFAULT 'active',
+  ADD COLUMN IF NOT EXISTS `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp();

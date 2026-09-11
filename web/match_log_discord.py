@@ -14,11 +14,18 @@ def _resolve_steam_id3(team_players: list) -> set:
     return {f"[{p['steam_id3']}]" for p in team_players if p.get('steam_id3')}
 
 
+def _field(obj, key: str, default=None):
+    """Read ``key`` from a dict or a Citadel object (which has no ``.get``)."""
+    if isinstance(obj, dict):
+        return obj.get(key, default)
+    return getattr(obj, key, default)
+
+
 def _verify_log(match: Dict[str, Any], log_data: Dict[str, Any],
-                team_home: dict, team_away: dict) -> Dict[str, Any]:
+                team_home, team_away) -> Dict[str, Any]:
     """Verify a log against a match. Returns verification details."""
-    home_players = _resolve_steam_id3(team_home.get('players', []))
-    away_players = _resolve_steam_id3(team_away.get('players', []))
+    home_players = _resolve_steam_id3(_field(team_home, 'players') or [])
+    away_players = _resolve_steam_id3(_field(team_away, 'players') or [])
     log_players = log_data.get('players', {})
 
     red_players = {p for p in log_players if log_players[p].get('team') == 'Red'}
@@ -37,7 +44,8 @@ def _verify_log(match: Dict[str, Any], log_data: Dict[str, Any],
     if home_found >= away_found and home_found > 0:
         home_team_red = len(home_in_red) >= len(home_in_blue)
     elif away_found > 0:
-        home_team_red = len(home_in_red) > 0
+        # Infer from the away team's side: away on BLU means home was RED.
+        home_team_red = len(away_in_blue) >= len(away_in_red)
     else:
         home_team_red = None
 
@@ -181,8 +189,8 @@ class MatchLogSubmitModal(Modal, title='Submit Match Log'):
         }
         _db.match_logs.insert(db_entry)
 
-        team_home_name = team_home.get('name', f"Team {match['team_home']}")
-        team_away_name = team_away.get('name', f"Team {match['team_away']}")
+        team_home_name = _field(team_home, 'name') or f"Team {match['team_home']}"
+        team_away_name = _field(team_away, 'name') or f"Team {match['team_away']}"
         embed = _format_result_embed(result, match, team_home_name, team_away_name)
         await interaction.followup.send(embed=embed)
 

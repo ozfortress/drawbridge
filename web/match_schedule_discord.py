@@ -540,7 +540,8 @@ async def post_schedule_message(bot, db, match: dict, settings: dict | None = No
             db.match_schedules.insert({'match_id': match_id, 'league_id': match['league_id'],
                                        'deadline_at': deadline})
         else:
-            db.match_schedules.update(match_id, {'deadline_at': deadline})
+            # New deadline, so the one-time past-deadline warning should fire again.
+            db.match_schedules.update(match_id, {'deadline_at': deadline, 'deadline_flagged': 0})
         db.match_schedules.set_message_id(match_id, msg.id)
         return True
     except Exception as e:

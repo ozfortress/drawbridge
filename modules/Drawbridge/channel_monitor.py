@@ -97,11 +97,13 @@ async def rebuild_match_channel(bot, db, match, tracked):
     # Deactivate ALL old tracked entries for this match so the monitor
     # doesn't rebuild again from stale entries left by prior cycles.
     try:
-        for old in (db.tracked_channels.get_by_match(match['match_id']) or []):
+        if tracked and tracked.get('channel_id'):
+            db.tracked_channels.deactivate(tracked['channel_id'])
+        for old in db.tracked_channels.get_by_match(match['match_id']):
             if old.get('active'):
                 db.tracked_channels.deactivate(old['channel_id'])
     except Exception:
-        pass
+        logger.exception(f'Failed to deactivate old tracked channels for match {match["match_id"]}')
 
     overrides = {
         guild.default_role: discord.PermissionOverwrite(view_channel=False, send_messages=False),
@@ -178,6 +180,10 @@ async def rebuild_match_channel(bot, db, match, tracked):
         settings = db.tournament_schedule_settings.get_by_league(match['league_id'])
         if settings and settings.get('scheduling_enabled'):
             from web.match_schedule_discord import post_schedule_message
+            # The stored prompt id belongs to the deleted channel; clear it so
+            # post_schedule_message doesn't treat the prompt as already posted.
+            if db.match_schedules.get_by_match_id(match['match_id']):
+                db.match_schedules.set_message_id(match['match_id'], None)
             await post_schedule_message(bot, db, {
                 'match_id': match['match_id'],
                 'channel_id': new_channel.id,
@@ -212,7 +218,7 @@ async def rebuild_match_channel(bot, db, match, tracked):
         )
         embed.set_author(
             name=log_entry['user_nick'] or log_entry['user_name'],
-            icon_url=log_entry['user_avatar'],
+            icon_url=log_entry['user_avatar'] or None,
         )
         footer_parts = [role_label]
         if log_entry['message_additionals']:
@@ -355,7 +361,8 @@ def start_channel_monitor(bot, db):
                         await rebuild_match_channel(bot, db, match, tracked)
                         rebuilt_matches.add(tracked['match_id'])
                 elif tracked['channel_type'] == 'team':
-                    team = db.teams.get_by_id(tracked['team_id'])
+                    # tracked.team_id is the Citadel team_id (not roster_id)
+                    team = db.teams.get_by_team_and_league(tracked['team_id'], tracked['league_id'])
                     if team:
                         await rebuild_team_channel(bot, db, team, tracked)
                         rebuilt_teams.add(tracked['team_id'])

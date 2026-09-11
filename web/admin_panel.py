@@ -607,8 +607,9 @@ async def api_tournament_assign_captain_roles():
                         not_in_server.append(user['name'])
                     continue
                 if team_role is None:
-                    if user['name'] not in missing_role:
-                        missing_role.append(f"{user['name']} (team {team_id})")
+                    entry = f"{user['name']} (team {team_id})"
+                    if entry not in missing_role:
+                        missing_role.append(entry)
                     continue
                 if team_role not in member.roles:
                     await member.add_roles(team_role, reason='Drawbridge: assign_captain_roles (web panel)')
