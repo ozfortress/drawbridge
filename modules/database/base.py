@@ -67,6 +67,16 @@ class DatabaseConnection:
         except DatabaseError:
             return False
 
+    def table_exists(self, table_name: str) -> bool:
+        """Check if a table exists in the current database."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SHOW TABLES LIKE ?", (table_name,))
+                return cursor.fetchone() is not None
+        except Exception:
+            return False
+
 
 class BaseRepository(ABC):
     """Base class for all database repositories."""
@@ -172,8 +182,9 @@ class MigrationManager:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("SHOW TABLES LIKE 'schema_migrations'")
+                table_found = cursor.fetchone()
 
-                if cursor.rowcount == 0:
+                if not table_found:
                     # Create migrations table
                     cursor.execute("""
                         CREATE TABLE schema_migrations (
@@ -193,9 +204,22 @@ class MigrationManager:
             self.logger.error(f"Error checking migration version: {e}")
             return 0
 
-    def run_migrations(self) -> bool:
-        """Run all pending migrations."""
+    def run_migrations(self, reset: bool = False) -> bool:
+        """Run any pending migrations.
+
+        Args:
+            reset: If True, clear schema_migrations and re-run all migrations
+                   (for recovery when tables were never actually created despite
+                    being recorded as migrated).
+        """
         try:
+            if reset:
+                self.logger.warning("Resetting migration state — clearing schema_migrations")
+                with self.db.get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("DELETE FROM schema_migrations WHERE 1=1")
+                    conn.commit()
+
             current_version = self.get_current_version()
             migration_files = self._get_migration_files()
 
@@ -219,10 +243,10 @@ class MigrationManager:
                     with open(filepath, 'r') as f:
                         migration_sql = f.read()
 
-                    # Execute migration
+                    # Execute migration (MariaDB handles SQL comments natively)
                     for statement in migration_sql.split(';'):
                         statement = statement.strip()
-                        if statement and not statement.startswith('--'):
+                        if statement:
                             cursor.execute(statement)
 
                     # Record migration

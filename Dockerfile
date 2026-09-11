@@ -4,7 +4,7 @@ LABEL org.opencontainers.image.source https://github.com/ozfortress/drawbridge
 ARG GIT_COMMIT
 ENV GIT_COMMIT=${GIT_COMMIT}
 
-RUN apt update && apt install -y socat
+RUN apt update && apt install -y socat libmariadb-dev libmariadb-dev-compat gcc
 WORKDIR /usr/src/app
 
 COPY requirements.txt ./
@@ -29,7 +29,7 @@ RUN set -ex; \
 EXPOSE 8080
 
 # Health check using the Python script
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD python healthcheck.py || exit 1
 
 CMD [ "python", "./app.py" ]

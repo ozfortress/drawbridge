@@ -1,0 +1,190 @@
+{% extends "admin/layout.html" %}
+{% block title %}Match {{ match_id }} - Drawbridge Admin{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Match #{{ match_id }}</h1>
+    <div style="display:flex;gap:8px;">
+        <a href="/admin/matches" class="btn btn-secondary">Back to Matches</a>
+    </div>
+</div>
+
+<div id="match-info" class="card">
+    <h2>Match Information</h2>
+    <div id="match-loading">Loading...</div>
+</div>
+
+<div id="match-actions" class="card" style="display:none;">
+    <h2>Actions</h2>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-secondary" id="btn-end-match">End Match (Archive)</button>
+        <button class="btn btn-warning" id="btn-delete-channel">Delete Discord Channel</button>
+        <button class="btn btn-primary" id="btn-rebuild-channel">Rebuild Discord Channel</button>
+    </div>
+    <div id="action-result" class="result-box" style="display:none;margin-top:10px;"></div>
+</div>
+
+<div class="card">
+    <h2>Communications Log</h2>
+    <div class="form-group">
+        <label>Filter by role</label>
+        <select id="log-role-filter" class="form-input" style="max-width:300px;">
+            <option value="all">All</option>
+            <option value="player_home">Home Team</option>
+            <option value="player_away">Away Team</option>
+            <option value="director">Director</option>
+            <option value="head_admin">Head Admin</option>
+            <option value="admin">Admin</option>
+            <option value="staff">Staff</option>
+            <option value="caster">Caster</option>
+            <option value="unknown">Unknown</option>
+        </select>
+    </div>
+    <div id="log-container" style="max-height:70vh;overflow-y:auto;"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const MATCH_ID = {{ match_id }};
+
+const ROLE_COLORS = {
+    player_home: { bg: '#1b1d2e', border: '#3498db' },
+    player_away: { bg: '#2d1b1b', border: '#e74c3c' },
+    director:    { bg: '#1e1b2e', border: '#8e44ad' },
+    head_admin:  { bg: '#2d1b1b', border: '#e67e22' },
+    admin:       { bg: '#2d2418', border: '#f1c40f' },
+    staff:       { bg: '#1b2e1d', border: '#1abc9c' },
+    caster:      { bg: '#1e1d2e', border: '#9b59b6' },
+    unknown:     { bg: '#1e1e1e', border: '#7f8c8d' },
+};
+
+async function loadMatch() {
+    const info = document.getElementById('match-info');
+    const infoDiv = document.getElementById('match-loading');
+    const actions = document.getElementById('match-actions');
+
+    try {
+        const resp = await API.get(`/admin/api/match/${MATCH_ID}`);
+        const m = resp.match;
+        let html = `
+            <table class="stats-table">
+                <tr><td><strong>Match ID</strong></td><td>${m.match_id}</td></tr>
+                <tr><td><strong>League</strong></td><td>${m.league_id}</td></tr>
+                <tr><td><strong>Division</strong></td><td>${m.division_name || m.division}</td></tr>
+                <tr><td><strong>Home Team</strong></td><td>${m.team_home_name || m.team_home}</td></tr>
+                <tr><td><strong>Away Team</strong></td><td>${m.team_away_name || m.team_away}</td></tr>
+                <tr><td><strong>Channel</strong></td><td>${m.channel_id ? '<code>#' + m.channel_id + '</code>' : 'None'}</td></tr>
+                <tr><td><strong>Status</strong></td><td>${m.archived ? '<span class="status-badge status-archived">Archived</span>' : '<span class="status-badge status-active">Active</span>'}</td></tr>
+                <tr><td><strong>Logs</strong></td><td>${resp.log_count} messages</td></tr>
+            </table>
+        `;
+        infoDiv.innerHTML = html;
+        actions.style.display = 'block';
+    } catch (e) {
+        infoDiv.innerHTML = `<div class="result-error">Failed to load match: ${e.message}</div>`;
+    }
+}
+
+function renderLogEntry(log) {
+    const roleInfo = ROLE_COLORS[log.role_type] || ROLE_COLORS.unknown;
+    const roleLabel = log.role_label || log.role_type || 'Unknown';
+    const ts = log.log_timestamp ? new Date(log.log_timestamp + 'Z').toLocaleString() : '';
+    const content = (log.message_content || '').substring(0, 2000);
+    const attachments = log.message_additionals || '';
+
+    let html = `<div class="log-entry" style="border-left:4px solid ${roleInfo.border};background:${roleInfo.bg};padding:8px 12px;margin:4px 0;border-radius:4px;">`;
+    html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">`;
+    html += `<span style="font-weight:bold;">${escHtml(log.user_nick || log.user_name)}</span>`;
+    html += `<span style="font-size:0.8em;color:#aaa;">${ts}</span>`;
+    html += `</div>`;
+    html += `<div style="display:flex;gap:6px;margin-bottom:4px;">`;
+    html += `<span class="role-badge" style="background:${roleInfo.border};color:#fff;padding:0 6px;border-radius:3px;font-size:0.75em;">${escHtml(roleLabel)}</span>`;
+    if (log.log_type === 'CREATE') html += `<span class="role-badge" style="background:#27ae60;color:#fff;padding:0 6px;border-radius:3px;font-size:0.75em;">Message</span>`;
+    else if (log.log_type === 'EDIT') html += `<span class="role-badge" style="background:#f39c12;color:#fff;padding:0 6px;border-radius:3px;font-size:0.75em;">Edited</span>`;
+    else if (log.log_type === 'DELETE') html += `<span class="role-badge" style="background:#e74c3c;color:#fff;padding:0 6px;border-radius:3px;font-size:0.75em;">Deleted</span>`;
+    else if (log.log_type === 'SCHED') html += `<span class="role-badge" style="background:#3498db;color:#fff;padding:0 6px;border-radius:3px;font-size:0.75em;">📅 Schedule</span>`;
+    else html += `<span class="role-badge" style="background:#95a5a6;color:#fff;padding:0 6px;border-radius:3px;font-size:0.75em;">${escHtml(log.log_type)}</span>`;
+    html += `</div>`;
+    if (content) html += `<div style="white-space:pre-wrap;font-size:0.9em;">${escHtml(content)}</div>`;
+    if (attachments) html += `<div style="font-size:0.8em;color:#3498db;margin-top:2px;">📎 ${escHtml(attachments)}</div>`;
+    html += `</div>`;
+    return html;
+}
+
+async function loadLogs(filterRole) {
+    const container = document.getElementById('log-container');
+    try {
+        const resp = await API.get(`/admin/api/match/${MATCH_ID}/logs?role_type=${encodeURIComponent(filterRole)}`);
+        if (!resp.logs || resp.logs.length === 0) {
+            container.innerHTML = '<div style="text-align:center;padding:40px;color:#888;">No communication logs found for this match.</div>';
+            return;
+        }
+        container.innerHTML = resp.logs.map(renderLogEntry).join('\n');
+    } catch (e) {
+        container.innerHTML = `<div class="result-error">Failed to load logs: ${e.message}</div>`;
+    }
+}
+
+function escHtml(s) {
+    if (!s) return '';
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+document.getElementById('btn-end-match').addEventListener('click', async () => {
+    if (!confirm('Archive this match channel (set to read-only)?')) return;
+    const result = document.getElementById('action-result');
+    result.style.display = 'none';
+    try {
+        const resp = await API.post('/admin/api/tournament/matchend', { match_id: MATCH_ID });
+        result.textContent = resp.message || 'Done';
+        result.className = 'result-box result-success';
+        API.toast('Match ended', 'success');
+        loadMatch();
+    } catch (e) {
+        result.textContent = e.message;
+        result.className = 'result-box result-error';
+    }
+    result.style.display = 'block';
+});
+
+document.getElementById('btn-delete-channel').addEventListener('click', async () => {
+    if (!confirm('DELETE the Discord channel for this match? This cannot be undone.')) return;
+    const result = document.getElementById('action-result');
+    result.style.display = 'none';
+    try {
+        const resp = await API.post(`/admin/api/match/${MATCH_ID}/delete-channel`);
+        result.textContent = resp.message || 'Done';
+        result.className = 'result-box ' + (resp.success ? 'result-success' : 'result-error');
+        API.toast(resp.message, resp.success ? 'success' : 'error');
+        loadMatch();
+    } catch (e) {
+        result.textContent = e.message;
+        result.className = 'result-box result-error';
+    }
+    result.style.display = 'block';
+});
+
+document.getElementById('btn-rebuild-channel').addEventListener('click', async () => {
+    if (!confirm('Rebuild the Discord channel? If the channel still exists, it will be deleted and recreated with message history replayed.')) return;
+    const result = document.getElementById('action-result');
+    result.style.display = 'none';
+    try {
+        const resp = await API.post(`/admin/api/match/${MATCH_ID}/rebuild-channel`);
+        result.textContent = resp.message || 'Done';
+        result.className = 'result-box ' + (resp.success ? 'result-success' : 'result-error');
+        API.toast(resp.message, resp.success ? 'success' : 'error');
+        loadMatch();
+    } catch (e) {
+        result.textContent = e.message;
+        result.className = 'result-box result-error';
+    }
+    result.style.display = 'block';
+});
+
+document.getElementById('log-role-filter').addEventListener('change', () => {
+    loadLogs(document.getElementById('log-role-filter').value);
+});
+
+loadMatch();
+loadLogs('all');
+</script>
+{% endblock %}

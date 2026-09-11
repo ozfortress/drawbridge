@@ -177,6 +177,14 @@ async def on_ready():
     except Exception as e:
         logger.error(f'Failed to initialize admin panel: {e}')
 
+    # Start channel monitoring background task
+    try:
+        from modules.Drawbridge.channel_monitor import start_channel_monitor
+        start_channel_monitor(client, db)
+        logger.info('Channel monitor started')
+    except Exception as e:
+        logger.error(f'Failed to start channel monitor: {e}')
+
     botmisc = client.get_channel(int(os.getenv('ANNOUNCE_CHANNEL')))
     public_url = os.getenv('PUBLIC_URL', '')
     now = int(datetime.datetime.now().timestamp())

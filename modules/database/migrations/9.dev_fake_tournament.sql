@@ -1,0 +1,1 @@
+ALTER TABLE matches ADD COLUMN IF NOT EXISTS round_number int(11) DEFAULT NULL;

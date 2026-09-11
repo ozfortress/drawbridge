@@ -22,6 +22,8 @@ _cit = None
 _tournament_cog = None
 _sync_cog = None
 
+_IS_DEV = os.getenv('ENVIRONMENT', 'production') == 'development'
+
 # Warned users tracking for tournament end
 _warned_users: dict[str, float] = {}
 
@@ -110,6 +112,13 @@ def initialize(bot, db, cit, tournament_cog, sync_cog):
             logger.info('Match schedule persistent views registered')
         except Exception as e:
             logger.warning(f'Failed to register match schedule views: {e}')
+
+        try:
+            from web.match_log_discord import register_match_log_views
+            register_match_log_views(_bot, _db)
+            logger.info('Match log persistent views registered')
+        except Exception as e:
+            logger.warning(f'Failed to register match log views: {e}')
 
 
 # ── Session helpers ──────────────────────────────────────────
@@ -301,7 +310,7 @@ async def dashboard_page():
     session_user = get_session_user()
     if not session_user or not session_user.get('is_admin'):
         return redirect('/admin/login')
-    return await render_template('admin/dashboard.html', user=session_user)
+    return await render_template('admin/dashboard.html', user=session_user, is_dev=_IS_DEV)
 
 
 @admin_bp.route('/launchpad')
@@ -314,10 +323,7 @@ async def launchpad_page():
 
 @admin_bp.route('/tournaments')
 async def tournaments_page():
-    session_user = get_session_user()
-    if not session_user or not session_user.get('is_admin'):
-        return redirect('/admin/login')
-    return await render_template('admin/tournaments.html', user=session_user)
+    return redirect('/admin/launchpad')
 
 
 @admin_bp.route('/tournament/<int:league_id>')
@@ -601,8 +607,9 @@ async def api_tournament_assign_captain_roles():
                         not_in_server.append(user['name'])
                     continue
                 if team_role is None:
-                    if user['name'] not in missing_role:
-                        missing_role.append(f"{user['name']} (team {team_id})")
+                    entry = f"{user['name']} (team {team_id})"
+                    if entry not in missing_role:
+                        missing_role.append(entry)
                     continue
                 if team_role not in member.roles:
                     await member.add_roles(team_role, reason='Drawbridge: assign_captain_roles (web panel)')
@@ -830,12 +837,281 @@ async def api_tournament_matchend():
                 if role.id != guild.default_role.id:
                     overwrites[role] = discord.PermissionOverwrite(read_messages=True, send_messages=False)
             await channel.edit(overwrites=overwrites)
-        _db.matches.archive_match(match_id)
+        _db.matches.archive(match_id)
+        try:
+            if match.get('channel_id'):
+                _db.tracked_channels.deactivate(match['channel_id'])
+        except Exception:
+            pass
         await _get_tournament_cog().update_launchpad()
         return jsonify({'success': True, 'message': 'Match ended and archived.'})
     except Exception as e:
         logger.error(f'Matchend error: {e}')
         return _db_error(e)
+
+
+@admin_bp.route('/api/tournament/round-archive', methods=['POST'])
+@require_admin
+async def api_tournament_round_archive():
+    if not _check_bot_ready() or not _get_tournament_cog():
+        return jsonify({'error': 'Bot not ready'}), 503
+    data = await request.get_json()
+    league_id = data.get('league_id')
+    round_number = data.get('round_number')
+    if not league_id or round_number is None:
+        return jsonify({'error': 'league_id and round_number required'}), 400
+    try:
+        league = _cit.getLeague(league_id)
+        if not league:
+            return jsonify({'error': 'League not found'}), 404
+        cit_matches = getattr(league, 'matches', []) or []
+        round_ids = set()
+        for m in cit_matches:
+            rn = m['round_number'] if isinstance(m, dict) else m.round_number
+            if rn == round_number:
+                round_ids.add(m['id'] if isinstance(m, dict) else m.id)
+
+        guild = _get_guild()
+        archived = 0
+        for mid in round_ids:
+            match = _db.matches.get_by_id(mid)
+            if not match or match.get('archived'):
+                continue
+            channel = guild.get_channel(match['channel_id']) if match.get('channel_id') else None
+            if channel:
+                try:
+                    await channel.send('Match has ended. This channel will now be archived.')
+                    overwrites = channel.overwrites
+                    for role, perm in overwrites.items():
+                        if role.id != guild.default_role.id:
+                            overwrites[role] = discord.PermissionOverwrite(read_messages=True, send_messages=False)
+                    await channel.edit(overwrites=overwrites)
+                except Exception:
+                    pass
+            _db.matches.archive(mid)
+            try:
+                if match.get('channel_id'):
+                    _db.tracked_channels.deactivate(match['channel_id'])
+            except Exception:
+                pass
+            archived += 1
+        await _get_tournament_cog().update_launchpad()
+        return jsonify({'success': True, 'message': f'Archived {archived} match(es) in round {round_number}.'})
+    except Exception as e:
+        logger.error(f'Round archive error: {e}')
+        return _db_error(e)
+
+
+@admin_bp.route('/api/tournament/round-delete', methods=['POST'])
+@require_admin
+async def api_tournament_round_delete():
+    if not _check_bot_ready() or not _get_tournament_cog():
+        return jsonify({'error': 'Bot not ready'}), 503
+    data = await request.get_json()
+    league_id = data.get('league_id')
+    round_number = data.get('round_number')
+    if not league_id or round_number is None:
+        return jsonify({'error': 'league_id and round_number required'}), 400
+    try:
+        league = _cit.getLeague(league_id)
+        if not league:
+            return jsonify({'error': 'League not found'}), 404
+        cit_matches = getattr(league, 'matches', []) or []
+        round_ids = set()
+        for m in cit_matches:
+            rn = m['round_number'] if isinstance(m, dict) else m.round_number
+            if rn == round_number:
+                round_ids.add(m['id'] if isinstance(m, dict) else m.id)
+
+        guild = _get_guild()
+        deleted = 0
+        for mid in round_ids:
+            match = _db.matches.get_by_id(mid)
+            if not match:
+                continue
+            channel = guild.get_channel(match['channel_id']) if match.get('channel_id') else None
+            if channel:
+                try:
+                    await channel.delete(reason=f'Bulk round {round_number} delete')
+                except Exception:
+                    pass
+            try:
+                if match.get('channel_id'):
+                    _db.tracked_channels.deactivate(match['channel_id'])
+            except Exception:
+                pass
+            try:
+                _db.match_schedules.delete_by_match(mid)
+            except Exception:
+                pass
+            _db.matches.update(mid, {'channel_id': None, 'archived': 1})
+            deleted += 1
+        await _get_tournament_cog().update_launchpad()
+        return jsonify({'success': True, 'message': f'Cleaned {deleted} match(es) in round {round_number}.'})
+    except Exception as e:
+        logger.error(f'Round delete error: {e}')
+        return _db_error(e)
+
+
+@admin_bp.route('/match/<int:match_id>')
+@require_admin
+async def match_detail_page(match_id: int):
+    return await render_template('admin/match_detail.html', user=get_session_user(), match_id=match_id)
+
+
+@admin_bp.route('/api/match/<int:match_id>')
+@require_admin
+async def api_match_detail(match_id: int):
+    try:
+        m = _db.matches.get_by_id(match_id)
+        if not m:
+            return jsonify({'error': 'Match not found'}), 404
+        home_team = _db.teams.get_by_team_id(m['team_home']) if m.get('team_home') else None
+        away_team = _db.teams.get_by_team_id(m['team_away']) if m.get('team_away') else None
+        try:
+            div = _db.divisions.get_by_id(m['division']) if m.get('division') else None
+        except Exception:
+            div = None
+        log_count = len(_db.logs.get_by_match_id(match_id))
+        return jsonify({'match': {
+            'match_id': m['match_id'],
+            'league_id': m['league_id'],
+            'division': m.get('division'),
+            'division_name': div.get('division_name') if div else None,
+            'team_home': m.get('team_home'),
+            'team_home_name': home_team.get('team_name') if home_team else None,
+            'team_away': m.get('team_away'),
+            'team_away_name': away_team.get('team_name') if away_team else None,
+            'channel_id': m.get('channel_id'),
+            'archived': m.get('archived', False),
+        }, 'log_count': log_count})
+    except Exception as e:
+        return _db_error(e)
+
+
+@admin_bp.route('/api/match/<int:match_id>/logs')
+@require_admin
+async def api_match_logs(match_id: int):
+    try:
+        role_type_filter = request.args.get('role_type', 'all')
+        logs = _db.logs.get_by_match_id(match_id)
+        if role_type_filter != 'all':
+            logs = [l for l in logs if l.get('role_type', 'unknown') == role_type_filter]
+
+        # Resolve team info for role labeling
+        match = _db.matches.get_by_id(match_id)
+        home_role_id = away_role_id = None
+        home_name = away_name = ''
+        if match:
+            th = _db.teams.get_by_team_id(match.get('team_home'))
+            ta = _db.teams.get_by_team_id(match.get('team_away'))
+            if th:
+                home_role_id = th.get('role_id')
+                home_name = th.get('team_name', '')
+            if ta:
+                away_role_id = ta.get('role_id')
+                away_name = ta.get('team_name', '')
+
+        # Resolve role for each unique user using the same logic as channel_monitor
+        from modules.Drawbridge.channel_monitor import _resolve_member_role as _resolve_role
+        guild = _bot.get_guild(int(os.getenv('DISCORD_GUILD_ID'))) if _bot else None
+        _role_cache = {}
+
+        def _resolve_web_role(uid):
+            if uid in _role_cache:
+                return _role_cache[uid]
+            member = guild.get_member(int(uid)) if guild and uid else None
+            role_key, role_label = _resolve_role(member, home_role_id, away_role_id)
+            if role_key == 'player_home':
+                role_label = f'Home team: {home_name}'
+            elif role_key == 'player_away':
+                role_label = f'Away team: {away_name}'
+            _role_cache[uid] = (role_key, role_label)
+            return _role_cache[uid]
+
+        result = []
+        for l in logs:
+            uid = l.get('user_id')
+            if uid is not None:
+                role_key, role_label = _resolve_web_role(uid)
+            else:
+                role_key = l.get('role_type', 'unknown')
+                role_label = role_key.capitalize()
+
+            result.append({
+                'log_id': l['id'],
+                'log_type': l.get('log_type'),
+                'message_content': l.get('message_content'),
+                'message_additionals': l.get('message_additionals'),
+                'user_name': l.get('user_name'),
+                'user_nick': l.get('user_nick'),
+                'user_avatar': l.get('user_avatar'),
+                'role_type': role_key,
+                'role_label': role_label,
+                'log_timestamp': l.get('log_timestamp').isoformat() if hasattr(l.get('log_timestamp'), 'isoformat') else str(l.get('log_timestamp', '')),
+            })
+        return jsonify({'logs': result})
+    except Exception as e:
+        return _db_error(e)
+
+
+@admin_bp.route('/api/match/<int:match_id>/delete-channel', methods=['POST'])
+@require_admin
+async def api_match_delete_channel(match_id: int):
+    if not _check_bot_ready():
+        return jsonify({'error': 'Bot not ready', 'success': False}), 503
+    try:
+        m = _db.matches.get_by_id(match_id)
+        if not m:
+            return jsonify({'error': 'Match not found', 'success': False}), 404
+        ch_id = m.get('channel_id')
+        if not ch_id:
+            return jsonify({'message': 'No channel to delete', 'success': True})
+        guild = _bot.get_guild(int(os.getenv('DISCORD_GUILD_ID')))
+        if not guild:
+            return jsonify({'error': 'Guild not found', 'success': False}), 500
+        ch = guild.get_channel(int(ch_id))
+        if ch:
+            await ch.delete(reason='Admin requested channel deletion')
+        _db.matches.update(match_id, {'channel_id': None})
+        try:
+            tracked = _db.tracked_channels.get_by_channel_id(int(ch_id))
+            if tracked:
+                _db.tracked_channels.deactivate(int(ch_id))
+        except Exception:
+            pass
+        return jsonify({'message': 'Channel deleted', 'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e), 'success': False}), 500
+
+
+@admin_bp.route('/api/match/<int:match_id>/rebuild-channel', methods=['POST'])
+@require_admin
+async def api_match_rebuild_channel(match_id: int):
+    if not _check_bot_ready():
+        return jsonify({'error': 'Bot not ready', 'success': False}), 503
+    try:
+        from modules.Drawbridge.channel_monitor import rebuild_match_channel
+        m = _db.matches.get_by_id(match_id)
+        if not m:
+            return jsonify({'error': 'Match not found', 'success': False}), 404
+        if m.get('channel_id'):
+            ch = _bot.get_guild(int(os.getenv('DISCORD_GUILD_ID'))).get_channel(int(m['channel_id']))
+            if ch:
+                await ch.delete(reason='Rebuilding channel')
+        tracked_entry = None
+        if m.get('channel_id'):
+            try:
+                tracked_entry = _db.tracked_channels.get_by_channel_id(int(m['channel_id']))
+            except Exception:
+                pass
+        new_ch = await rebuild_match_channel(_bot, _db, m, tracked_entry)
+        if new_ch:
+            return jsonify({'message': f'Channel rebuilt as #{new_ch.name}', 'success': True, 'channel_id': new_ch.id})
+        else:
+            return jsonify({'error': 'Failed to rebuild channel', 'success': False}), 500
+    except Exception as e:
+        return jsonify({'error': str(e), 'success': False}), 500
 
 
 @admin_bp.route('/api/tournament/random-demo-check', methods=['POST'])
@@ -1074,19 +1350,93 @@ async def api_tournament_detail(league_id: int):
     if not _cit or not _db:
         return jsonify({'error': 'Not ready'}), 503
     try:
-        league = _cit.getLeague(league_id)
-        if not league:
-            return jsonify({'error': 'League not found in Citadel'}), 404
+        league = None
+        if _cit and league_id != 99999:
+            league = _cit.getLeague(league_id)
+
         db_league = _db.leagues.get_by_id(league_id)
+
+        is_fake = (league_id == 99999) and (league is None)
+
+        if not league and not is_fake:
+            return jsonify({'error': 'League not found in Citadel'}), 404
+
+        roster_map = {}
+        citadel_matches = []
+
+        if is_fake:
+            from .dev_fake_tournament import generate_fake_citadel_data
+            fake_data = generate_fake_citadel_data(_db)
+            citadel_matches = fake_data['citadel_matches']
+            roster_map = fake_data['roster_map']
+        elif league:
+            if hasattr(league, 'rosters') and league.rosters:
+                for r in league.rosters:
+                    if isinstance(r, dict):
+                        roster_map[r['id']] = {'team_id': r.get('team_id'), 'name': r.get('name', '')}
+                    else:
+                        roster_map[r.id] = {'team_id': r.team_id, 'name': r.name}
+            if hasattr(league, 'matches') and league.matches:
+                for m in league.matches:
+                    if isinstance(m, dict):
+                        citadel_matches.append({
+                            'id': m['id'],
+                            'round_number': m.get('round_number', 0),
+                            'round_name': m.get('round_name', ''),
+                            'status': m.get('status', ''),
+                            'forfeit_by': m.get('forfeit_by', ''),
+                        })
+                    else:
+                        citadel_matches.append({
+                            'id': m.id,
+                            'round_number': m.round_number,
+                            'round_name': m.round_name,
+                            'status': m.status,
+                            'forfeit_by': getattr(m, 'forfeit_by', ''),
+                        })
+
+        cm_by_round = {}
+        for cm in citadel_matches:
+            cm_by_round.setdefault(cm['round_number'], []).append(cm)
+
+        award_events_raw = []
+        try:
+            award_events_raw = _db.award_events.get_by_league(league_id) or []
+        except Exception:
+            pass
+        award_events = []
+        for ae in award_events_raw:
+            award_events.append({
+                'id': ae['id'],
+                'name': ae['name'],
+                'status': ae['status'],
+                'nomination_deadline': ae.get('nomination_deadline'),
+                'voting_deadline': ae.get('voting_deadline'),
+                'created_at': ae.get('created_at'),
+            })
+
         divisions = _db.divisions.get_by_league(league_id)
         div_list = []
+        all_match_ids = []
         for d in divisions:
-            teams = _db.teams.get_by_division(d['id'])
             matches = _db.matches.get_by_division(d['id'])
-            matches_rich = []
             for m in matches:
+                all_match_ids.append(m['match_id'])
+            teams = _db.teams.get_by_division(d['id'])
+            matches_rich = []
+            cit_match_lookup = {cm['id']: cm for cm in citadel_matches}
+            for m in matches:
+                cit_info = cit_match_lookup.get(m['match_id'], {})
                 home_team = _db.teams.get_by_team_id(m['team_home']) if m['team_home'] else None
                 away_team = _db.teams.get_by_team_id(m['team_away']) if m.get('team_away') else None
+                home_roster_id = home_team['roster_id'] if home_team else None
+                away_roster_id = away_team['roster_id'] if away_team else None
+                home_ozf_team_id = None
+                away_ozf_team_id = None
+                if home_roster_id and home_roster_id in roster_map:
+                    home_ozf_team_id = roster_map[home_roster_id]['team_id']
+                if away_roster_id and away_roster_id in roster_map:
+                    away_ozf_team_id = roster_map[away_roster_id]['team_id']
                 matches_rich.append({
                     'match_id': m['match_id'],
                     'home_team': home_team['team_name'] if home_team else f"Team {m['team_home']}",
@@ -1095,8 +1445,23 @@ async def api_tournament_detail(league_id: int):
                     'away_team_id': m.get('team_away'),
                     'channel_id': m['channel_id'],
                     'archived': m['archived'],
+                    'round_number': cit_info.get('round_number'),
+                    'round_name': cit_info.get('round_name'),
+                    'status': cit_info.get('status', ''),
+                    'forfeit_by': cit_info.get('forfeit_by', ''),
+                    'home_ozf_team_id': home_ozf_team_id,
+                    'away_ozf_team_id': away_ozf_team_id,
+                    'home_roster_id': home_roster_id,
+                    'away_roster_id': away_roster_id,
                 })
-            team_list = [{'roster_id': t['roster_id'], 'team_id': t['team_id'], 'name': t['team_name'], 'channel_id': t['team_channel'], 'role_id': t['role_id']} for t in teams]
+            team_list = [{
+                'roster_id': t['roster_id'],
+                'team_id': t['team_id'],
+                'name': t['team_name'],
+                'channel_id': t['team_channel'],
+                'role_id': t['role_id'],
+                'ozf_team_id': roster_map.get(t['roster_id'], {}).get('team_id'),
+            } for t in teams]
             div_list.append({
                 'id': d['id'],
                 'name': d['division_name'],
@@ -1105,15 +1470,53 @@ async def api_tournament_detail(league_id: int):
                 'teams': team_list,
                 'matches': matches_rich,
             })
+
+        log_counts = {}
+        for mid in all_match_ids:
+            try:
+                log_counts[str(mid)] = _db.match_logs.count_by_match(mid)
+            except Exception:
+                log_counts[str(mid)] = 0
+
+        league_id_display = league.id if league else league_id
+        league_name = league.name if league else (db_league.get('league_name') if db_league else f'League {league_id}')
+        league_shortcode = (league.shortcode if hasattr(league, 'shortcode') else '') if league else (db_league.get('league_shortcode', '') if db_league else '')
+
         return jsonify({
-            'id': league.id,
-            'name': league.name,
-            'shortcode': league.shortcode if hasattr(league, 'shortcode') else '',
+            'id': league_id_display,
+            'name': league_name,
+            'shortcode': league_shortcode,
             'status': db_league.get('status', 'active') if db_league else 'unknown',
             'divisions': div_list,
+            'citadel_matches': citadel_matches,
+            'citadel_rounds': [{'round_number': rn, 'matches': msgs} for rn, msgs in sorted(cm_by_round.items())],
+            'award_events': award_events,
+            'discord_guild_id': os.getenv('DISCORD_GUILD_ID', ''),
+            'log_counts': log_counts,
+            'roster_map': roster_map,
         })
     except Exception as e:
         logger.error(f'Tournament detail error: {e}', exc_info=True)
+        return _db_error(e)
+
+
+# ── Dev-only: fake tournament generator ────────────────────────
+
+@admin_bp.route('/api/dev/generate-fake-tournament', methods=['POST'])
+@require_admin
+async def api_dev_generate_fake():
+    if not _IS_DEV:
+        return jsonify({'error': 'Only available in dev environment'}), 403
+    if not _db:
+        return jsonify({'error': 'Not ready'}), 503
+    try:
+        data = await request.get_json() or {}
+        force = data.get('force', False)
+        from .dev_fake_tournament import generate_fake_tournament
+        league_id, message = generate_fake_tournament(_db, force=force)
+        return jsonify({'success': True, 'league_id': league_id, 'message': message})
+    except Exception as e:
+        logger.error(f'Fake tournament error: {e}', exc_info=True)
         return _db_error(e)
 
 
@@ -1397,7 +1800,8 @@ async def api_award_events_list():
     if not _db:
         return jsonify({'error': 'Database not ready'}), 503
     try:
-        events = _db.award_events.get_all()
+        league_filter = request.args.get('league_id', type=int)
+        events = _db.award_events.get_by_league(league_filter) if league_filter else _db.award_events.get_all()
         enriched = []
         for ev in events:
             league = _db.leagues.get_by_id(ev['league_id']) if _db.leagues else None

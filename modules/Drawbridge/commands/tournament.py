@@ -299,7 +299,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
         for div in self.db.divisions.get_by_league(league_id):
             div_role_id = div['role_id']
             div_role = self.guild.get_role(div_role_id)
-            for team in self.db.teams.get_by_league(league_id):
+            for team in self.db.teams.get_by_division(div['id']):
                 team_id = team['team_id']
                 team_role_id = team['role_id']
                 team_role = self.guild.get_role(team_role_id)
@@ -336,7 +336,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
                         #         not_in_server.append(user['name'])
                         # elif not user['name'] in not_linked:
                         #     not_linked.append(user['name'])
-            not_linked_str = f"## Account Not Linked\n{', '.join(not_linked)}\n" if len(not_linked) > 0 else ""
+        not_linked_str = f"## Account Not Linked\n{', '.join(not_linked)}\n" if len(not_linked) > 0 else ""
         not_in_server_str = f"## Not In Server\n{', '.join(not_in_server)}\n" if len(not_in_server) > 0 else ""
         return f"# Role Assignment Errors\n{not_linked_str}\n{not_in_server_str}"
 
@@ -424,7 +424,6 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
                     r+=1
                     if (len(roster['name']) > 50):
                         roster_name = f'{roster['name'][:47]}...'
-                        role = await interaction.guild.create_role(name=f'{roster_name} ({league_shortcode})', mentionable=True)
                     else:
                         roster_name = roster['name']
 
@@ -444,6 +443,16 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
                         channel_name = f'🛡️{roster_name[:20]} ({league_shortcode})'
                         self.logger.warning(f'Channel name for {roster_name} is too long, trimming to {channel_name}')
                     teamchannel = await interaction.guild.create_text_channel(channel_name, category=channelcategory, overwrites=overwrites)
+                    try:
+                        self.db.tracked_channels.upsert_by_channel({
+                            'channel_id': teamchannel.id,
+                            'channel_type': 'team',
+                            'team_id': roster['team_id'],
+                            'league_id': league_id,
+                            'active': 1,
+                        })
+                    except Exception:
+                        pass
                     team_id = roster['team_id']
                     subsitutions = {
                         '{TEAM_MENTION}': f'<@&{role.id}>',
@@ -472,10 +481,10 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
                     }
                     self.db.teams.insert(dbteam)
         finished_response = '\n'.join([
-            'Generated.'
+            'Generated.',
             f'League: {league.name}',
             f'Divisions: {d}/{len(divs)}',
-            f'{r}/{len(rosters)}',
+            f'Teams: {r}/{len(rosters)}',
             await self._assign_roles(league_id),
             'All done :3'
         ])
@@ -555,8 +564,9 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
                         not_in_server.append(user['name'])
                     continue
                 if team_role is None:
-                    if user['name'] not in missing_role:
-                        missing_role.append(f"{user['name']} (team {team_id})")
+                    entry = f"{user['name']} (team {team_id})"
+                    if entry not in missing_role:
+                        missing_role.append(entry)
                     continue
                 if team_role not in member.roles:
                     await member.add_roles(team_role, reason="Drawbridge: assign_captain_roles")
@@ -599,6 +609,12 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
 
         await interaction.response.send_message('Ending tournament...', ephemeral=not share)
 
+        # Stop the channel monitor from recreating channels as we delete them.
+        try:
+            self.db.tracked_channels.delete_by_league(league_id)
+        except Exception as e:
+            self.logger.error(f'Failed to clear tracked channels for league {league_id}: {e}')
+
         divs = self.db.divisions.get_by_league(league_id)
         guild = interaction.guild
         teams = self.db.teams.get_by_league(league_id)
@@ -625,7 +641,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
                     await channel.delete(
                         reason='Tournament ended'
                     )
-                    await interaction.edit_original_response(content=f'{status}\n```\n{format(last_five)}\n```')
+                    await interaction.edit_original_response(content=f'{status}\n```\n{"\n".join(last_five)}\n```')
                     break
             for match_channel in match_channels:
                 if channel.id == match_channel['channel_id']:
@@ -633,7 +649,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
                     await channel.delete(
                         reason='Tournament ended'
                     )
-                    await interaction.edit_original_response(content=f'{status}\n```\n{format(last_five)}\n```')
+                    await interaction.edit_original_response(content=f'{status}\n```\n{"\n".join(last_five)}\n```')
 
         last_five = []
         status = f'All Channels Deleted!\nDeleting categories... (2/3)'
@@ -644,25 +660,25 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
                 if category.id == div['category_id']:
                     insert_to_lastfive(category.name)
                     await category.delete()
-                    await interaction.edit_original_response(content=f'{status}\n```\n{format(last_five)}\n```')
+                    await interaction.edit_original_response(content=f'{status}\n```\n{"\n".join(last_five)}\n```')
                     break
         last_five = []
         status = f'All Channels Deleted!\nAll Categories Deleted!\nDeleting roles... (3/3)'
-        await interaction.edit_original_response(content=f'{status}\n```')
+        await interaction.edit_original_response(content=f'{status}')
 
         for role in guild.roles:
             for team in teams:
                 if role.id == team['role_id']:
                     insert_to_lastfive(role.name)
                     await role.delete()
-                    await interaction.edit_original_response(content=f'{status}\n```\n{format(last_five)}\n```')
+                    await interaction.edit_original_response(content=f'{status}\n```\n{"\n".join(last_five)}\n```')
                     break
         for div in divs:
             for role in guild.roles:
                 if role.id == div['role_id']:
                     insert_to_lastfive(role.name)
                     await role.delete()
-                    await interaction.edit_original_response(content=f'{status}\n```\n{format(last_five)}\n```')
+                    await interaction.edit_original_response(content=f'{status}\n```\n{"\n".join(last_five)}\n```')
                     break
 
         self.db.match_schedules.delete_by_league(league_id)
@@ -779,6 +795,16 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
                 'channel_id': match_channel.id,
                 'league_id': match.league_id
             })
+            try:
+                self.db.tracked_channels.upsert_by_channel({
+                    'channel_id': match_channel.id,
+                    'channel_type': 'match',
+                    'match_id': match.id,
+                    'league_id': match.league_id,
+                    'active': 1,
+                })
+            except Exception:
+                pass
             settings = self.db.tournament_schedule_settings.get_by_league(match.league_id)
             scheduling_enabled = bool(settings and settings.get('scheduling_enabled'))
             deadline = compute_deadline_utc(settings) if scheduling_enabled else None
@@ -802,11 +828,17 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
             }))
             matchmessage['embed'] = discord.Embed(**matchmessage['embeds'][0])
             del matchmessage['embeds']
+            from web.match_log_discord import MatchLogSubmitView
             notice_msg = await match_channel.send(**matchmessage)
             try:
                 await notice_msg.pin()
             except Exception:
                 pass
+            try:
+                log_view = MatchLogSubmitView(match.id)
+                log_msg = await match_channel.send('Submit your match logs below once the match is complete.', view=log_view)
+            except Exception as e:
+                self.logger.error(f'Failed to send log submission view: {e}')
 
             # Scheduling prompt (propose button + deadline) — only when enabled for this
             # league. The same helper is used when the admin flips the toggle later, so the
@@ -840,6 +872,10 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
             match_channel = self.bot.get_channel(match['channel_id'])
             if match_channel is not None:
                 await match_channel.delete()
+            try:
+                self.db.tracked_channels.deactivate(match['channel_id'])
+            except Exception:
+                pass
             self.db.match_schedules.delete_by_match(match_id)
             self.db.matches.delete(match_id)
 
@@ -1402,6 +1438,50 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
         
         await self.logging.archive_match(match_id=match_id,ctx=interaction)
 
+    async def _remove_wrong_division_roles(self, guild: discord.Guild) -> int:
+        """Remove division roles that don't match the member's team roles.
+
+        A division role is only removed if the member holds a team role in the
+        same league and none of those teams are in that division. Members with
+        no team role in a league are left alone, so manually granted division
+        roles survive. Returns the number of members changed.
+        """
+        divisions = {div['id']: div for div in self.db.divisions.get_all()}
+        div_by_role = {div['role_id']: div for div in divisions.values()}
+        team_by_role = {team['role_id']: team for team in self.db.teams.get_all()}
+
+        changed = 0
+        for member in guild.members:
+            held_divs = [div_by_role[r.id] for r in member.roles if r.id in div_by_role]
+            if not held_divs:
+                continue
+            leagues: set[int] = set()
+            unsure_leagues: set[int] = set()
+            correct_divs: set[int] = set()
+            for r in member.roles:
+                team = team_by_role.get(r.id)
+                if team is None:
+                    continue
+                div = divisions.get(team['division'])
+                if div is None or div['league_id'] != team['league_id']:
+                    # Can't tell which division this team is in, so don't touch this league
+                    unsure_leagues.add(team['league_id'])
+                    continue
+                leagues.add(team['league_id'])
+                correct_divs.add(div['id'])
+            leagues -= unsure_leagues
+
+            wrong_roles = [
+                role for div in held_divs
+                if div['league_id'] in leagues and div['id'] not in correct_divs
+                and (role := guild.get_role(div['role_id'])) is not None
+            ]
+            if wrong_roles:
+                await member.remove_roles(*wrong_roles, reason='Drawbridge fixperms: removing wrong division roles')
+                self.logger.info(f'fixperms: removed {", ".join(r.name for r in wrong_roles)} from {member}')
+                changed += 1
+        return changed
+
     @app_commands.command(
         name='fixperms'
     )
@@ -1413,76 +1493,98 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
         warned_for='fixperms',
         warning_message='This is a very expensive command to run. Only use this if you have 15-30 minutes to spare!'
     )
-    async def fixperms(self, interaction : discord.Interaction):
-        """Fix permissions for all channels and roles for a league"""
-        # get all channels
+    async def fixperms(self, interaction : discord.Interaction, role_overrides: Optional[str] = None):
+        """Fix permissions for all team/match channels and remove wrong division roles
+
+        Parameters
+        -----------
+        role_overrides: Optional[str]
+            Extra roles to give access to all division categories, team and match channels. These are comma-separated.
+        """
         if (datetime.datetime.now().timestamp() - self.perms_last_fixed) < 900.0:
             await interaction.response.send_message('Permissions were fixed less than 15 minutes ago. Please wait before running this command again.', ephemeral=True)
             return
+        extra_roles = self.get_role_ids_from_overrides(role_overrides)
+        if role_overrides is not None:
+            found = {role.name for role in extra_roles}
+            missing = [name.strip() for name in role_overrides.split(',') if name.strip() and name.strip() not in found]
+            if missing:
+                await interaction.response.send_message(f'Could not find these roles, check the names and try again: {", ".join(missing)}', ephemeral=True)
+                return
         self.perms_last_fixed = datetime.datetime.now().timestamp()
         guild = interaction.guild
         teams = self.db.get_all_teams()
-        matches = self.db.get_all_matches()
-        message_has_timed_out = False
+        teams_by_channel = {team['team_channel']: team for team in teams}
+        teams_by_id = {(team['team_id'], team['league_id']): team for team in teams}
+        matches_by_channel = {match['channel_id']: match for match in self.db.get_all_matches() if match.get('channel_id')}
         await interaction.response.send_message('Fixing permissions...', ephemeral=True)
-        for channel in guild.channels:
-            if isinstance(channel, discord.TextChannel):
-                # check if its a team channel
-                try:
-                    if message_has_timed_out == False:
-                        await interaction.edit_original_response(content=f'Fixing permissions for {channel.name}...')
-                    else:
-                        break
-                except discord.errors.HTTPException as e:
-                    # if 401 Unauthorized
-                    if e.code == 401:
-                        message_has_timed_out = True
-                        await interaction.channel.send(content=f'Hey <@{interaction.user.id}>, Discord is giving us errors for editing the earlier interaction. We\'ll continue quietly in the background.')
-                        break
 
-                if channel.id in [team[5] for team in teams]:
-                    team = [team for team in teams if team[5] == channel.id][0]
-                    role = guild.get_role(team[3])
-                    all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', '!AC', 'DEVELOPER', 'BOT')
-                    no_access = checks._get_role_ids('CASTER')
-                    await channel.set_permissions(role, read_messages=True, send_messages=True)
-                    # wait one second
-                    await asyncio.sleep(1)
-                    # add admins
-                    await channel.set_permissions(guild.default_role, read_messages=False)
-                    await asyncio.sleep(1)
-                    for role in all_access:
-                        await channel.set_permissions(guild.get_role(role), read_messages=True, send_messages=True)
-                        await asyncio.sleep(1)
-                    for role in no_access:
-                        await channel.set_permissions(guild.get_role(role), read_messages=False)
-                        await asyncio.sleep(1)
-                # check if its a match channel
-                if channel.id in [match['channel_id'] for match in matches if match['channel_id']]:
-                    match = [match for match in matches if match.get('channel_id') == channel.id][0]
-                    all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'APPROVED', 'BOT')
-                    no_access = checks._get_role_ids('UNAPPROVED')
-                    await channel.set_permissions(guild.default_role, read_messages=False)
-                    await asyncio.sleep(1)
-                    team_home = self.db.teams.get_by_team_id(match['team_home'])
-                    team_away = self.db.teams.get_by_team_id(match['team_away'])
-                    if team_home:
-                        await channel.set_permissions(guild.get_role(team_home['role_id']), read_messages=True, send_messages=True)
-                        await asyncio.sleep(1)
-                    if team_away:
-                        await channel.set_permissions(guild.get_role(team_away['role_id']), read_messages=True, send_messages=True)
-                        await asyncio.sleep(1)
-                    for role in all_access:
-                        await channel.set_permissions(guild.get_role(role), read_messages=True, send_messages=True)
-                        await asyncio.sleep(1)
-                    for role in no_access:
-                        await channel.set_permissions(guild.get_role(role), read_messages=False)
-                        await asyncio.sleep(1)
-        try:
-            await interaction.edit_original_response(content='Permissions fixed.')
-        except discord.errors.HTTPException as e:
-            if e.code == 401:
-                await interaction.channel.send(content='Permissions fixed.')
+        can_edit = True
+        async def update_status(content: str):
+            # Interaction tokens expire after 15 minutes, after which edits fail
+            nonlocal can_edit
+            if not can_edit:
+                return
+            try:
+                await interaction.edit_original_response(content=content)
+            except discord.HTTPException:
+                can_edit = False
+                await interaction.channel.send(content=f'Hey <@{interaction.user.id}>, Discord is giving us errors for editing the earlier interaction. We\'ll continue quietly in the background.')
+
+        async def set_perms(channel: discord.abc.GuildChannel, target: Optional[discord.abc.Snowflake], **perms):
+            if target is None:
+                return
+            await channel.set_permissions(target, **perms)
+            await asyncio.sleep(1)
+
+        await update_status('Removing wrong division roles...')
+        div_fixes = await self._remove_wrong_division_roles(guild)
+        div_summary = f'Removed wrong division roles from {div_fixes} member(s).'
+        if extra_roles:
+            div_summary += f'\nAdding access for: {", ".join(role.name for role in extra_roles)}'
+            for div in self.db.divisions.get_all():
+                category = guild.get_channel(div['category_id'])
+                if isinstance(category, discord.CategoryChannel):
+                    await update_status(f'{div_summary}\nFixing permissions for {category.name}...')
+                    for role in extra_roles:
+                        await set_perms(category, role, read_messages=True, send_messages=True)
+
+        for channel in guild.text_channels:
+            team = teams_by_channel.get(channel.id)
+            match = matches_by_channel.get(channel.id)
+            if team is None and match is None:
+                continue
+            await update_status(f'{div_summary}\nFixing permissions for {channel.name}...')
+
+            if team is not None:
+                all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', '!AC', 'DEVELOPER', 'BOT')
+                no_access = checks._get_role_ids('CASTER')
+                await set_perms(channel, guild.get_role(team['role_id']), read_messages=True, send_messages=True)
+                await set_perms(channel, guild.default_role, read_messages=False)
+                for role_id in all_access:
+                    await set_perms(channel, guild.get_role(role_id), read_messages=True, send_messages=True)
+                for role_id in no_access:
+                    await set_perms(channel, guild.get_role(role_id), read_messages=False)
+
+            if match is not None:
+                all_access = checks._get_role_ids('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'APPROVED', 'BOT')
+                no_access = checks._get_role_ids('UNAPPROVED')
+                await set_perms(channel, guild.default_role, read_messages=False)
+                for team_id in (match['team_home'], match['team_away']):
+                    match_team = teams_by_id.get((team_id, match['league_id']))
+                    if match_team:
+                        await set_perms(channel, guild.get_role(match_team['role_id']), read_messages=True, send_messages=True)
+                for role_id in all_access:
+                    await set_perms(channel, guild.get_role(role_id), read_messages=True, send_messages=True)
+                for role_id in no_access:
+                    await set_perms(channel, guild.get_role(role_id), read_messages=False)
+
+            for role in extra_roles:
+                await set_perms(channel, role, read_messages=True, send_messages=True)
+
+        await update_status(f'{div_summary}\nPermissions fixed.')
+        if not can_edit:
+            await interaction.channel.send(content=f'<@{interaction.user.id}> {div_summary}\nPermissions fixed.')
 
 
 

@@ -1,7 +1,7 @@
 -- Awards Nomination & Voting System
 -- Template categories hold the category definitions per template
 
-CREATE TABLE `award_templates` (
+CREATE TABLE IF NOT EXISTS `award_templates` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `name` varchar(100) NOT NULL,
   `description` text DEFAULT NULL,
@@ -11,7 +11,7 @@ CREATE TABLE `award_templates` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-CREATE TABLE `award_template_categories` (
+CREATE TABLE IF NOT EXISTS `award_template_categories` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `template_id` int(11) NOT NULL,
   `name` varchar(100) NOT NULL,
@@ -22,7 +22,7 @@ CREATE TABLE `award_template_categories` (
   KEY `idx_aw_tmpl_cat_tmpl` (`template_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-CREATE TABLE `award_events` (
+CREATE TABLE IF NOT EXISTS `award_events` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `league_id` int(11) NOT NULL,
   `template_id` int(11) DEFAULT NULL,
@@ -37,7 +37,7 @@ CREATE TABLE `award_events` (
   KEY `idx_award_events_tmpl` (`template_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-CREATE TABLE `award_event_categories` (
+CREATE TABLE IF NOT EXISTS `award_event_categories` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `event_id` int(11) NOT NULL,
   `template_category_id` int(11) DEFAULT NULL,
@@ -50,7 +50,7 @@ CREATE TABLE `award_event_categories` (
   KEY `idx_award_cat_tmpl_cat` (`template_category_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-CREATE TABLE `award_admin_fill_options` (
+CREATE TABLE IF NOT EXISTS `award_admin_fill_options` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `event_id` int(11) NOT NULL,
   `category_id` int(11) NOT NULL,
@@ -61,7 +61,7 @@ CREATE TABLE `award_admin_fill_options` (
   KEY `idx_aw_fill_event` (`event_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-CREATE TABLE `award_nominations` (
+CREATE TABLE IF NOT EXISTS `award_nominations` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `event_id` int(11) NOT NULL,
   `category_id` int(11) NOT NULL,
@@ -82,7 +82,7 @@ CREATE TABLE `award_nominations` (
   KEY `idx_award_nom_div` (`division_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-CREATE TABLE `award_nomination_audit_log` (
+CREATE TABLE IF NOT EXISTS `award_nomination_audit_log` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `nomination_id` int(11) NOT NULL,
   `action` varchar(50) NOT NULL,
@@ -96,7 +96,7 @@ CREATE TABLE `award_nomination_audit_log` (
   KEY `idx_award_nom_audit` (`nomination_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-CREATE TABLE `award_votes` (
+CREATE TABLE IF NOT EXISTS `award_votes` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `event_id` int(11) NOT NULL,
   `category_id` int(11) NOT NULL,
@@ -119,7 +119,7 @@ CREATE TABLE `award_votes` (
   KEY `idx_award_vote_div` (`division_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-CREATE TABLE `award_vote_audit_log` (
+CREATE TABLE IF NOT EXISTS `award_vote_audit_log` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `vote_id` int(11) NOT NULL,
   `action` varchar(50) NOT NULL,
@@ -133,7 +133,7 @@ CREATE TABLE `award_vote_audit_log` (
   KEY `idx_award_vote_audit` (`vote_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-CREATE TABLE `award_results` (
+CREATE TABLE IF NOT EXISTS `award_results` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `event_id` int(11) NOT NULL,
   `category_id` int(11) NOT NULL,

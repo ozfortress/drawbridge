@@ -82,8 +82,10 @@ async function loadLeagues() {
 
 async function loadEvents() {
     const tbody = document.getElementById('events-tbody');
+    const leagueFilter = getUrlParam('league');
+    const url = leagueFilter ? `${API_BASE}/events?league_id=${leagueFilter}` : `${API_BASE}/events`;
     try {
-        const r = await API.get(`${API_BASE}/events`);
+        const r = await API.get(url);
         tbody.innerHTML = (r.events || []).map(ev => `
             <tr>
                 <td>${ev.id}</td>
@@ -128,11 +130,18 @@ async function loadTemplates() {
     }
 }
 
+function getUrlParam(name) {
+    const p = new URLSearchParams(window.location.search);
+    return p.get(name);
+}
+
 document.getElementById('btn-create-event').addEventListener('click', async () => {
     const modal = document.getElementById('create-event-modal');
     const leagues = await loadLeagues();
     const sel = document.getElementById('new-event-league');
     sel.innerHTML = leagues.map(l => `<option value="${l.id}">${l.name} (${l.shortcode || '—'})</option>`).join('');
+    const preSel = getUrlParam('league');
+    if (preSel) { sel.value = preSel; }
     const tmplSel = document.getElementById('new-event-template');
     try {
         const r = await API.get(`${API_BASE}/templates`);

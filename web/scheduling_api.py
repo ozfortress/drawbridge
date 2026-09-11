@@ -198,10 +198,11 @@ async def set_match_time(match_id: int):
     if not db:
         return jsonify({'error': 'Database not ready'}), 503
     data = await request.get_json() or {}
+    from web.match_schedule_discord import parse_time
     try:
         day = int(data['day'])
-        time_str = str(data['time'])
-        if not (0 <= day <= 6) or ':' not in time_str:
+        time_str = parse_time(str(data['time']))
+        if not (0 <= day <= 6) or time_str is None:
             raise ValueError
     except (KeyError, ValueError, TypeError):
         return jsonify({'error': 'Body must include day (0=Mon..6=Sun) and time (HH:MM)'}), 400

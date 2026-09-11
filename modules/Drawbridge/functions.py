@@ -14,6 +14,8 @@ class Functions:
         self.db = db
         self.cit = cit
         self.logger = logging.getLogger(__name__)
+        from modules.Drawbridge.checks import Checks
+        self.checks = Checks()
         pass
 
     def substitute_strings_in_embed(self, json: str, substitutions: dict) -> str:
@@ -40,6 +42,7 @@ class Functions:
         log['user_avatar'] = message.author.display_avatar.url
         log['message_id'] = message.id
         log['message_content'] = message.content
+        log['channel_id'] = message.channel.id
 
         if message.attachments:
             log['message_additionals'] = ' '.join([attachment.url for attachment in message.attachments])
@@ -52,5 +55,57 @@ class Functions:
             log['log_timestamp'] = after.edited_at
         if log_type == "DELETE":
             log['log_timestamp'] = datetime.datetime.now()
+
+        if isinstance(message.author, discord.Member):
+            author_roles = {r.id for r in message.author.roles}
+            role_sets = {}
+            try:
+                role_sets = {
+                    'DIRECTOR': set(self.checks._get_role_ids('DIRECTOR')),
+                    'HEAD': set(self.checks._get_role_ids('HEAD')),
+                    'ADMIN': set(self.checks._get_role_ids('ADMIN', 'TRIAL', '!HEAD')),
+                    'STAFF': set(self.checks._get_role_ids('DEVELOPER', 'APPROVED', 'STAFF', '!UNAPPROVED')),
+                    'CASTER': set(self.checks._get_role_ids('CASTER')),
+                }
+            except Exception:
+                pass
+
+            # Priority order: team > director > head_admin > admin > staff > caster
+            if not is_team and match:
+                home_team = self.db.teams.get_by_team_id(match['team_home'])
+                away_team = self.db.teams.get_by_team_id(match['team_away'])
+                if home_team and author_roles & {home_team.get('role_id', 0)}:
+                    log['role_type'] = 'player_home'
+                elif away_team and author_roles & {away_team.get('role_id', 0)}:
+                    log['role_type'] = 'player_away'
+                elif role_sets.get('DIRECTOR') and author_roles & role_sets['DIRECTOR']:
+                    log['role_type'] = 'director'
+                elif role_sets.get('HEAD') and author_roles & role_sets['HEAD']:
+                    log['role_type'] = 'head_admin'
+                elif role_sets.get('ADMIN') and author_roles & role_sets['ADMIN']:
+                    log['role_type'] = 'admin'
+                elif role_sets.get('STAFF') and author_roles & role_sets['STAFF']:
+                    log['role_type'] = 'staff'
+                elif role_sets.get('CASTER') and author_roles & role_sets['CASTER']:
+                    log['role_type'] = 'caster'
+                else:
+                    log['role_type'] = 'unknown'
+            else:
+                # Team channel or no match context
+                if role_sets.get('DIRECTOR') and author_roles & role_sets['DIRECTOR']:
+                    log['role_type'] = 'director'
+                elif role_sets.get('HEAD') and author_roles & role_sets['HEAD']:
+                    log['role_type'] = 'head_admin'
+                elif role_sets.get('ADMIN') and author_roles & role_sets['ADMIN']:
+                    log['role_type'] = 'admin'
+                elif role_sets.get('STAFF') and author_roles & role_sets['STAFF']:
+                    log['role_type'] = 'staff'
+                elif role_sets.get('CASTER') and author_roles & role_sets['CASTER']:
+                    log['role_type'] = 'caster'
+                else:
+                    log['role_type'] = 'unknown'
+        else:
+            log['role_type'] = 'unknown'
+
         self.db.logs.insert(log)
         #self.logger.debug(f'new log {message.author.name}#{message.author.discriminator} ({message.author.id}) - {log_type}')
