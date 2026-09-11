@@ -190,6 +190,10 @@ async def on_ready():
     now = int(datetime.datetime.now().timestamp())
 
     def read_commit_hash():
+        # Deploy platforms may inject the commit at runtime instead of build time
+        for var in ('GIT_COMMIT', 'SOURCE_COMMIT'):
+            if os.getenv(var, '').strip():
+                return os.getenv(var).strip()
         for src in ('.git_commit', '/app/.git_commit'):
             try:
                 with open(src) as f:
