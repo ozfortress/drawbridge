@@ -13,7 +13,9 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
-# Extract commit hash from .git files directly (avoids git command issues)
+# Extract commit hash from .git files directly (avoids git command issues), then
+# save its author, date and message for the startup message if git can read it.
+# Without .git_commit_info, app.py looks the commit up on the GitHub API instead.
 RUN set -ex; \
     commit=""; \
     if [ -n "$GIT_COMMIT" ]; then \
@@ -33,7 +35,12 @@ RUN set -ex; \
         esac; \
     fi; \
     echo "$commit" > .git_commit; \
-    echo "commit: ${commit:-unknown}"
+    echo "commit: ${commit:-unknown}"; \
+    if [ -n "$commit" ] && git -c safe.directory='*' log -1 --format='%an <%ae>%n%ad%n%B' "$commit" > .git_commit_info 2>/dev/null; then \
+        cat .git_commit_info; \
+    else \
+        rm -f .git_commit_info; \
+    fi
 EXPOSE 8080
 
 # Health check using the Python script

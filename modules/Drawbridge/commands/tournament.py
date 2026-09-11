@@ -1289,16 +1289,34 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
         return 'fuck'
 
     def get_role_ids_from_overrides(self, role_overrides: Optional[str]) -> list[discord.Role]:
-        if role_overrides is not None:
-            guild = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID')))
-            roles = []
-            for role in role_overrides.split(','):
-                role_obj = discord.utils.get(guild.roles, name=role.strip())
-                if role_obj is not None:
-                    roles.append(role_obj)
-            return roles
-        else:
-            return []
+        return self.parse_role_overrides(role_overrides)[0]
+
+    def parse_role_overrides(self, role_overrides: Optional[str]) -> tuple[list[discord.Role], list[str]]:
+        """Resolve role overrides to roles. Accepts role mentions, role IDs and
+        role names (comma-separated). Returns (roles, entries that didn't match)."""
+        if not role_overrides:
+            return [], []
+        guild = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID')))
+        roles: list[discord.Role] = []
+        missing: list[str] = []
+
+        def add(role: Optional[discord.Role], entry: str):
+            if role is None:
+                missing.append(entry)
+            elif role not in roles:
+                roles.append(role)
+
+        # Picking roles from Discord's mention list sends <@&id>, often space-separated
+        for role_id in re.findall(r'<@&(\d+)>', role_overrides):
+            add(guild.get_role(int(role_id)), f'<@&{role_id}>')
+        for entry in re.sub(r'<@&\d+>', ',', role_overrides).split(','):
+            name = entry.strip()
+            if not name:
+                continue
+            role = guild.get_role(int(name)) if name.isdigit() else None
+            role = role or discord.utils.get(guild.roles, name=name) or discord.utils.get(guild.roles, name=name.lstrip('@').strip())
+            add(role, name)
+        return roles, missing
     # @app_commands.command(
     #         name='randomdemocheck',
     #         description='Announces a truly random demo check, given a League ID. Automatically picks a team in the league, and a match to check'
@@ -1513,13 +1531,10 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
         if (datetime.datetime.now().timestamp() - self.perms_last_fixed) < 900.0:
             await interaction.response.send_message('Permissions were fixed less than 15 minutes ago. Please wait before running this command again.', ephemeral=True)
             return
-        extra_roles = self.get_role_ids_from_overrides(role_overrides)
-        if role_overrides is not None:
-            found = {role.name for role in extra_roles}
-            missing = [name.strip() for name in role_overrides.split(',') if name.strip() and name.strip() not in found]
-            if missing:
-                await interaction.response.send_message(f'Could not find these roles, check the names and try again: {", ".join(missing)}', ephemeral=True)
-                return
+        extra_roles, missing = self.parse_role_overrides(role_overrides)
+        if missing:
+            await interaction.response.send_message(f'Could not find these roles, check the names and try again: {", ".join(f"`{m}`" for m in missing)}', ephemeral=True)
+            return
         if league_id is not None:
             divisions = self.db.divisions.get_by_league(league_id)
             if not divisions:

@@ -19,6 +19,7 @@ import datetime
 import socket
 import asyncio
 import traceback
+import aiohttp
 
 
 load_dotenv()
@@ -189,27 +190,61 @@ async def on_ready():
     public_url = os.getenv('PUBLIC_URL', '')
     now = int(datetime.datetime.now().timestamp())
 
+    def read_build_file(name):
+        for src in (name, f'/app/{name}'):
+            try:
+                with open(src) as f:
+                    return f.read()
+            except Exception:
+                continue
+        return None
+
     def read_commit_hash():
         # Deploy platforms may inject the commit at runtime instead of build time
         for var in ('GIT_COMMIT', 'SOURCE_COMMIT'):
             if os.getenv(var, '').strip():
                 return os.getenv(var).strip()
-        for src in ('.git_commit', '/app/.git_commit'):
-            try:
-                with open(src) as f:
-                    return f.read().strip() or None
-            except Exception:
-                continue
-        return None
+        return (read_build_file('.git_commit') or '').strip() or None
+
+    async def get_commit_info(commit_hash):
+        """Return (author, date, message) for the commit, from the build or the GitHub API."""
+        saved = read_build_file('.git_commit_info')
+        if saved and (read_build_file('.git_commit') or '').strip() == commit_hash:
+            author, date, message = (saved.split('\n', 2) + ['', ''])[:3]
+            return author, date, message.strip()
+        # The build had no .git, so look the commit up instead (public repo, no token needed)
+        repo = os.getenv('GITHUB_REPOSITORY', 'ozfortress/drawbridge')
+        try:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5)) as session:
+                async with session.get(f'https://api.github.com/repos/{repo}/commits/{commit_hash}') as resp:
+                    resp.raise_for_status()
+                    commit = (await resp.json())['commit']
+            date = datetime.datetime.fromisoformat(commit['author']['date'].replace('Z', '+00:00'))
+            return (f"{commit['author']['name']} <{commit['author']['email']}>",
+                    f'{date:%a %b} {date.day} {date:%H:%M:%S %Y %z}',
+                    commit['message'].strip())
+        except Exception as e:
+            logger.warning(f'Could not get commit info for {commit_hash[:6]}: {e}')
+            return None
 
     commit_hash = read_commit_hash()
     commit_display = commit_hash[:6] if commit_hash else 'unknown'
-    logger.info(f'Bot started (commit: {commit_display})')
+    commit_info = await get_commit_info(commit_hash) if commit_hash else None
 
     parts = [f'# Bot has been started', f'- time: <t:{now}>']
     if public_url:
         parts.append(f'- admin panel: {public_url}/admin')
-    parts.append(f'- commit: `{commit_display}`')
+    if commit_info:
+        author, date, message = commit_info
+        logger.info(f'Bot started (commit: {commit_display} by {author})')
+        parts.append(f'- `{commit_display}` - `{date}`')
+        parts.append(f'- author: {author}')
+        # Keep inside Discord's 2000 character limit and don't let the message close the code block
+        message = message[:1500].replace('```', "'''")
+        parts.append(f'```\n{message}```')
+    else:
+        logger.info(f'Bot started (commit: {commit_display})')
+        parts.append(f'- commit: `{commit_display}`')
     await botmisc.send('\n'.join(parts))
     
     healthstatus['status'] = b"OK"
