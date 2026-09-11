@@ -1438,17 +1438,24 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
         
         await self.logging.archive_match(match_id=match_id,ctx=interaction)
 
-    async def _remove_wrong_division_roles(self, guild: discord.Guild) -> int:
+    async def _remove_wrong_division_roles(self, guild: discord.Guild, league_id: Optional[int] = None) -> int:
         """Remove division roles that don't match the member's team roles.
 
         A division role is only removed if the member holds a team role in the
         same league and none of those teams are in that division. Members with
         no team role in a league are left alone, so manually granted division
-        roles survive. Returns the number of members changed.
+        roles survive. If league_id is given, only that league's division roles
+        are checked. Returns the number of members changed.
         """
-        divisions = {div['id']: div for div in self.db.divisions.get_all()}
+        if league_id is not None:
+            div_rows = self.db.divisions.get_by_league(league_id)
+            team_rows = self.db.teams.get_by_league(league_id)
+        else:
+            div_rows = self.db.divisions.get_all()
+            team_rows = self.db.teams.get_all()
+        divisions = {div['id']: div for div in div_rows}
         div_by_role = {div['role_id']: div for div in divisions.values()}
-        team_by_role = {team['role_id']: team for team in self.db.teams.get_all()}
+        team_by_role = {team['role_id']: team for team in team_rows}
 
         changed = 0
         for member in guild.members:
@@ -1493,13 +1500,15 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
         warned_for='fixperms',
         warning_message='This is a very expensive command to run. Only use this if you have 15-30 minutes to spare!'
     )
-    async def fixperms(self, interaction : discord.Interaction, role_overrides: Optional[str] = None):
-        """Fix permissions for all team/match channels and remove wrong division roles
+    async def fixperms(self, interaction : discord.Interaction, league_id: Optional[int] = None, role_overrides: Optional[str] = None):
+        """Fix permissions for team/match channels and remove wrong division roles
 
         Parameters
         -----------
+        league_id: Optional[int]
+            Only fix this league's channels and roles. Leave empty to fix every league.
         role_overrides: Optional[str]
-            Extra roles to give access to all division categories, team and match channels. These are comma-separated.
+            Extra roles to give access to the division categories, team and match channels. These are comma-separated.
         """
         if (datetime.datetime.now().timestamp() - self.perms_last_fixed) < 900.0:
             await interaction.response.send_message('Permissions were fixed less than 15 minutes ago. Please wait before running this command again.', ephemeral=True)
@@ -1511,13 +1520,25 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
             if missing:
                 await interaction.response.send_message(f'Could not find these roles, check the names and try again: {", ".join(missing)}', ephemeral=True)
                 return
+        if league_id is not None:
+            divisions = self.db.divisions.get_by_league(league_id)
+            if not divisions:
+                await interaction.response.send_message(f'No tournament found for league {league_id}. Has it been set up with /tournament start?', ephemeral=True)
+                return
+            teams = self.db.teams.get_by_league(league_id)
+            matches = self.db.matches.get_by_league(league_id)
+            scope = f'league {league_id}'
+        else:
+            divisions = self.db.divisions.get_all()
+            teams = self.db.get_all_teams()
+            matches = self.db.get_all_matches()
+            scope = 'all leagues'
         self.perms_last_fixed = datetime.datetime.now().timestamp()
         guild = interaction.guild
-        teams = self.db.get_all_teams()
         teams_by_channel = {team['team_channel']: team for team in teams}
         teams_by_id = {(team['team_id'], team['league_id']): team for team in teams}
-        matches_by_channel = {match['channel_id']: match for match in self.db.get_all_matches() if match.get('channel_id')}
-        await interaction.response.send_message('Fixing permissions...', ephemeral=True)
+        matches_by_channel = {match['channel_id']: match for match in matches if match.get('channel_id')}
+        await interaction.response.send_message(f'Fixing permissions for {scope}...', ephemeral=True)
 
         can_edit = True
         async def update_status(content: str):
@@ -1538,11 +1559,11 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
             await asyncio.sleep(1)
 
         await update_status('Removing wrong division roles...')
-        div_fixes = await self._remove_wrong_division_roles(guild)
-        div_summary = f'Removed wrong division roles from {div_fixes} member(s).'
+        div_fixes = await self._remove_wrong_division_roles(guild, league_id)
+        div_summary = f'Scope: {scope}\nRemoved wrong division roles from {div_fixes} member(s).'
         if extra_roles:
             div_summary += f'\nAdding access for: {", ".join(role.name for role in extra_roles)}'
-            for div in self.db.divisions.get_all():
+            for div in divisions:
                 category = guild.get_channel(div['category_id'])
                 if isinstance(category, discord.CategoryChannel):
                     await update_status(f'{div_summary}\nFixing permissions for {category.name}...')

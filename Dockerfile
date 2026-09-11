@@ -2,6 +2,8 @@ FROM python:3.12.4-bookworm AS build
 LABEL org.opencontainers.image.source https://github.com/ozfortress/drawbridge
 
 ARG GIT_COMMIT
+# Some deploy platforms (e.g. Coolify) pass the commit under this name instead
+ARG SOURCE_COMMIT
 ENV GIT_COMMIT=${GIT_COMMIT}
 
 RUN apt update && apt install -y socat libmariadb-dev libmariadb-dev-compat gcc
@@ -16,16 +18,22 @@ RUN set -ex; \
     commit=""; \
     if [ -n "$GIT_COMMIT" ]; then \
         commit="$GIT_COMMIT"; \
+    elif [ -n "$SOURCE_COMMIT" ]; then \
+        commit="$SOURCE_COMMIT"; \
     elif [ -f .git/HEAD ]; then \
         head_ref=$(cat .git/HEAD); \
         case "$head_ref" in \
-            ref:*) ref_path=".git/$(echo "$head_ref" | cut -d' ' -f2)"; \
-                   [ -f "$ref_path" ] && commit=$(cat "$ref_path");; \
+            ref:*) ref=$(echo "$head_ref" | cut -d' ' -f2); \
+                   if [ -f ".git/$ref" ]; then \
+                       commit=$(cat ".git/$ref"); \
+                   elif [ -f .git/packed-refs ]; then \
+                       commit=$(awk -v r="$ref" '$2 == r {print $1}' .git/packed-refs); \
+                   fi;; \
             *)     commit="$head_ref";; \
         esac; \
     fi; \
-    echo "${commit:-unknown}" > .git_commit; \
-    echo "commit: $(cat .git_commit)"
+    echo "$commit" > .git_commit; \
+    echo "commit: ${commit:-unknown}"
 EXPOSE 8080
 
 # Health check using the Python script
