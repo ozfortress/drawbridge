@@ -2,9 +2,8 @@ import random
 import datetime
 import math
 
-FAKE_LEAGUE_ID = 99999
-FAKE_LEAGUE_NAME = "ETF2L Season 34"
-FAKE_LEAGUE_SHORTCODE = "ETF2L34"
+from modules.citadel import FAKE_LEAGUE_ID, FAKE_LEAGUE_NAME, FAKE_LEAGUE_SHORTCODE
+
 BASE_MATCH_ID = 500000
 
 DIV_NAMES = ["Premiership", "Division 1", "Division 2"]

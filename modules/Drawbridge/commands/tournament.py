@@ -189,10 +189,15 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
             for team in teams:
                 if team['league_id'] not in leagueids:
                     leagueids.append(team['league_id'])
-                    leagues.append(self.cit.getLeague(team['league_id']))
+                    try:
+                        leagues.append(self.cit.getLeague(team['league_id']))
+                    except Exception as e:
+                        self.logger.error(f'Failed to fetch league {team["league_id"]} from Citadel: {e}')
                 if team['division'] not in divids:
                     divids.append(team['division'])
-                    divs.append(self.db.divisions.get_by_id(team['division']))
+                    division = self.db.divisions.get_by_id(team['division'])
+                    if division is not None:
+                        divs.append(division)
             if len(leagueids) == 0:
                 await channel.send(content='There are no active tournaments running.')
                 return
