@@ -1548,17 +1548,31 @@ async def api_tournament_detail(league_id: int):
 async def api_dev_generate_fake():
     if not _IS_DEV:
         return jsonify({'error': 'Only available in dev environment'}), 403
-    if not _db:
-        return jsonify({'error': 'Not ready'}), 503
-    try:
-        data = await request.get_json() or {}
-        force = data.get('force', False)
+    if not _check_bot_ready() or not _get_tournament_cog():
+        return jsonify({'error': 'Bot or tournament cog not ready'}), 503
+    data = await request.get_json() or {}
+    force = data.get('force', False)
+    guild = _get_guild()
+    if guild is None:
+        return jsonify({'error': 'Guild not found'}), 500
+    session_user = get_session_user()
+    admin_discord_id = None
+    if session_user and session_user.get('sub'):
+        try:
+            admin_discord_id = int(session_user['sub'])
+        except (TypeError, ValueError):
+            admin_discord_id = None
+
+    async def _run(p):
         from .dev_fake_tournament import generate_fake_tournament
-        league_id, message = generate_fake_tournament(_db, force=force)
-        return jsonify({'success': True, 'league_id': league_id, 'message': message})
-    except Exception as e:
-        logger.error(f'Fake tournament error: {e}', exc_info=True)
-        return _db_error(e)
+        p(1, 'Starting fake tournament generation...')
+        league_id, message = await generate_fake_tournament(
+            _bot, _db, _cit, guild, _get_tournament_cog(),
+            admin_discord_id=admin_discord_id, force=force, progress=p)
+        return {'success': True, 'league_id': league_id, 'message': message}
+
+    task_id = _start_task(_run)
+    return jsonify({'task_id': task_id}), 202
 
 
 # Message templates
