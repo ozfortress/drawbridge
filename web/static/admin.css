@@ -471,3 +471,64 @@ body {
 .stats-table td:first-child { width:140px; color:var(--text-secondary); }
 
 .role-badge { display:inline-block; padding:0 6px; border-radius:3px; font-size:0.75em; font-weight:600; }
+
+/* Tournament creation preview */
+.preview-panel {
+    margin-top: 1.25rem;
+    padding: 1rem 1.25rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+.preview-option {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.85rem;
+    cursor: pointer;
+}
+.preview-panel h3 {
+    color: var(--accent);
+    font-size: 1rem;
+    margin-bottom: 0.75rem;
+}
+.preview-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+.preview-stats strong { color: var(--text-primary); }
+.preview-meta {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin: 0.35rem 0;
+    line-height: 1.9;
+}
+.preview-division {
+    margin-top: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.preview-division-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: baseline;
+    padding: 0.6rem 0.9rem;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+}
+.preview-division-head code,
+.preview-panel code {
+    background: var(--bg-input);
+    padding: 0.1rem 0.35rem;
+    border-radius: 4px;
+    font-size: 0.85em;
+    color: var(--text-primary);
+}

@@ -323,7 +323,10 @@ async def launchpad_page():
 
 @admin_bp.route('/tournaments')
 async def tournaments_page():
-    return redirect('/admin/launchpad')
+    session_user = get_session_user()
+    if not session_user or not session_user.get('is_admin'):
+        return redirect('/admin/login')
+    return await render_template('admin/tournaments.html', user=session_user)
 
 
 @admin_bp.route('/tournament/<int:league_id>')
@@ -444,14 +447,12 @@ async def api_tournament_start():
         return jsonify({'error': 'league_id and league_shortcode are required'}), 400
 
     async def _run(p):
+        from modules.Drawbridge.tournament_plan import build_tournament_plan
         p(0, 'Starting tournament creation...')
         guild = _get_guild()
         league = _cit.getLeague(league_id)
-        rosters = league.rosters
-        divs = []
-        for roster in rosters:
-            if roster['division'] not in divs:
-                divs.append(roster['division'])
+        if league is None:
+            raise ValueError(f'League {league_id} not found in Citadel.')
 
         try:
             existing = _db.leagues.get_by_id(league_id)
@@ -466,61 +467,64 @@ async def api_tournament_start():
         except Exception as e:
             logger.warning(f'Failed to seed league {league_id}: {e}')
 
+        # Shared, side-effect-free plan — the same builder powers the preview.
+        plan = build_tournament_plan(
+            guild, _cit, league, league_shortcode, role_overrides, include_assignments=False)
+
         rawteammessage = get_template('teams.json')
+
+        category_roles = [guild.get_role(r['id']) for r in plan['category_access'] if r]
+        extra_overrides = [guild.get_role(r['id']) for r in plan['role_overrides']['resolved'] if r]
 
         r = 0
         d = 0
-        total_divs = len(divs)
-        for div in divs:
+        total_divs = len(plan['divisions']) or 1
+        for div in plan['divisions']:
             d += 1
-            p(int(10 + (d / total_divs) * 55), f'Creating division {d}/{total_divs}: {div}...')
+            p(int(10 + (d / total_divs) * 55), f'Creating division {d}/{total_divs}: {div["name"]}...')
             overrides = {
                 guild.default_role: discord.PermissionOverwrite(view_channel=False)
             }
-            all_access = checks._get_role_ids('HEAD', 'ADMIN', '!AC', 'TRIAL', 'DEVELOPER', 'APPROVED', '!UNAPPROVED', 'BOT')
-            for role_id in all_access:
-                role_obj = guild.get_role(role_id)
+            for role_obj in category_roles:
                 if role_obj:
                     overrides[role_obj] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
-            extra_overrides = _get_tournament_cog().get_role_ids_from_overrides(role_overrides)
             for override in extra_overrides:
-                overrides[override] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
+                if override:
+                    overrides[override] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
 
-            category = await _discord_safe(guild.create_category(f'{div} - {league_shortcode}', overwrites=overrides))
-            role = await _discord_safe(guild.create_role(name=f'{div} - {league_shortcode}'))
+            category = await _discord_safe(guild.create_category(div['category_name'], overwrites=overrides))
+            role = await _discord_safe(guild.create_role(name=div['role_name']))
             dbdiv = {
                 'league_id': league_id,
-                'division_name': div,
+                'division_name': div['name'],
                 'role_id': role.id,
                 'category_id': category.id,
             }
             divid = _db.divisions.insert(dbdiv)
 
-            teams_in_div = [ros for ros in rosters if ros['division'] == div]
-            total_teams = len(teams_in_div)
-            for idx, roster in enumerate(teams_in_div):
+            teams_in_div = div['teams']
+            total_teams = len(teams_in_div) or 1
+            for idx, team in enumerate(teams_in_div):
                 r += 1
                 p(int(10 + (d - 1) / total_divs * 55 + (idx + 1) / total_teams * (55 / total_divs)),
-                  f'Creating team {r} ({roster["name"][:20]})...')
-                roster_name = roster['name'][:50]
-                role = await _discord_safe(guild.create_role(name=f'{roster_name[:20]} ({league_shortcode})', mentionable=True))
+                  f'Creating team {r} ({team["name"]})...')
+                team_role = await _discord_safe(guild.create_role(name=team['role_name'], mentionable=True))
                 overwrites = {
                     guild.default_role: discord.PermissionOverwrite(view_channel=False, send_messages=False),
-                    role: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+                    team_role: discord.PermissionOverwrite(view_channel=True, send_messages=True),
                 }
-                for role_id in all_access:
-                    role_obj = guild.get_role(role_id)
+                for role_obj in category_roles:
                     if role_obj:
                         overwrites[role_obj] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
                 for override in extra_overrides:
-                    overwrites[override] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
-                channel_name = f'🛡️{roster_name[:20]} ({league_shortcode})'
-                team_channel = await _discord_safe(guild.create_text_channel(channel_name, category=category, overwrites=overwrites))
+                    if override:
+                        overwrites[override] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
+                team_channel = await _discord_safe(guild.create_text_channel(team['channel_name'], category=category, overwrites=overwrites))
                 subs = {
-                    '{TEAM_MENTION}': f'<@&{role.id}>',
-                    '{TEAM_NAME}': roster_name,
-                    '{TEAM_ID}': str(roster['team_id']),
-                    '{DIVISION}': div,
+                    '{TEAM_MENTION}': f'<@&{team_role.id}>',
+                    '{TEAM_NAME}': team['name'],
+                    '{TEAM_ID}': str(team['team_id']),
+                    '{DIVISION}': div['name'],
                     '{LEAGUE_NAME}': league.name,
                     '{LEAGUE_SHORTCODE}': league_shortcode,
                     '{CHANNEL_ID}': str(team_channel.id),
@@ -533,17 +537,16 @@ async def api_tournament_start():
                 del team_msg['embeds']
                 await _discord_safe(team_channel.send(**team_msg))
                 _db.teams.insert({
-                    'roster_id': roster['id'],
-                    'team_id': roster['team_id'],
+                    'roster_id': team['roster_id'],
+                    'team_id': team['team_id'],
                     'league_id': league_id,
-                    'role_id': role.id,
+                    'role_id': team_role.id,
                     'team_channel': team_channel.id,
                     'division': divid,
-                    'team_name': roster_name,
+                    'team_name': team['name'],
                 })
 
         p(75, 'Assigning roles...')
-        from modules.Drawbridge.functions import Functions as Funcs
         err_msg = await _get_tournament_cog()._assign_roles(league_id)
         p(90, 'Updating launchpad...')
         await _get_tournament_cog().update_launchpad()
@@ -551,6 +554,44 @@ async def api_tournament_start():
 
     task_id = _start_task(_run)
     return jsonify({'task_id': task_id}), 202
+
+
+@admin_bp.route('/api/tournament/preview', methods=['POST'])
+@require_admin
+async def api_tournament_preview():
+    """Preview the categories, roles, channels and assignments a tournament
+    creation would produce, without touching Discord or the database."""
+    if not _check_bot_ready() or not _get_tournament_cog():
+        return jsonify({'error': 'Bot or tournament cog not ready'}), 503
+    data = await request.get_json()
+    league_id = data.get('league_id')
+    league_shortcode = data.get('league_shortcode')
+    role_overrides = data.get('role_overrides')
+    include_assignments = data.get('include_assignments', True)
+    if not league_id or not league_shortcode:
+        return jsonify({'error': 'league_id and league_shortcode are required'}), 400
+    try:
+        guild = _get_guild()
+        if not guild:
+            return jsonify({'error': 'Guild not found'}), 500
+        league = _cit.getLeague(league_id)
+        if league is None:
+            return jsonify({'error': f'League {league_id} not found in Citadel.'}), 404
+        try:
+            already_started = bool(_db.divisions.get_by_league(league_id))
+        except Exception as e:
+            logger.warning(f'Preview could not check existing divisions for {league_id}: {e}')
+            already_started = False
+        from modules.Drawbridge.tournament_plan import build_tournament_plan
+        plan = build_tournament_plan(
+            guild, _cit, league, league_shortcode, role_overrides,
+            include_assignments=include_assignments,
+            already_started=already_started,
+        )
+        return jsonify({'success': True, 'plan': plan})
+    except Exception as e:
+        logger.error(f'Tournament preview error: {e}', exc_info=True)
+        return _db_error(e, default_msg='Failed to build tournament preview')
 
 
 @admin_bp.route('/api/tournament/assign-roles', methods=['POST'])

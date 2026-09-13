@@ -19,7 +19,15 @@
         <label>Role Overrides (optional, comma-separated role names)</label>
         <input type="text" id="start-overrides" class="form-input" placeholder="e.g. Caster, Staff">
     </div>
-    <button class="btn btn-primary" id="btn-start">Start Tournament</button>
+    <label class="preview-option">
+        <input type="checkbox" id="start-include-assignments" checked>
+        Include captain role assignment preview (queries Citadel for each team, slower)
+    </label>
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+        <button class="btn btn-secondary" id="btn-preview">Preview</button>
+        <button class="btn btn-primary" id="btn-start">Start Tournament</button>
+    </div>
+    <div id="start-preview" class="preview-panel" style="display:none;"></div>
     <div id="start-progress" class="progress-container"></div>
     <div id="start-result" class="result-box" style="display:none;"></div>
 </div>
@@ -50,6 +58,143 @@
 {% endblock %}
 {% block scripts %}
 <script>
+function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    })[c]);
+}
+
+function startFormPayload() {
+    return {
+        league_id: parseInt(document.getElementById('start-league-id').value),
+        league_shortcode: document.getElementById('start-shortcode').value.trim(),
+        role_overrides: document.getElementById('start-overrides').value.trim() || null,
+    };
+}
+
+function roleList(roles) {
+    if (!roles || !roles.length) return '<span style="color:var(--text-muted);">None</span>';
+    return roles
+        .map(r => `<span class="role-badge" style="background:var(--bg-input);color:var(--text-primary);">${escapeHtml(r.name)}</span>`)
+        .join(' ');
+}
+
+function renderPreview(plan) {
+    const s = plan.summary || {};
+    const overrides = plan.role_overrides || { resolved: [], missing: [] };
+    const warnings = (plan.warnings || [])
+        .map(w => `<div class="alert alert-error">${escapeHtml(w)}</div>`)
+        .join('');
+
+    const divisionsHtml = (plan.divisions || []).map(div => `
+        <div class="preview-division">
+            <div class="preview-division-head">
+                <strong>${escapeHtml(div.name)}</strong>
+                <span class="preview-meta">category: <code>${escapeHtml(div.category_name)}</code></span>
+                <span class="preview-meta">role: <code>${escapeHtml(div.role_name)}</code></span>
+            </div>
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead><tr><th>Team</th><th>Role</th><th>Channel</th></tr></thead>
+                    <tbody>
+                        ${(div.teams || []).map(t => `
+                            <tr>
+                                <td>${escapeHtml(t.name)}${t.name_trimmed ? ' <span title="name trimmed to fit">✂️</span>' : ''}</td>
+                                <td><code>${escapeHtml(t.role_name)}</code></td>
+                                <td><code>${escapeHtml(t.channel_name)}</code></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `).join('');
+
+    let assignmentsHtml = '';
+    if (plan.assignments) {
+        const a = plan.assignments;
+        const badgeFor = status => ({
+            will_assign: '<span class="status-badge status-active">will assign</span>',
+            not_linked: '<span class="status-badge status-pending">no Discord linked</span>',
+            not_in_server: '<span class="status-badge status-cancelled">not in server</span>',
+        }[status] || escapeHtml(status));
+        const rows = (a.players || []).map(p => `
+            <tr>
+                <td>${escapeHtml(p.division)}</td>
+                <td>${escapeHtml(p.team_name)}</td>
+                <td>${escapeHtml(p.player_name)}</td>
+                <td>${badgeFor(p.status)}</td>
+                <td>${escapeHtml((p.roles || []).join(', '))}</td>
+            </tr>
+        `).join('');
+        assignmentsHtml = `
+            <h3>Captain Role Assignments</h3>
+            <p class="preview-meta">
+                Will assign: ${a.summary.will_assign} ·
+                No Discord linked: ${a.summary.not_linked} ·
+                Not in server: ${a.summary.not_in_server}${a.summary.errors ? ` · Lookup errors: ${a.summary.errors}` : ''}
+            </p>
+            ${(a.players || []).length ? `
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead><tr><th>Division</th><th>Team</th><th>Captain</th><th>Status</th><th>Roles</th></tr></thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>
+            ` : '<p class="preview-meta">No captains found to assign.</p>'}
+        `;
+    } else {
+        assignmentsHtml = '<p class="preview-meta">Assignment preview was skipped.</p>';
+    }
+
+    return `
+        <h3>Preview — ${escapeHtml(plan.league_name)} (${escapeHtml(plan.league_shortcode)})</h3>
+        <div class="preview-stats">
+            <span><strong>${s.divisions}</strong> divisions</span>
+            <span><strong>${s.teams}</strong> teams</span>
+            <span><strong>${s.categories}</strong> categories</span>
+            <span><strong>${s.roles}</strong> roles</span>
+            <span><strong>${s.channels}</strong> channels</span>
+        </div>
+        ${warnings}
+        <p class="preview-meta">Category access: ${roleList(plan.category_access)}</p>
+        <p class="preview-meta">Team channel access: ${roleList(plan.team_access)}</p>
+        <p class="preview-meta">Extra role overrides: ${roleList(overrides.resolved)}</p>
+        ${(overrides.missing || []).length ? `<div class="alert alert-error">Unmatched overrides: ${escapeHtml(overrides.missing.join(', '))}</div>` : ''}
+        ${divisionsHtml}
+        ${assignmentsHtml}
+    `;
+}
+
+document.getElementById('btn-preview').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-preview');
+    const panel = document.getElementById('start-preview');
+    const result = document.getElementById('start-result');
+    const payload = startFormPayload();
+    if (!payload.league_id || !payload.league_shortcode) {
+        API.toast('League ID and shortcode are required', 'error');
+        return;
+    }
+    payload.include_assignments = document.getElementById('start-include-assignments').checked;
+    btn.disabled = true;
+    btn.textContent = 'Building preview...';
+    result.style.display = 'none';
+    try {
+        const resp = await API.post('/admin/api/tournament/preview', payload);
+        panel.innerHTML = renderPreview(resp.plan);
+        panel.style.display = 'block';
+        API.toast('Preview generated', 'success');
+    } catch (e) {
+        panel.style.display = 'none';
+        result.textContent = e.message;
+        result.className = 'result-box result-error';
+        result.style.display = 'block';
+        API.toast(e.message, 'error');
+    }
+    btn.disabled = false;
+    btn.textContent = 'Preview';
+});
+
 document.getElementById('btn-start').addEventListener('click', async () => {
     const btn = document.getElementById('btn-start');
     const result = document.getElementById('start-result');
@@ -57,11 +202,7 @@ document.getElementById('btn-start').addEventListener('click', async () => {
     btn.textContent = 'Starting...';
     result.style.display = 'none';
     try {
-        const taskResult = await API.runTask('/admin/api/tournament/start', {
-            league_id: parseInt(document.getElementById('start-league-id').value),
-            league_shortcode: document.getElementById('start-shortcode').value,
-            role_overrides: document.getElementById('start-overrides').value || null,
-        }, 'start-progress');
+        const taskResult = await API.runTask('/admin/api/tournament/start', startFormPayload(), 'start-progress');
         API.toast(taskResult.message, 'success');
         result.textContent = taskResult.message;
         result.className = 'result-box result-success';
