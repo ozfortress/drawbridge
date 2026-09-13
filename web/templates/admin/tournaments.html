@@ -28,10 +28,18 @@
     <div class="form-group">
         <div class="override-header">
             <label>Role Overrides</label>
-            <span class="field-help">Extra roles that should get access to the generated channels.</span>
+            <span class="field-help">Add a role, then choose what it can do in team and match channels.</span>
         </div>
-        <div id="override-groups"></div>
-        <button type="button" class="btn btn-secondary btn-sm" id="btn-add-override" disabled>+ Add role group</button>
+        <div id="override-roles"></div>
+        <div class="tag-input-wrap override-add">
+            <input type="text" id="override-search" class="form-input role-search"
+                   placeholder="Search and add a role..." autocomplete="off">
+            <div class="role-suggestions" id="override-suggestions" style="display:none;"></div>
+        </div>
+        <p class="field-help">
+            Permission levels are cumulative: <strong>Read</strong> → <strong>Send</strong> → <strong>Manage</strong>.
+            Choosing <em>Manage</em> also grants send and read. Leave a channel at <em>No access</em> to grant nothing.
+        </p>
     </div>
 
     <label class="preview-option">
@@ -88,161 +96,107 @@ function debounce(fn, ms) {
     };
 }
 
-/* ── Role override groups ─────────────────────────────────── */
+/* ── Role overrides: one row per role with team/match levels ── */
 
-const OVERRIDE_PRESETS = [];
+const OVERRIDE_LEVELS = [];
 let currentLeagueId = null;
 let prefilledFor = null;
 
-function presetByKey(key) {
-    return OVERRIDE_PRESETS.find(p => p.key === key);
+function levelLabel(value) {
+    const level = OVERRIDE_LEVELS.find(l => l.value === value);
+    return level ? level.label : value;
 }
 
-function buildGroupElement(presetKey) {
-    const group = document.createElement('div');
-    group.className = 'override-group';
-
-    const head = document.createElement('div');
-    head.className = 'override-group-head';
-
-    const select = document.createElement('select');
-    select.className = 'form-input override-preset';
-    for (const preset of OVERRIDE_PRESETS) {
-        const opt = document.createElement('option');
-        opt.value = preset.key;
-        opt.textContent = preset.label;
-        select.appendChild(opt);
+function addOverrideRow(role, teamLevel, matchLevel) {
+    const container = document.getElementById('override-roles');
+    if (container.querySelector(`[data-role-id="${role.id}"]`)) return;
+    const row = document.createElement('div');
+    row.className = 'override-row';
+    row.dataset.roleId = role.id;
+    row.innerHTML = `
+        <span class="override-role-name">${escapeHtml(role.name)}</span>
+        <div class="override-level">
+            <label>Team</label>
+            <select class="override-team"></select>
+        </div>
+        <div class="override-level">
+            <label>Match</label>
+            <select class="override-match"></select>
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm override-remove">Remove</button>
+    `;
+    const teamSelect = row.querySelector('.override-team');
+    const matchSelect = row.querySelector('.override-match');
+    for (const level of OVERRIDE_LEVELS) {
+        teamSelect.appendChild(new Option(level.label, level.value));
+        matchSelect.appendChild(new Option(level.label, level.value));
     }
-    if (presetKey) select.value = presetKey;
-    head.appendChild(select);
-
-    const removeBtn = document.createElement('button');
-    removeBtn.type = 'button';
-    removeBtn.className = 'btn btn-secondary btn-sm';
-    removeBtn.textContent = 'Remove';
-    removeBtn.addEventListener('click', () => group.remove());
-    head.appendChild(removeBtn);
-
-    const desc = document.createElement('p');
-    desc.className = 'field-help override-desc';
-
-    const tagInput = document.createElement('div');
-    tagInput.className = 'tag-input-wrap';
-    const tags = document.createElement('div');
-    tags.className = 'role-tags';
-    const search = document.createElement('input');
-    search.type = 'text';
-    search.className = 'form-input role-search';
-    search.placeholder = 'Search and add roles...';
-    search.autocomplete = 'off';
-    const suggestions = document.createElement('div');
-    suggestions.className = 'role-suggestions';
-    suggestions.style.display = 'none';
-    tagInput.appendChild(tags);
-    tagInput.appendChild(search);
-    tagInput.appendChild(suggestions);
-
-    function updateDesc() {
-        const preset = presetByKey(select.value);
-        desc.textContent = preset ? preset.description : '';
-    }
-    select.addEventListener('change', updateDesc);
-    updateDesc();
-
-    function addTag(role) {
-        if (tags.querySelector(`[data-role-id="${role.id}"]`)) return;
-        const tag = document.createElement('span');
-        tag.className = 'role-tag';
-        tag.dataset.roleId = role.id;
-        tag.innerHTML = `<span>${escapeHtml(role.name)}</span>`;
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.textContent = '×';
-        btn.title = 'Remove role';
-        btn.addEventListener('click', () => tag.remove());
-        tag.appendChild(btn);
-        tags.appendChild(tag);
-    }
-
-    let suggestionTimer = null;
-    function closeSuggestions() {
-        suggestions.style.display = 'none';
-        suggestions.innerHTML = '';
-    }
-    search.addEventListener('input', () => {
-        clearTimeout(suggestionTimer);
-        const q = search.value.trim();
-        suggestionTimer = setTimeout(async () => {
-            try {
-                const resp = await API.get(`/admin/api/tournament/roles?query=${encodeURIComponent(q)}&limit=20`);
-                const roles = resp.roles || [];
-                if (!roles.length) {
-                    suggestions.innerHTML = '<div class="role-suggestion muted">No roles found</div>';
-                } else {
-                    suggestions.innerHTML = roles.map(r =>
-                        `<div class="role-suggestion" data-id="${r.id}" data-name="${escapeHtml(r.name)}">${escapeHtml(r.name)}</div>`
-                    ).join('');
-                }
-                suggestions.style.display = 'block';
-            } catch (e) {
-                closeSuggestions();
-            }
-        }, 200);
-    });
-    suggestions.addEventListener('mousedown', (ev) => {
-        const item = ev.target.closest('.role-suggestion[data-id]');
-        if (!item) return;
-        ev.preventDefault();
-        addTag({ id: Number(item.dataset.id), name: item.dataset.name });
-        search.value = '';
-        closeSuggestions();
-        search.focus();
-    });
-    search.addEventListener('keydown', (ev) => {
-        if (ev.key === 'Enter') {
-            ev.preventDefault();
-            const first = suggestions.querySelector('.role-suggestion[data-id]');
-            if (first) {
-                addTag({ id: Number(first.dataset.id), name: first.dataset.name });
-                search.value = '';
-                closeSuggestions();
-            }
-        } else if (ev.key === 'Escape') {
-            closeSuggestions();
-        } else if (ev.key === 'Backspace' && !search.value) {
-            const last = tags.querySelector('.role-tag:last-child');
-            if (last) last.remove();
-        }
-    });
-    search.addEventListener('blur', () => setTimeout(closeSuggestions, 150));
-
-    group.appendChild(head);
-    group.appendChild(desc);
-    group.appendChild(tagInput);
-
-    group.addSavedRole = (roleId, roleName) => addTag({ id: roleId, name: roleName });
-    return group;
-}
-
-function addOverrideGroup(presetKey, roles) {
-    const container = document.getElementById('override-groups');
-    const el = buildGroupElement(presetKey || (OVERRIDE_PRESETS[0] && OVERRIDE_PRESETS[0].key));
-    if (Array.isArray(roles)) {
-        for (const role of roles) {
-            if (role && role.id != null) el.addSavedRole(role.id, role.name || `Role ${role.id}`);
-        }
-    }
-    container.appendChild(el);
+    teamSelect.value = teamLevel || 'read';
+    matchSelect.value = matchLevel || 'read';
+    row.querySelector('.override-remove').addEventListener('click', () => row.remove());
+    container.appendChild(row);
 }
 
 function collectOverrides() {
-    const groups = [];
-    document.querySelectorAll('#override-groups .override-group').forEach(groupEl => {
-        const preset = groupEl.querySelector('.override-preset').value;
-        const roles = Array.from(groupEl.querySelectorAll('.role-tag')).map(tag => Number(tag.dataset.roleId));
-        if (roles.length) groups.push({ preset, roles });
+    return Array.from(document.querySelectorAll('#override-roles .override-row')).map(row => ({
+        role_id: Number(row.dataset.roleId),
+        team: row.querySelector('.override-team').value,
+        match: row.querySelector('.override-match').value,
+    }));
+}
+
+function closeOverrideSuggestions() {
+    const box = document.getElementById('override-suggestions');
+    box.style.display = 'none';
+    box.innerHTML = '';
+}
+
+function initOverrideSearch() {
+    const search = document.getElementById('override-search');
+    const box = document.getElementById('override-suggestions');
+    let timer = null;
+
+    search.addEventListener('input', () => {
+        clearTimeout(timer);
+        const q = search.value.trim();
+        timer = setTimeout(async () => {
+            try {
+                const resp = await API.get(`/admin/api/tournament/roles?query=${encodeURIComponent(q)}&limit=20`);
+                const roles = resp.roles || [];
+                box.innerHTML = roles.length
+                    ? roles.map(r => `<div class="role-suggestion" data-id="${r.id}" data-name="${escapeHtml(r.name)}">${escapeHtml(r.name)}</div>`).join('')
+                    : '<div class="role-suggestion muted">No roles found</div>';
+                box.style.display = 'block';
+            } catch (e) {
+                closeOverrideSuggestions();
+            }
+        }, 200);
     });
-    return groups;
+
+    box.addEventListener('mousedown', (ev) => {
+        const item = ev.target.closest('.role-suggestion[data-id]');
+        if (!item) return;
+        ev.preventDefault();
+        addOverrideRow({ id: Number(item.dataset.id), name: item.dataset.name }, 'read', 'read');
+        search.value = '';
+        closeOverrideSuggestions();
+        search.focus();
+    });
+
+    search.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') {
+            ev.preventDefault();
+            const first = box.querySelector('.role-suggestion[data-id]');
+            if (first) {
+                addOverrideRow({ id: Number(first.dataset.id), name: first.dataset.name }, 'read', 'read');
+                search.value = '';
+                closeOverrideSuggestions();
+            }
+        } else if (ev.key === 'Escape') {
+            closeOverrideSuggestions();
+        }
+    });
+    search.addEventListener('blur', () => setTimeout(closeOverrideSuggestions, 150));
 }
 
 /* ── League validation ────────────────────────────────────── */
@@ -275,10 +229,9 @@ const validateLeague = debounce(async () => {
         if (prefilledFor !== league.id) {
             prefilledFor = league.id;
             if (Array.isArray(resp.role_overrides) && resp.role_overrides.length) {
-                const container = document.getElementById('override-groups');
-                container.innerHTML = '';
-                for (const group of resp.role_overrides) {
-                    addOverrideGroup(group.preset, group.roles);
+                document.getElementById('override-roles').innerHTML = '';
+                for (const entry of resp.role_overrides) {
+                    if (entry.role) addOverrideRow(entry.role, entry.team, entry.match);
                 }
             }
         }
@@ -302,23 +255,24 @@ function roleList(roles) {
         .join(' ');
 }
 
-function renderOverrideGroups(overrides) {
-    const groups = (overrides && overrides.groups) || [];
-    if (!groups.length) {
+function renderOverrideEntries(overrides) {
+    const entries = (overrides && overrides.entries) || [];
+    if (!entries.length) {
         return '<p class="preview-meta">No extra role overrides.</p>';
     }
-    return groups.map(g => `
-        <p class="preview-meta">
-            <strong>${escapeHtml(g.label)}</strong>
-            <span class="preview-tag">${escapeHtml((g.applies_to || []).join(', '))}</span>
-            ${roleList(g.roles)}
-        </p>
-    `).join('');
+    return entries.map(entry => {
+        const role = entry.role || {};
+        return `<p class="preview-meta">
+            <strong>${escapeHtml(role.name)}</strong>
+            — team: <span class="preview-tag">${escapeHtml(levelLabel(entry.team))}</span>
+            · match: <span class="preview-tag">${escapeHtml(levelLabel(entry.match))}</span>
+        </p>`;
+    }).join('');
 }
 
 function renderPreview(plan) {
     const s = plan.summary || {};
-    const overrides = plan.role_overrides || { groups: [], missing: [] };
+    const overrides = plan.role_overrides || { entries: [], missing: [] };
     const warnings = (plan.warnings || [])
         .map(w => `<div class="alert alert-error">${escapeHtml(w)}</div>`)
         .join('');
@@ -398,7 +352,7 @@ function renderPreview(plan) {
         <p class="preview-meta">Team channel access: ${roleList(plan.team_access)}</p>
         <p class="preview-meta">Match channel access: ${roleList(plan.match_access)}</p>
         <h3>Role Overrides</h3>
-        ${renderOverrideGroups(overrides)}
+        ${renderOverrideEntries(overrides)}
         ${(overrides.missing || []).length ? `<div class="alert alert-error">Unmatched overrides: ${escapeHtml(overrides.missing.join(', '))}</div>` : ''}
         ${divisionsHtml}
         ${assignmentsHtml}
@@ -596,13 +550,12 @@ document.getElementById('btn-end').addEventListener('click', async () => {
 
 (async function initStartForm() {
     try {
-        const resp = await API.get('/admin/api/tournament/role-presets');
-        OVERRIDE_PRESETS.push(...(resp.presets || []));
+        const resp = await API.get('/admin/api/tournament/override-options');
+        OVERRIDE_LEVELS.push(...(resp.levels || []));
     } catch (e) {
-        API.toast('Could not load role presets', 'error');
+        API.toast('Could not load role override levels', 'error');
     }
-    document.getElementById('btn-add-override').disabled = OVERRIDE_PRESETS.length === 0;
-    document.getElementById('btn-add-override').addEventListener('click', () => addOverrideGroup());
+    initOverrideSearch();
 })();
 </script>
 {% endblock %}

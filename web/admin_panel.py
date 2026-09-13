@@ -429,14 +429,12 @@ async def api_admin_info():
 
 # Tournament API
 
-@admin_bp.route('/api/tournament/role-presets')
+@admin_bp.route('/api/tournament/override-options')
 @require_admin
-async def api_tournament_role_presets():
-    """Return the available role-override presets for the admin page."""
-    from modules.Drawbridge.tournament_plan import ROLE_OVERRIDE_PRESETS
-    return jsonify({'presets': [
-        {'key': key, **preset} for key, preset in ROLE_OVERRIDE_PRESETS.items()
-    ]})
+async def api_tournament_override_options():
+    """Return the selectable role-override permission levels for the admin page."""
+    from modules.Drawbridge.tournament_plan import override_options
+    return jsonify({'levels': override_options()})
 
 
 @admin_bp.route('/api/tournament/roles')
@@ -505,20 +503,18 @@ async def api_tournament_league_lookup():
         settings = _db.tournament_schedule_settings.get_by_league(league_id)
         raw = settings.get('role_overrides') if settings else None
         if raw:
+            from modules.Drawbridge.tournament_plan import normalize_role_overrides
             config = json.loads(raw) if isinstance(raw, str) else raw
             guild = _get_guild()
-            resolved = []
-            for group in (config or []):
-                roles = []
-                for role_id in (group.get('role_ids') or []):
-                    role = guild.get_role(int(role_id)) if guild else None
-                    roles.append({
-                        'id': role_id,
-                        'name': role.name if role else f'Role {role_id}',
-                        'missing': role is None,
-                    })
-                resolved.append({'preset': group.get('preset'), 'roles': roles})
-            saved_overrides = resolved
+            entries, _missing, _legacy = normalize_role_overrides(guild, config)
+            saved_overrides = [
+                {
+                    'role': {'id': entry['role'].id, 'name': entry['role'].name},
+                    'team': entry['team'],
+                    'match': entry['match'],
+                }
+                for entry in entries
+            ]
     except Exception as e:
         logger.warning(f'League lookup {league_id} DB extras failed: {e}')
 
@@ -572,7 +568,7 @@ async def api_tournament_start():
     async def _run(p):
         from modules.Drawbridge.tournament_plan import (
             build_tournament_plan, normalize_role_overrides,
-            overwrites_for_groups, serializable_role_overrides,
+            overwrites_for_channel_type, serializable_role_overrides,
         )
         p(0, 'Starting tournament creation...')
         guild = _get_guild()
@@ -597,14 +593,14 @@ async def api_tournament_start():
         plan = build_tournament_plan(
             guild, _cit, league, league_shortcode, role_overrides, include_assignments=False)
 
-        override_groups, _missing, _legacy = normalize_role_overrides(guild, role_overrides)
-        category_pairs = overwrites_for_groups(guild, override_groups, 'categories')
-        team_pairs = overwrites_for_groups(guild, override_groups, 'team_channels')
+        override_entries, _missing, _legacy = normalize_role_overrides(guild, role_overrides)
+        category_pairs = overwrites_for_channel_type(override_entries, 'categories')
+        team_pairs = overwrites_for_channel_type(override_entries, 'team_channels')
 
         # Remember the overrides so match channels generated later inherit them.
         try:
             _db.tournament_schedule_settings.upsert_role_overrides(
-                league_id, json.dumps(serializable_role_overrides(override_groups)))
+                league_id, json.dumps(serializable_role_overrides(override_entries)))
         except Exception as e:
             logger.warning(f'Failed to persist role overrides for league {league_id}: {e}')
 

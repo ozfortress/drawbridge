@@ -772,9 +772,9 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
                     overrides[role_obj] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
                 else:
                     self.logger.warning(f'Could not find Discord role for role_id={role_id} in all_access list, skipping')
-            # Extra override groups: use the request value, else the config saved
+            # Extra override roles: use the request value, else the config saved
             # for this league when the tournament was started.
-            from ..tournament_plan import normalize_role_overrides, overwrites_for_groups
+            from ..tournament_plan import normalize_role_overrides, overwrites_for_channel_type
             raw_overrides = role_overrides
             if not raw_overrides:
                 try:
@@ -785,8 +785,8 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
                 except Exception as e:
                     self.logger.warning(f'Could not load saved role overrides for league {match.league_id}: {e}')
                     raw_overrides = None
-            override_groups, _missing, _legacy = normalize_role_overrides(self.guild, raw_overrides)
-            for role_obj, overwrite in overwrites_for_groups(self.guild, override_groups, 'match_channels'):
+            override_entries, _missing, _legacy = normalize_role_overrides(self.guild, raw_overrides)
+            for role_obj, overwrite in overwrites_for_channel_type(override_entries, 'match_channels'):
                 overrides[role_obj] = overwrite
             cat = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID'))).get_channel(category_id)
             if cat == None:

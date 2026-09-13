@@ -27,44 +27,50 @@ CATEGORY_ACCESS = ('HEAD', 'ADMIN', '!AC', 'TRIAL', 'DEVELOPER', 'APPROVED', '!U
 TEAM_ACCESS = ('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'BOT')
 MATCH_ACCESS = ('HEAD', 'ADMIN', 'TRIAL', 'DEVELOPER', 'APPROVED', '!UNAPPROVED', 'BOT', 'STAFF')
 
-# Selectable role-override presets. Each preset describes which extra roles get
-# access to which kinds of channel and with what permissions. This is the single
-# source of truth shared by the admin page (for display) and the creation flow
-# (for applying permissions).
-ROLE_OVERRIDE_PRESETS = {
-    'admin': {
-        'label': 'Admin',
-        'description': 'Team and match channels: view, send and manage messages.',
-        'applies_to': ['categories', 'team_channels', 'match_channels'],
-        'permissions': {'view_channel': True, 'send_messages': True, 'manage_messages': True},
+# Role-override permission levels. Each level implies the ones before it
+# (manage > send > read), and is chosen per role, per channel kind.
+OVERRIDE_LEVELS = {
+    'none': {
+        'label': 'No access',
+        'description': 'Do not grant access.',
+        'permissions': None,
     },
-    'staff': {
-        'label': 'Staff',
-        'description': 'Team and match channels: view and send messages.',
-        'applies_to': ['categories', 'team_channels', 'match_channels'],
-        'permissions': {'view_channel': True, 'send_messages': True},
+    'read': {
+        'label': 'Read',
+        'description': 'View the channel and read history.',
+        'permissions': {
+            'view_channel': True, 'read_message_history': True,
+            'send_messages': False, 'manage_messages': False,
+        },
     },
-    'viewer': {
-        'label': 'Viewer',
-        'description': 'Team and match channels: read-only access.',
-        'applies_to': ['categories', 'team_channels', 'match_channels'],
-        'permissions': {'view_channel': True, 'send_messages': False, 'manage_messages': False, 'read_message_history': True},
+    'send': {
+        'label': 'Send',
+        'description': 'Read plus send messages.',
+        'permissions': {
+            'view_channel': True, 'read_message_history': True,
+            'send_messages': True, 'manage_messages': False,
+        },
     },
-    'match_viewer': {
-        'label': 'Match Viewer',
-        'description': 'Match channels only: read-only, cannot send or manage messages.',
-        'applies_to': ['match_channels'],
-        'permissions': {'view_channel': True, 'send_messages': False, 'manage_messages': False, 'read_message_history': True},
-    },
-    'caster': {
-        'label': 'Caster',
-        'description': 'Match channels only: view and send messages (no manage).',
-        'applies_to': ['match_channels'],
-        'permissions': {'view_channel': True, 'send_messages': True},
+    'manage': {
+        'label': 'Manage',
+        'description': 'Send plus manage messages.',
+        'permissions': {
+            'view_channel': True, 'read_message_history': True,
+            'send_messages': True, 'manage_messages': True,
+        },
     },
 }
+OVERRIDE_LEVEL_ORDER = ['none', 'read', 'send', 'manage']
 
-_LEGACY_OVERRIDE_PRESET = 'staff'
+# Mapping used to migrate the old preset-based configs to level pairs
+# (team level, match level).
+_LEGACY_PRESET_LEVELS = {
+    'admin': ('manage', 'manage'),
+    'staff': ('send', 'send'),
+    'viewer': ('read', 'read'),
+    'match_viewer': ('none', 'read'),
+    'caster': ('none', 'send'),
+}
 
 # Discord name limits.
 MAX_TEAM_NAME = 50
@@ -84,6 +90,17 @@ def _role_ref(role: Optional[discord.Role]) -> Optional[dict]:
     if role is None:
         return None
     return {'id': role.id, 'name': role.name}
+
+
+def _normalize_level(value, default: str = 'none') -> str:
+    level = str(value or default).strip().lower()
+    return level if level in OVERRIDE_LEVELS else default
+
+
+def level_permissions(level: str) -> Optional[dict]:
+    """Return the PermissionOverwrite kwargs for a level, or None for no access."""
+    preset = OVERRIDE_LEVELS.get(_normalize_level(level))
+    return dict(preset['permissions']) if preset and preset['permissions'] else None
 
 
 def resolve_role(guild: discord.Guild, entry) -> Optional[discord.Role]:
@@ -135,102 +152,117 @@ def parse_role_overrides(guild: discord.Guild, role_overrides: Optional[str]):
 
 
 def normalize_role_overrides(guild: discord.Guild, raw):
-    """Normalise a role-overrides payload into structured groups.
+    """Normalise a role-overrides payload into per-role permission entries.
 
     Accepts:
 
     * ``None`` / empty — no overrides;
-    * a legacy comma-separated string — treated as a single ``staff`` group;
-    * a list (or single dict) of ``{"preset": key, "roles": [id|mention|name]}``.
+    * a legacy comma-separated string — roles default to ``send`` on both channel
+      kinds (the behaviour of the old string overrides);
+    * a list (or single dict) of entries. Two shapes are understood:
+      - ``{"role_id"|"role"|"id": ref, "team": level, "match": level}`` (current);
+      - ``{"preset": key, "roles"|"role_ids": [ref, ...]}`` (older preset config).
 
-    Returns ``(groups, missing, legacy)`` where each group is a dict with
-    ``preset``, ``label``, ``description``, ``applies_to``, ``permissions`` and
-    ``roles`` (a list of ``discord.Role``). ``missing`` lists role references that
-    could not be resolved. ``legacy`` is True when a raw string was supplied.
+    Returns ``(entries, missing, legacy)`` where each entry is
+    ``{"role": discord.Role, "team": level, "match": level}``. Levels are one of
+    ``none`` / ``read`` / ``send`` / ``manage``.
     """
-    groups: list[dict] = []
+    entries: list[dict] = []
     missing: list[str] = []
+    seen: set[int] = set()
 
     if not raw:
-        return groups, missing, False
+        return entries, missing, False
 
-    def build(preset_key: str, roles: list[discord.Role]) -> Optional[dict]:
-        preset = ROLE_OVERRIDE_PRESETS.get(preset_key)
-        if not preset or not roles:
-            return None
-        return {
-            'preset': preset_key,
-            'label': preset['label'],
-            'description': preset['description'],
-            'applies_to': list(preset['applies_to']),
-            'permissions': dict(preset['permissions']),
-            'roles': roles,
-        }
+    def add(role: Optional[discord.Role], team: str, match: str):
+        if role is None:
+            return
+        if role.id in seen:
+            # Keep the highest permission if a role appears more than once.
+            existing = next(e for e in entries if e['role'].id == role.id)
+            if OVERRIDE_LEVEL_ORDER.index(_normalize_level(team)) > OVERRIDE_LEVEL_ORDER.index(existing['team']):
+                existing['team'] = _normalize_level(team)
+            if OVERRIDE_LEVEL_ORDER.index(_normalize_level(match)) > OVERRIDE_LEVEL_ORDER.index(existing['match']):
+                existing['match'] = _normalize_level(match)
+            return
+        seen.add(role.id)
+        entries.append({'role': role, 'team': _normalize_level(team), 'match': _normalize_level(match)})
 
     # Legacy raw string (e.g. from the slash commands or older clients).
     if isinstance(raw, str):
         roles, miss = parse_role_overrides(guild, raw)
         missing.extend(miss)
-        group = build(_LEGACY_OVERRIDE_PRESET, roles)
-        if group:
-            groups.append(group)
-        return groups, missing, True
+        for role in roles:
+            add(role, 'send', 'send')
+        return entries, missing, True
 
     items = raw if isinstance(raw, list) else [raw]
     for item in items:
         if not isinstance(item, dict):
             continue
-        preset_key = str(item.get('preset') or _LEGACY_OVERRIDE_PRESET).strip()
-        role_entries = item.get('roles') or item.get('role_ids') or []
-        if isinstance(role_entries, (str, int)):
-            role_entries = [role_entries]
-        resolved: list[discord.Role] = []
-        for entry in role_entries:
-            role = resolve_role(guild, entry)
-            if role is None:
-                missing.append(str(entry))
-            elif role not in resolved:
-                resolved.append(role)
-        group = build(preset_key, resolved)
-        if group:
-            groups.append(group)
-    return groups, missing, False
+        # Old preset shape.
+        if item.get('preset'):
+            preset_key = str(item.get('preset')).strip()
+            team, match = _LEGACY_PRESET_LEVELS.get(preset_key, ('send', 'send'))
+            role_entries = item.get('roles') or item.get('role_ids') or []
+            if isinstance(role_entries, (str, int)):
+                role_entries = [role_entries]
+            for ref in role_entries:
+                role = resolve_role(guild, ref)
+                if role is None:
+                    missing.append(str(ref))
+                else:
+                    add(role, team, match)
+            continue
+        # Current per-role shape.
+        ref = item.get('role_id', item.get('role', item.get('id')))
+        role = resolve_role(guild, ref)
+        if role is None:
+            if ref is not None:
+                missing.append(str(ref))
+            continue
+        add(role, item.get('team', 'none'), item.get('match', 'none'))
+    return entries, missing, False
 
 
-def serializable_role_overrides(groups: list[dict]) -> list[dict]:
-    """Convert normalized groups to a JSON-safe config for persistence."""
-    config = []
-    for group in groups:
-        config.append({
-            'preset': group['preset'],
-            'role_ids': [role.id for role in group['roles']],
-        })
-    return config
+def serializable_role_overrides(entries: list[dict]) -> list[dict]:
+    """Convert normalized entries to a JSON-safe config for persistence."""
+    return [
+        {'role_id': entry['role'].id, 'team': entry['team'], 'match': entry['match']}
+        for entry in entries
+    ]
 
 
-def overwrites_for_groups(guild: discord.Guild, groups: list[dict], channel_type: str):
+def overwrites_for_channel_type(entries: list[dict], channel_type: str):
     """Build ``(role, PermissionOverwrite)`` pairs for a channel type.
 
     ``channel_type`` is one of ``categories``, ``team_channels`` or
-    ``match_channels``. Categories only receive visibility; other channel types
-    receive the full preset permission set.
+    ``match_channels``. Categories receive visibility whenever the role has any
+    access to team channels (which live under the category).
     """
     pairs: list[tuple[discord.Role, discord.PermissionOverwrite]] = []
-    seen: set[int] = set()
-    for group in groups:
-        if channel_type not in group.get('applies_to', []):
+    for entry in entries:
+        role = entry.get('role')
+        if role is None:
             continue
-        perms = group.get('permissions', {})
         if channel_type == 'categories':
-            overwrite = discord.PermissionOverwrite(view_channel=perms.get('view_channel', True))
-        else:
-            overwrite = discord.PermissionOverwrite(**perms)
-        for role in group.get('roles', []):
-            if role is None or role.id in seen:
-                continue
-            seen.add(role.id)
-            pairs.append((role, overwrite))
+            # Categories just need visibility if the role can see team channels.
+            if _normalize_level(entry.get('team')) != 'none':
+                pairs.append((role, discord.PermissionOverwrite(view_channel=True)))
+            continue
+        level = entry.get('team') if channel_type == 'team_channels' else entry.get('match')
+        perms = level_permissions(level)
+        if perms:
+            pairs.append((role, discord.PermissionOverwrite(**perms)))
     return pairs
+
+
+def override_options() -> list[dict]:
+    """Return the selectable permission levels for the admin page."""
+    return [
+        {'value': key, 'label': OVERRIDE_LEVELS[key]['label'], 'description': OVERRIDE_LEVELS[key]['description']}
+        for key in OVERRIDE_LEVEL_ORDER
+    ]
 
 
 def _access_roles(guild: discord.Guild, keywords: tuple[str, ...]) -> list[discord.Role]:
@@ -315,8 +347,9 @@ def build_tournament_plan(guild: discord.Guild, cit, league, league_shortcode: s
     league_shortcode:
         Shortcode appended to created role/channel names.
     role_overrides:
-        Optional raw role-overrides payload: a legacy string or a list of
-        ``{"preset": key, "roles": [...]}`` groups.
+        Optional raw role-overrides payload: a legacy string, a list of
+        ``{"role_id": id, "team": level, "match": level}`` entries, or an older
+        preset-based config.
     include_assignments:
         When True, query Citadel teams for the captains that would be assigned.
     already_started:
@@ -325,7 +358,7 @@ def build_tournament_plan(guild: discord.Guild, cit, league, league_shortcode: s
     rosters = list(_field(league, 'rosters', []) or [])
     div_names = _division_names(rosters)
 
-    override_groups, missing_overrides, legacy_overrides = normalize_role_overrides(guild, role_overrides)
+    override_entries, missing_overrides, legacy_overrides = normalize_role_overrides(guild, role_overrides)
     category_access = _access_roles(guild, CATEGORY_ACCESS)
     team_access = _access_roles(guild, TEAM_ACCESS)
     match_access = _access_roles(guild, MATCH_ACCESS)
@@ -383,18 +416,14 @@ def build_tournament_plan(guild: discord.Guild, cit, league, league_shortcode: s
             'channels': team_count,
         },
         'role_overrides': {
-            'groups': [
+            'entries': [
                 {
-                    'preset': group['preset'],
-                    'label': group['label'],
-                    'description': group['description'],
-                    'applies_to': group['applies_to'],
-                    'permissions': group['permissions'],
-                    'roles': [_role_ref(r) for r in group['roles']],
+                    'role': _role_ref(entry['role']),
+                    'team': entry['team'],
+                    'match': entry['match'],
                 }
-                for group in override_groups
+                for entry in override_entries
             ],
-            'resolved': [_role_ref(r) for group in override_groups for r in group['roles']],
             'missing': missing_overrides,
             'legacy': legacy_overrides,
         },
