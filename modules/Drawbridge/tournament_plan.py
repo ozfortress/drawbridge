@@ -277,6 +277,25 @@ def _access_roles(guild: discord.Guild, keywords: tuple[str, ...]) -> list[disco
     return result
 
 
+def default_role_levels(guild: discord.Guild) -> dict[int, dict]:
+    """Effective default access per role, before any overrides.
+
+    Returns ``{role_id: {"team": level, "match": level}}``. Built-in access roles
+    already get send access to team/match channels, so the UI can flag overrides
+    that are redundant (or that deliberately change the default).
+    """
+    levels: dict[int, dict] = {}
+
+    def entry(role_id: int) -> dict:
+        return levels.setdefault(role_id, {'team': 'none', 'match': 'none'})
+
+    for role in _access_roles(guild, CATEGORY_ACCESS):
+        entry(role.id)['team'] = 'send'
+    for role in _access_roles(guild, MATCH_ACCESS):
+        entry(role.id)['match'] = 'send'
+    return levels
+
+
 def _team_name(roster) -> str:
     return str(_field(roster, 'name', ''))[:MAX_TEAM_NAME]
 
@@ -362,6 +381,7 @@ def build_tournament_plan(guild: discord.Guild, cit, league, league_shortcode: s
     category_access = _access_roles(guild, CATEGORY_ACCESS)
     team_access = _access_roles(guild, TEAM_ACCESS)
     match_access = _access_roles(guild, MATCH_ACCESS)
+    defaults = default_role_levels(guild)
 
     warnings: list[str] = []
     if missing_overrides:
@@ -418,7 +438,15 @@ def build_tournament_plan(guild: discord.Guild, cit, league, league_shortcode: s
         'role_overrides': {
             'entries': [
                 {
-                    'role': _role_ref(entry['role']),
+                    'role': {
+                        **_role_ref(entry['role']),
+                        'default_team': defaults.get(entry['role'].id, {'team': 'none'})['team'],
+                        'default_match': defaults.get(entry['role'].id, {'match': 'none'})['match'],
+                        'is_default': (
+                            defaults.get(entry['role'].id, {}).get('team', 'none') != 'none'
+                            or defaults.get(entry['role'].id, {}).get('match', 'none') != 'none'
+                        ),
+                    },
                     'team': entry['team'],
                     'match': entry['match'],
                 }

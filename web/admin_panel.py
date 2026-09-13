@@ -452,20 +452,26 @@ async def api_tournament_roles():
     except (TypeError, ValueError):
         limit = 25
     limit = max(1, min(limit, 50))
+    from modules.Drawbridge.tournament_plan import default_role_levels
+    defaults = default_role_levels(guild)
     roles = [r for r in guild.roles if r.id != guild.default_role.id]
     if query:
         roles = [r for r in roles if query in r.name.lower()]
     roles.sort(key=lambda r: r.position, reverse=True)
-    return jsonify({'roles': [
-        {
+    results = []
+    for r in roles[:limit]:
+        default = defaults.get(r.id, {'team': 'none', 'match': 'none'})
+        results.append({
             'id': r.id,
             'name': r.name,
             'color': str(r.color),
             'position': r.position,
             'managed': r.managed,
-        }
-        for r in roles[:limit]
-    ]})
+            'default_team': default['team'],
+            'default_match': default['match'],
+            'is_default': default['team'] != 'none' or default['match'] != 'none',
+        })
+    return jsonify({'roles': results})
 
 
 @admin_bp.route('/api/tournament/league-lookup', methods=['POST'])
@@ -503,18 +509,26 @@ async def api_tournament_league_lookup():
         settings = _db.tournament_schedule_settings.get_by_league(league_id)
         raw = settings.get('role_overrides') if settings else None
         if raw:
-            from modules.Drawbridge.tournament_plan import normalize_role_overrides
+            from modules.Drawbridge.tournament_plan import normalize_role_overrides, default_role_levels
             config = json.loads(raw) if isinstance(raw, str) else raw
             guild = _get_guild()
             entries, _missing, _legacy = normalize_role_overrides(guild, config)
-            saved_overrides = [
-                {
-                    'role': {'id': entry['role'].id, 'name': entry['role'].name},
+            defaults = default_role_levels(guild) if guild else {}
+            saved_overrides = []
+            for entry in entries:
+                role = entry['role']
+                default = defaults.get(role.id, {'team': 'none', 'match': 'none'})
+                saved_overrides.append({
+                    'role': {
+                        'id': role.id,
+                        'name': role.name,
+                        'default_team': default['team'],
+                        'default_match': default['match'],
+                        'is_default': default['team'] != 'none' or default['match'] != 'none',
+                    },
                     'team': entry['team'],
                     'match': entry['match'],
-                }
-                for entry in entries
-            ]
+                })
     except Exception as e:
         logger.warning(f'League lookup {league_id} DB extras failed: {e}')
 

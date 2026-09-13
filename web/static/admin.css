@@ -496,118 +496,189 @@ body {
     color: var(--text-secondary);
 }
 
-/* Role override rows */
+/* Role override builder */
 .override-header {
     display: flex;
     align-items: baseline;
     gap: 0.6rem;
     flex-wrap: wrap;
-    margin-bottom: 0.35rem;
-}
-#override-roles { margin-bottom: 0.5rem; }
-.override-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    gap: 0.75rem;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 0.6rem 0.75rem;
     margin-bottom: 0.5rem;
-    background: var(--bg-secondary);
+}
+.override-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 0.6rem;
+}
+.override-row {
+    display: grid;
+    grid-template-columns: minmax(170px, 1.1fr) auto auto;
+    align-items: center;
+    gap: 0.65rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.7rem 0.9rem;
+    background: linear-gradient(180deg, var(--bg-secondary), var(--bg-card));
+}
+.override-role {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    min-width: 0;
 }
 .override-role-name {
     font-weight: 600;
     color: var(--text-primary);
-    padding-bottom: 0.45rem;
-    min-width: 140px;
-    flex: 1 1 160px;
+    overflow-wrap: anywhere;
 }
-.override-level {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
+.role-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+    background: var(--text-muted);
 }
-.override-level label {
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--text-muted);
-}
-.override-level select {
-    max-width: 150px;
-    margin: 0;
-    padding: 0.4rem 0.5rem;
-}
-.override-remove { margin-bottom: 0; }
-.override-add { max-width: 420px; }
-
-/* Tag input + role autocomplete */
-.tag-input-wrap {
-    position: relative;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.35rem;
-    align-items: center;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 0.35rem;
-    background: var(--bg-input);
-}
-.tag-input-wrap:focus-within { border-color: var(--accent); }
-.role-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; }
-.role-tag {
+.role-dot-empty { background: transparent; border: 1px solid var(--border); }
+.default-badge {
     display: inline-flex;
     align-items: center;
-    gap: 0.3rem;
-    padding: 0.15rem 0.3rem 0.15rem 0.55rem;
-    background: var(--accent);
-    color: var(--bg-primary);
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.1rem 0.45rem;
     border-radius: 999px;
+    color: var(--warning);
+    background: rgba(249, 226, 175, 0.12);
+    border: 1px solid rgba(249, 226, 175, 0.4);
+    cursor: help;
+    white-space: nowrap;
+}
+.override-controls {
+    display: flex;
+    gap: 0.9rem;
+    flex-wrap: wrap;
+}
+.level-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+.level-group-label {
+    font-size: 0.66rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+}
+.segmented {
+    display: inline-flex;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 2px;
+}
+.segmented button {
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
     font-size: 0.8rem;
     font-weight: 600;
-}
-.role-tag button {
-    background: transparent;
-    border: none;
-    color: var(--bg-primary);
+    padding: 0.3rem 0.6rem;
+    border-radius: 6px;
     cursor: pointer;
-    font-size: 0.95rem;
-    line-height: 1;
-    opacity: 0.75;
+    transition: background 0.15s, color 0.15s;
 }
-.role-tag button:hover { opacity: 1; }
-.role-search {
-    flex: 1 1 160px;
-    min-width: 140px;
+.segmented button:hover { color: var(--text-primary); }
+.segmented button.active {
+    background: var(--accent);
+    color: var(--bg-primary);
+}
+.icon-btn {
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1.05rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.icon-btn:hover {
+    background: rgba(243, 139, 168, 0.12);
+    color: var(--danger);
+    border-color: var(--danger);
+}
+
+/* Add-role search + suggestions */
+.override-add {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    max-width: 420px;
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    padding: 0.35rem 0.6rem;
+    background: var(--bg-input);
+    transition: border-color 0.15s, border-style 0.15s;
+}
+.override-add:focus-within {
+    border-color: var(--accent);
+    border-style: solid;
+}
+.override-add-icon {
+    color: var(--text-muted);
+    font-weight: 700;
+    font-size: 1.05rem;
+}
+.override-search {
+    flex: 1;
     border: none;
     background: transparent;
-    padding: 0.25rem;
-    max-width: none;
+    color: var(--text-primary);
+    padding: 0.3rem 0;
+    font-size: 0.9rem;
+    outline: none;
+    min-width: 0;
 }
-.role-search:focus { outline: none; border: none; }
 .role-suggestions {
     position: absolute;
-    top: calc(100% + 2px);
+    top: calc(100% + 6px);
     left: 0;
     right: 0;
     z-index: 50;
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: 6px;
-    max-height: 220px;
+    border-radius: 8px;
+    max-height: 240px;
     overflow-y: auto;
-    box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4);
 }
 .role-suggestion {
-    padding: 0.45rem 0.7rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.7rem;
     font-size: 0.85rem;
     cursor: pointer;
     color: var(--text-primary);
 }
 .role-suggestion:hover { background: var(--bg-input); }
+.role-suggestion-name { flex: 1; overflow-wrap: anywhere; }
+.role-suggestion .default-badge { margin-left: auto; }
 .role-suggestion.muted { color: var(--text-muted); cursor: default; }
 .role-suggestion.muted:hover { background: transparent; }
+
+@media (max-width: 720px) {
+    .override-row { grid-template-columns: 1fr; }
+    .override-remove { justify-self: end; }
+}
 
 .preview-tag {
     display: inline-block;

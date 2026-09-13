@@ -30,15 +30,16 @@
             <label>Role Overrides</label>
             <span class="field-help">Add a role, then choose what it can do in team and match channels.</span>
         </div>
-        <div id="override-roles"></div>
-        <div class="tag-input-wrap override-add">
-            <input type="text" id="override-search" class="form-input role-search"
-                   placeholder="Search and add a role..." autocomplete="off">
+        <div id="override-roles" class="override-list"></div>
+        <div class="override-add">
+            <span class="override-add-icon">+</span>
+            <input type="text" id="override-search" class="override-search"
+                   placeholder="Search for a role to add..." autocomplete="off">
             <div class="role-suggestions" id="override-suggestions" style="display:none;"></div>
         </div>
         <p class="field-help">
-            Permission levels are cumulative: <strong>Read</strong> → <strong>Send</strong> → <strong>Manage</strong>.
-            Choosing <em>Manage</em> also grants send and read. Leave a channel at <em>No access</em> to grant nothing.
+            Permission levels are cumulative — <strong>Read</strong> → <strong>Send</strong> → <strong>Manage</strong>.
+            Roles shown with a <span class="default-badge">Default</span> badge already have access without an override.
         </p>
     </div>
 
@@ -107,48 +108,133 @@ function levelLabel(value) {
     return level ? level.label : value;
 }
 
+function initialLevel(value) {
+    return value && value !== 'none' ? value : 'read';
+}
+
+function buildSegmented(channel, value) {
+    const wrap = document.createElement('div');
+    wrap.className = 'segmented';
+    wrap.dataset.channel = channel;
+    for (const level of OVERRIDE_LEVELS) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.dataset.level = level.value;
+        button.textContent = level.label;
+        if (level.description) button.title = level.description;
+        if (level.value === value) button.classList.add('active');
+        button.addEventListener('click', () => {
+            wrap.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+            button.classList.add('active');
+        });
+        wrap.appendChild(button);
+    }
+    return wrap;
+}
+
+function defaultBadge(role) {
+    const parts = [];
+    if (role.default_team && role.default_team !== 'none') parts.push(`Team: ${levelLabel(role.default_team)}`);
+    if (role.default_match && role.default_match !== 'none') parts.push(`Match: ${levelLabel(role.default_match)}`);
+    const badge = document.createElement('span');
+    badge.className = 'default-badge';
+    badge.textContent = 'Default';
+    badge.title = `Already granted by default${parts.length ? ' — ' + parts.join(', ') : ''}. An override changes this.`;
+    return badge;
+}
+
 function addOverrideRow(role, teamLevel, matchLevel) {
     const container = document.getElementById('override-roles');
     if (container.querySelector(`[data-role-id="${role.id}"]`)) return;
     const row = document.createElement('div');
     row.className = 'override-row';
     row.dataset.roleId = role.id;
-    row.innerHTML = `
-        <span class="override-role-name">${escapeHtml(role.name)}</span>
-        <div class="override-level">
-            <label>Team</label>
-            <select class="override-team"></select>
-        </div>
-        <div class="override-level">
-            <label>Match</label>
-            <select class="override-match"></select>
-        </div>
-        <button type="button" class="btn btn-secondary btn-sm override-remove">Remove</button>
-    `;
-    const teamSelect = row.querySelector('.override-team');
-    const matchSelect = row.querySelector('.override-match');
-    for (const level of OVERRIDE_LEVELS) {
-        teamSelect.appendChild(new Option(level.label, level.value));
-        matchSelect.appendChild(new Option(level.label, level.value));
-    }
-    teamSelect.value = teamLevel || 'read';
-    matchSelect.value = matchLevel || 'read';
-    row.querySelector('.override-remove').addEventListener('click', () => row.remove());
+
+    const roleWrap = document.createElement('div');
+    roleWrap.className = 'override-role';
+    const dot = document.createElement('span');
+    dot.className = 'role-dot';
+    if (role.color && role.color !== '#000000') dot.style.background = role.color;
+    else dot.classList.add('role-dot-empty');
+    roleWrap.appendChild(dot);
+    const nameEl = document.createElement('span');
+    nameEl.className = 'override-role-name';
+    nameEl.textContent = role.name;
+    roleWrap.appendChild(nameEl);
+    if (role.is_default) roleWrap.appendChild(defaultBadge(role));
+    row.appendChild(roleWrap);
+
+    const controls = document.createElement('div');
+    controls.className = 'override-controls';
+    const teamGroup = document.createElement('div');
+    teamGroup.className = 'level-group';
+    teamGroup.innerHTML = '<span class="level-group-label">Team channels</span>';
+    teamGroup.appendChild(buildSegmented('team', teamLevel || 'read'));
+    const matchGroup = document.createElement('div');
+    matchGroup.className = 'level-group';
+    matchGroup.innerHTML = '<span class="level-group-label">Match channels</span>';
+    matchGroup.appendChild(buildSegmented('match', matchLevel || 'read'));
+    controls.appendChild(teamGroup);
+    controls.appendChild(matchGroup);
+    row.appendChild(controls);
+
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'icon-btn override-remove';
+    remove.title = 'Remove this role';
+    remove.setAttribute('aria-label', 'Remove role');
+    remove.textContent = '×';
+    remove.addEventListener('click', () => row.remove());
+    row.appendChild(remove);
+
     container.appendChild(row);
 }
 
 function collectOverrides() {
-    return Array.from(document.querySelectorAll('#override-roles .override-row')).map(row => ({
-        role_id: Number(row.dataset.roleId),
-        team: row.querySelector('.override-team').value,
-        match: row.querySelector('.override-match').value,
-    }));
+    return Array.from(document.querySelectorAll('#override-roles .override-row')).map(row => {
+        const team = row.querySelector('.segmented[data-channel="team"] button.active');
+        const match = row.querySelector('.segmented[data-channel="match"] button.active');
+        return {
+            role_id: Number(row.dataset.roleId),
+            team: team ? team.dataset.level : 'none',
+            match: match ? match.dataset.level : 'none',
+        };
+    });
 }
 
 function closeOverrideSuggestions() {
     const box = document.getElementById('override-suggestions');
     box.style.display = 'none';
     box.innerHTML = '';
+}
+
+function suggestionRow(role) {
+    const colorDot = role.color && role.color !== '#000000'
+        ? `<span class="role-dot" style="background:${role.color}"></span>`
+        : '<span class="role-dot role-dot-empty"></span>';
+    const defaultTag = role.is_default ? '<span class="default-badge">Default</span>' : '';
+    return `<div class="role-suggestion" data-id="${role.id}" data-name="${escapeHtml(role.name)}"
+                 data-color="${role.color || ''}" data-team="${role.default_team || 'none'}"
+                 data-match="${role.default_match || 'none'}" data-default="${role.is_default ? '1' : ''}">
+        ${colorDot}<span class="role-suggestion-name">${escapeHtml(role.name)}</span>${defaultTag}
+    </div>`;
+}
+
+function suggestionToRole(item) {
+    const defaultTeam = item.dataset.team || 'none';
+    const defaultMatch = item.dataset.match || 'none';
+    return {
+        role: {
+            id: Number(item.dataset.id),
+            name: item.dataset.name,
+            color: item.dataset.color,
+            default_team: defaultTeam,
+            default_match: defaultMatch,
+            is_default: item.dataset.default === '1',
+        },
+        team: initialLevel(defaultTeam),
+        match: initialLevel(defaultMatch),
+    };
 }
 
 function initOverrideSearch() {
@@ -164,7 +250,7 @@ function initOverrideSearch() {
                 const resp = await API.get(`/admin/api/tournament/roles?query=${encodeURIComponent(q)}&limit=20`);
                 const roles = resp.roles || [];
                 box.innerHTML = roles.length
-                    ? roles.map(r => `<div class="role-suggestion" data-id="${r.id}" data-name="${escapeHtml(r.name)}">${escapeHtml(r.name)}</div>`).join('')
+                    ? roles.map(suggestionRow).join('')
                     : '<div class="role-suggestion muted">No roles found</div>';
                 box.style.display = 'block';
             } catch (e) {
@@ -177,7 +263,8 @@ function initOverrideSearch() {
         const item = ev.target.closest('.role-suggestion[data-id]');
         if (!item) return;
         ev.preventDefault();
-        addOverrideRow({ id: Number(item.dataset.id), name: item.dataset.name }, 'read', 'read');
+        const parsed = suggestionToRole(item);
+        addOverrideRow(parsed.role, parsed.team, parsed.match);
         search.value = '';
         closeOverrideSuggestions();
         search.focus();
@@ -188,7 +275,8 @@ function initOverrideSearch() {
             ev.preventDefault();
             const first = box.querySelector('.role-suggestion[data-id]');
             if (first) {
-                addOverrideRow({ id: Number(first.dataset.id), name: first.dataset.name }, 'read', 'read');
+                const parsed = suggestionToRole(first);
+                addOverrideRow(parsed.role, parsed.team, parsed.match);
                 search.value = '';
                 closeOverrideSuggestions();
             }
@@ -262,8 +350,9 @@ function renderOverrideEntries(overrides) {
     }
     return entries.map(entry => {
         const role = entry.role || {};
+        const defaultTag = role.is_default ? ' <span class="default-badge">Default</span>' : '';
         return `<p class="preview-meta">
-            <strong>${escapeHtml(role.name)}</strong>
+            <strong>${escapeHtml(role.name)}</strong>${defaultTag}
             — team: <span class="preview-tag">${escapeHtml(levelLabel(entry.team))}</span>
             · match: <span class="preview-tag">${escapeHtml(levelLabel(entry.match))}</span>
         </p>`;
