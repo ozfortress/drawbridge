@@ -472,6 +472,131 @@ body {
 
 .role-badge { display:inline-block; padding:0 6px; border-radius:3px; font-size:0.75em; font-weight:600; }
 
+/* Field validation + help text */
+.field-status {
+    margin-top: 0.4rem;
+    font-size: 0.85rem;
+    min-height: 1.1rem;
+    color: var(--text-secondary);
+}
+.field-status.checking { color: var(--text-muted); }
+.field-status.ok { color: var(--success); }
+.field-status.ok strong { color: var(--success); }
+.field-status.error { color: var(--danger); }
+.field-help {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 0.35rem;
+    max-width: 640px;
+}
+.field-help code {
+    background: var(--bg-input);
+    padding: 0.05rem 0.3rem;
+    border-radius: 4px;
+    color: var(--text-secondary);
+}
+
+/* Role override groups */
+.override-header {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.35rem;
+}
+.override-group {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.75rem;
+    margin-bottom: 0.6rem;
+    background: var(--bg-secondary);
+}
+.override-group-head {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 0.35rem;
+}
+.override-group-head .override-preset {
+    max-width: 220px;
+    margin: 0;
+}
+.override-desc { margin-bottom: 0.5rem; }
+
+/* Tag input + role autocomplete */
+.tag-input-wrap {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    align-items: center;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.35rem;
+    background: var(--bg-input);
+}
+.tag-input-wrap:focus-within { border-color: var(--accent); }
+.role-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.role-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.15rem 0.3rem 0.15rem 0.55rem;
+    background: var(--accent);
+    color: var(--bg-primary);
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+.role-tag button {
+    background: transparent;
+    border: none;
+    color: var(--bg-primary);
+    cursor: pointer;
+    font-size: 0.95rem;
+    line-height: 1;
+    opacity: 0.75;
+}
+.role-tag button:hover { opacity: 1; }
+.role-search {
+    flex: 1 1 160px;
+    min-width: 140px;
+    border: none;
+    background: transparent;
+    padding: 0.25rem;
+    max-width: none;
+}
+.role-search:focus { outline: none; border: none; }
+.role-suggestions {
+    position: absolute;
+    top: calc(100% + 2px);
+    left: 0;
+    right: 0;
+    z-index: 50;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    max-height: 220px;
+    overflow-y: auto;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+}
+.role-suggestion {
+    padding: 0.45rem 0.7rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+    color: var(--text-primary);
+}
+.role-suggestion:hover { background: var(--bg-input); }
+.role-suggestion.muted { color: var(--text-muted); cursor: default; }
+.role-suggestion.muted:hover { background: transparent; }
+
+.preview-tag {
+    display: inline-block;
+    margin: 0 0.4rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
 /* Tournament creation preview */
 .preview-panel {
     margin-top: 1.25rem;

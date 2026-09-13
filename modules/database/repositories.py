@@ -1232,12 +1232,13 @@ class TournamentScheduleSettingsRepository(BaseRepository):
             raise ValueError("Missing required field: league_id")
         return self._execute_query(
             f"""INSERT INTO {self.table}
-                (league_id, excluded_days, scheduling_enabled, `format`, deadline_day, deadline_time)
-                VALUES (?, ?, ?, ?, ?, ?)""",
+                (league_id, excluded_days, scheduling_enabled, `format`, deadline_day, deadline_time, role_overrides)
+                VALUES (?, ?, ?, ?, ?, ?, ?)""",
             (
                 data['league_id'], data.get('excluded_days'),
                 int(data.get('scheduling_enabled', 0)), data.get('format'),
                 data.get('deadline_day'), data.get('deadline_time'),
+                data.get('role_overrides'),
             )
         )
 
@@ -1249,13 +1250,26 @@ class TournamentScheduleSettingsRepository(BaseRepository):
         return self._execute_query(
             f"""UPDATE {self.table}
                 SET excluded_days = ?, scheduling_enabled = ?, `format` = ?,
-                    deadline_day = ?, deadline_time = ?
+                    deadline_day = ?, deadline_time = ?, role_overrides = ?
                 WHERE id = ?""",
             (
                 merged.get('excluded_days'), int(merged.get('scheduling_enabled', 0) or 0),
                 merged.get('format'), merged.get('deadline_day'),
-                merged.get('deadline_time'), settings_id,
+                merged.get('deadline_time'), merged.get('role_overrides'), settings_id,
             )
+        ) > 0
+
+    def upsert_role_overrides(self, league_id: int, role_overrides_json: Optional[str]) -> bool:
+        """Store the JSON role-override config for a league, creating the row if needed."""
+        existing = self.get_by_league(league_id)
+        if existing:
+            return self._execute_query(
+                f"UPDATE {self.table} SET role_overrides = ? WHERE league_id = ?",
+                (role_overrides_json, league_id),
+            ) > 0
+        return self._execute_query(
+            f"""INSERT INTO {self.table} (league_id, role_overrides) VALUES (?, ?)""",
+            (league_id, role_overrides_json),
         ) > 0
 
     def delete(self, settings_id: int) -> bool:
