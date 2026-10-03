@@ -16,6 +16,7 @@
                 <a href="/admin/launchpad" class="btn btn-secondary" style="text-decoration:none;">Launchpad</a>
             </div>
         </div>
+        {% if is_dev %}<div id="fake-progress" class="progress-container"></div>{% endif %}
         <div id="tournaments-loading" style="padding:1rem 0;color:var(--text-secondary);">Loading...</div>
         <div id="tournaments-container"></div>
     </div>
@@ -86,9 +87,9 @@ document.getElementById('btn-gen-fake')?.addEventListener('click', async () => {
     const btn = document.getElementById('btn-gen-fake');
     btn.disabled = true; btn.textContent = 'Generating...';
     try {
-        const resp = await API.post('/admin/api/dev/generate-fake-tournament', {});
-        API.toast(resp.message, 'success');
-        window.location.href = `/admin/tournament/${resp.league_id}`;
+        const result = await API.runTask('/admin/api/dev/generate-fake-tournament', {}, 'fake-progress');
+        API.toast(result.message, 'success');
+        window.location.href = `/admin/tournament/${result.league_id}`;
     } catch (e) {
         API.toast(e.message, 'error');
         btn.disabled = false; btn.textContent = 'Generate Fake Tournament';

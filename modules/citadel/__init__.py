@@ -13,8 +13,18 @@ __copyright__ = 'Copyright 2024-present ozfortress'
 __path__ = __import__('pkgutil').extend_path(__path__, __name__)
 
 from typing import Optional
+import os
 import requests
 import json
+
+# Development-mode fake data IDs. These match the fake tournament generator in
+# web/dev_fake_tournament.py. In development we feign responses for these
+# instead of hitting the live Citadel API, which would otherwise return 404.
+FAKE_LEAGUE_ID = 99999
+FAKE_LEAGUE_NAME = 'ETF2L Season 34'
+FAKE_LEAGUE_SHORTCODE = 'ETF2L34'
+FAKE_ROSTER_MIN_ID = 500000
+FAKE_ROSTER_MAX_ID = 599999
 
 class Citadel:
     """
@@ -396,6 +406,115 @@ class Citadel:
         if self._base_url[-1] != '/':
             self._base_url += '/' # Ensure the base URL ends with a slash
         self._api_key: str = apiKey
+        self._is_dev: bool = os.getenv('ENVIRONMENT', 'production') == 'development'
+        # Optional fixture published by the dev fake-tournament generator so that
+        # fake leagues/teams/rosters/matches resolve exactly like real Citadel data.
+        self._fake_fixture: Optional[dict] = None
+
+    def set_fake_fixture(self, fixture: dict) -> None:
+        """Publish a fake-data fixture used to satisfy ``_feign_*`` lookups.
+
+        The fixture is a dict with keys ``league``, ``rosters``, ``teams``,
+        ``matches`` and ``users``. It is only consulted in development.
+        """
+        self._fake_fixture = fixture
+
+    def clear_fake_fixture(self) -> None:
+        self._fake_fixture = None
+
+    def has_fake_fixture(self) -> bool:
+        return bool(self._fake_fixture)
+
+    def _is_fake_id(self, id) -> bool:
+        """Whether an ID falls in the fake-data range used by the dev generator."""
+        try:
+            return FAKE_ROSTER_MIN_ID <= int(id) <= FAKE_ROSTER_MAX_ID
+        except (TypeError, ValueError):
+            return False
+
+    def _fixture_get(self, collection: str, id) -> Optional[dict]:
+        if not self._fake_fixture:
+            return None
+        try:
+            return self._fake_fixture.get(collection, {}).get(int(id))
+        except (TypeError, ValueError):
+            return None
+
+    def _feign_league(self, id: int):
+        fixture = self._fake_fixture.get('league') if self._fake_fixture else None
+        if fixture is not None:
+            league = self.League(dict(fixture))
+            # PartialLeague does not define shortcode, but Drawbridge reads it.
+            league.shortcode = self._fake_fixture.get('shortcode', '')
+            return league
+        return self.League({
+            'id': int(id),
+            'name': FAKE_LEAGUE_NAME,
+            'description': 'Development fake league (generated for local testing)',
+            'rosters': [],
+            'matches': [],
+        })
+
+    def _feign_roster(self, id: int):
+        data = self._fixture_get('rosters', id)
+        if data is not None:
+            return self.Roster(dict(data))
+        uid = int(id)
+        return self.Roster({
+            'id': uid,
+            'team_id': uid,
+            'name': f'Dev Fake Team {uid}',
+            'description': 'Development fake roster',
+            'division': 'Development',
+            'disbanded': False,
+            'players': [],
+            'matches': [],
+        })
+
+    def _feign_team(self, id: int):
+        data = self._fixture_get('teams', id)
+        if data is not None:
+            return self.Team(dict(data))
+        uid = int(id)
+        return self.Team({
+            'id': uid,
+            'name': f'Dev Fake Team {uid}',
+            'description': 'Development fake team',
+            'avatar_url': '',
+            'avatar_thumb_url': '',
+            'avatar_icon_url': '',
+            'players': [],
+            'rosters': [],
+        })
+
+    def _feign_match(self, id: int):
+        data = self._fixture_get('matches', id)
+        if data is not None:
+            return self.Match(dict(data))
+        uid = int(id)
+        return self.Match({
+            'id': uid,
+            'forfeit_by': 'no_forfeit',
+            'status': 'pending',
+            'round_name': 'Development',
+            'round_number': 1,
+            'notice': '',
+            'created_at': '',
+            'league': {
+                'id': FAKE_LEAGUE_ID,
+                'name': FAKE_LEAGUE_NAME,
+                'description': 'Development fake league',
+            },
+            'home_team': {
+                'id': uid,
+                'team_id': uid,
+                'name': f'Dev Fake Team {uid}',
+                'description': 'Development fake roster',
+                'division': 'Development',
+                'disbanded': False,
+            },
+            'away_team': None,
+        })
 
     def getUser(self, id: int) -> User:
         """
@@ -412,6 +531,9 @@ class Citadel:
         """
         url = f'{self._base_url}users/{id}'
         headers = {'X-API-Key': self._api_key}
+        fake_user = self._fixture_get('users', id) if self._is_dev else None
+        if fake_user is not None:
+            return self.User(dict(fake_user))
         response: dict = requests.get(url, headers=headers).json()
         if 'status' in response:
             raise Citadel.APIException(response['status'], response['message'])
@@ -507,6 +629,8 @@ class Citadel:
         """
         url = f'{self._base_url}teams/{id}'
         headers = {'X-API-Key': self._api_key}
+        if self._is_dev and self._is_fake_id(id):
+            return self._feign_team(id)
         response: dict = requests.get(url, headers=headers).json()
         if 'status' in response:
             raise Citadel.APIException(response['status'], response['message'])
@@ -528,6 +652,8 @@ class Citadel:
         """
         url = f'{self._base_url}leagues/{id}'
         headers = {'X-API-Key': self._api_key}
+        if self._is_dev and int(id) == FAKE_LEAGUE_ID:
+            return self._feign_league(id)
         response: dict = requests.get(url, headers=headers).json()
         if 'status' in response:
             raise Citadel.APIException(response['status'], response['message'])
@@ -549,6 +675,8 @@ class Citadel:
         """
         url = f'{self._base_url}rosters/{id}'
         headers = {'X-API-Key': self._api_key}
+        if self._is_dev and self._is_fake_id(id):
+            return self._feign_roster(id)
         response: dict = requests.get(url, headers=headers).json()
         if 'status' in response:
             raise Citadel.APIException(response['status'], response['message'])
@@ -569,6 +697,8 @@ class Citadel:
         """
         url = f'{self._base_url}matches/{id}'
         headers = {'X-API-Key': self._api_key}
+        if self._is_dev and self._is_fake_id(id):
+            return self._feign_match(id)
         response: dict = requests.get(url, headers=headers).json()
         if 'status' in response:
             raise Citadel.APIException(response['status'], response['message'])

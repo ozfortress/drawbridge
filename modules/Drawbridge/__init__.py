@@ -40,8 +40,10 @@ async def initialize(client: discord_commands.Bot, db : Database, cit : Citadel,
         # module.Start(self.cmd_tree, self.db, self.cit)
     for module in modules.values():
         if hasattr(module, 'initialize'):
-            # l
-            await module.initialize(client, db, cit, logger)
+            try:
+                await module.initialize(client, db, cit, logger)
+            except Exception as e:
+                logger.error(f'Failed to initialize module {module.__name__}: {e}', exc_info=True)
     cmds = await client.tree.sync(guild=discord.Object(id=os.getenv('DISCORD_GUILD_ID')))
     logger.info(f'COMMANDS: {cmds}')
     for cmd in client.tree.walk_commands(guild=discord.Object(id=os.getenv('DISCORD_GUILD_ID'))):

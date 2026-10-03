@@ -7,19 +7,52 @@
 
 <div class="card">
     <h2>Start Tournament</h2>
+
     <div class="form-group">
-        <label>League ID</label>
-        <input type="number" id="start-league-id" class="form-input" placeholder="e.g. 27">
+        <label for="league-input">League</label>
+        <input type="text" id="league-input" class="form-input" autocomplete="off"
+               placeholder="e.g. 93 or https://ozfortress.com/leagues/93">
+        <div id="league-status" class="field-status" aria-live="polite"></div>
     </div>
+
     <div class="form-group">
-        <label>League Shortcode</label>
-        <input type="text" id="start-shortcode" class="form-input" placeholder="e.g. 6s 30">
+        <label for="shortcode-input">League Shortcode</label>
+        <input type="text" id="shortcode-input" class="form-input" autocomplete="off" placeholder="e.g. 6s 30">
+        <p class="field-help">
+            A short vanity label appended to every generated division and team role/channel,
+            e.g. <code>Premiership - 6s 30</code>. It has no functional effect — it just helps
+            tell apart leagues that reuse the same division or team names.
+        </p>
     </div>
+
     <div class="form-group">
-        <label>Role Overrides (optional, comma-separated role names)</label>
-        <input type="text" id="start-overrides" class="form-input" placeholder="e.g. Caster, Staff">
+        <div class="override-header">
+            <label>Role Overrides</label>
+            <span class="field-help">Add a role, then choose what it can do in team and match channels.</span>
+        </div>
+        <div id="override-roles" class="override-list"></div>
+        <div class="override-add">
+            <span class="override-add-icon">+</span>
+            <input type="text" id="override-search" class="override-search"
+                   placeholder="Search for a role to add..." autocomplete="off">
+            <div class="role-suggestions" id="override-suggestions" style="display:none;"></div>
+        </div>
+        <p class="field-help">
+            Permission levels are cumulative — <strong>Read</strong> → <strong>Send</strong> → <strong>Manage</strong>.
+            Roles shown with a <span class="default-badge">Default</span> badge already have access without an override.
+        </p>
     </div>
-    <button class="btn btn-primary" id="btn-start">Start Tournament</button>
+
+    <label class="preview-option">
+        <input type="checkbox" id="start-include-assignments" checked>
+        Include captain role assignment preview (queries Citadel for each team, slower)
+    </label>
+
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+        <button class="btn btn-secondary" id="btn-preview">Preview</button>
+        <button class="btn btn-primary" id="btn-start">Start Tournament</button>
+    </div>
+    <div id="start-preview" class="preview-panel" style="display:none;"></div>
     <div id="start-progress" class="progress-container"></div>
     <div id="start-result" class="result-box" style="display:none;"></div>
 </div>
@@ -50,18 +83,428 @@
 {% endblock %}
 {% block scripts %}
 <script>
+function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    })[c]);
+}
+
+function debounce(fn, ms) {
+    let timer = null;
+    return (...args) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), ms);
+    };
+}
+
+/* ── Role overrides: one row per role with team/match levels ── */
+
+const OVERRIDE_LEVELS = [];
+let currentLeagueId = null;
+let prefilledFor = null;
+
+function levelLabel(value) {
+    const level = OVERRIDE_LEVELS.find(l => l.value === value);
+    return level ? level.label : value;
+}
+
+function initialLevel(value) {
+    return value && value !== 'none' ? value : 'read';
+}
+
+function buildSegmented(channel, value) {
+    const wrap = document.createElement('div');
+    wrap.className = 'segmented';
+    wrap.dataset.channel = channel;
+    for (const level of OVERRIDE_LEVELS) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.dataset.level = level.value;
+        button.textContent = level.label;
+        if (level.description) button.title = level.description;
+        if (level.value === value) button.classList.add('active');
+        button.addEventListener('click', () => {
+            wrap.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+            button.classList.add('active');
+        });
+        wrap.appendChild(button);
+    }
+    return wrap;
+}
+
+function defaultBadge(role) {
+    const parts = [];
+    if (role.default_team && role.default_team !== 'none') parts.push(`Team: ${levelLabel(role.default_team)}`);
+    if (role.default_match && role.default_match !== 'none') parts.push(`Match: ${levelLabel(role.default_match)}`);
+    const badge = document.createElement('span');
+    badge.className = 'default-badge';
+    badge.textContent = 'Default';
+    badge.title = `Already granted by default${parts.length ? ' — ' + parts.join(', ') : ''}. An override changes this.`;
+    return badge;
+}
+
+function addOverrideRow(role, teamLevel, matchLevel) {
+    const container = document.getElementById('override-roles');
+    if (container.querySelector(`[data-role-id="${role.id}"]`)) return;
+    const row = document.createElement('div');
+    row.className = 'override-row';
+    row.dataset.roleId = role.id;
+
+    const roleWrap = document.createElement('div');
+    roleWrap.className = 'override-role';
+    const dot = document.createElement('span');
+    dot.className = 'role-dot';
+    if (role.color && role.color !== '#000000') dot.style.background = role.color;
+    else dot.classList.add('role-dot-empty');
+    roleWrap.appendChild(dot);
+    const nameEl = document.createElement('span');
+    nameEl.className = 'override-role-name';
+    nameEl.textContent = role.name;
+    roleWrap.appendChild(nameEl);
+    if (role.is_default) roleWrap.appendChild(defaultBadge(role));
+    row.appendChild(roleWrap);
+
+    const controls = document.createElement('div');
+    controls.className = 'override-controls';
+    const teamGroup = document.createElement('div');
+    teamGroup.className = 'level-group';
+    teamGroup.innerHTML = '<span class="level-group-label">Team channels</span>';
+    teamGroup.appendChild(buildSegmented('team', teamLevel || 'read'));
+    const matchGroup = document.createElement('div');
+    matchGroup.className = 'level-group';
+    matchGroup.innerHTML = '<span class="level-group-label">Match channels</span>';
+    matchGroup.appendChild(buildSegmented('match', matchLevel || 'read'));
+    controls.appendChild(teamGroup);
+    controls.appendChild(matchGroup);
+    row.appendChild(controls);
+
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'icon-btn override-remove';
+    remove.title = 'Remove this role';
+    remove.setAttribute('aria-label', 'Remove role');
+    remove.textContent = '×';
+    remove.addEventListener('click', () => row.remove());
+    row.appendChild(remove);
+
+    container.appendChild(row);
+}
+
+function collectOverrides() {
+    return Array.from(document.querySelectorAll('#override-roles .override-row')).map(row => {
+        const team = row.querySelector('.segmented[data-channel="team"] button.active');
+        const match = row.querySelector('.segmented[data-channel="match"] button.active');
+        return {
+            role_id: Number(row.dataset.roleId),
+            team: team ? team.dataset.level : 'none',
+            match: match ? match.dataset.level : 'none',
+        };
+    });
+}
+
+function closeOverrideSuggestions() {
+    const box = document.getElementById('override-suggestions');
+    box.style.display = 'none';
+    box.innerHTML = '';
+}
+
+function suggestionRow(role) {
+    const colorDot = role.color && role.color !== '#000000'
+        ? `<span class="role-dot" style="background:${role.color}"></span>`
+        : '<span class="role-dot role-dot-empty"></span>';
+    const defaultTag = role.is_default ? '<span class="default-badge">Default</span>' : '';
+    return `<div class="role-suggestion" data-id="${role.id}" data-name="${escapeHtml(role.name)}"
+                 data-color="${role.color || ''}" data-team="${role.default_team || 'none'}"
+                 data-match="${role.default_match || 'none'}" data-default="${role.is_default ? '1' : ''}">
+        ${colorDot}<span class="role-suggestion-name">${escapeHtml(role.name)}</span>${defaultTag}
+    </div>`;
+}
+
+function suggestionToRole(item) {
+    const defaultTeam = item.dataset.team || 'none';
+    const defaultMatch = item.dataset.match || 'none';
+    return {
+        role: {
+            id: Number(item.dataset.id),
+            name: item.dataset.name,
+            color: item.dataset.color,
+            default_team: defaultTeam,
+            default_match: defaultMatch,
+            is_default: item.dataset.default === '1',
+        },
+        team: initialLevel(defaultTeam),
+        match: initialLevel(defaultMatch),
+    };
+}
+
+function initOverrideSearch() {
+    const search = document.getElementById('override-search');
+    const box = document.getElementById('override-suggestions');
+    let timer = null;
+
+    search.addEventListener('input', () => {
+        clearTimeout(timer);
+        const q = search.value.trim();
+        timer = setTimeout(async () => {
+            try {
+                const resp = await API.get(`/admin/api/tournament/roles?query=${encodeURIComponent(q)}&limit=20`);
+                const roles = resp.roles || [];
+                box.innerHTML = roles.length
+                    ? roles.map(suggestionRow).join('')
+                    : '<div class="role-suggestion muted">No roles found</div>';
+                box.style.display = 'block';
+            } catch (e) {
+                closeOverrideSuggestions();
+            }
+        }, 200);
+    });
+
+    box.addEventListener('mousedown', (ev) => {
+        const item = ev.target.closest('.role-suggestion[data-id]');
+        if (!item) return;
+        ev.preventDefault();
+        const parsed = suggestionToRole(item);
+        addOverrideRow(parsed.role, parsed.team, parsed.match);
+        search.value = '';
+        closeOverrideSuggestions();
+        search.focus();
+    });
+
+    search.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') {
+            ev.preventDefault();
+            const first = box.querySelector('.role-suggestion[data-id]');
+            if (first) {
+                const parsed = suggestionToRole(first);
+                addOverrideRow(parsed.role, parsed.team, parsed.match);
+                search.value = '';
+                closeOverrideSuggestions();
+            }
+        } else if (ev.key === 'Escape') {
+            closeOverrideSuggestions();
+        }
+    });
+    search.addEventListener('blur', () => setTimeout(closeOverrideSuggestions, 150));
+}
+
+/* ── League validation ────────────────────────────────────── */
+
+function setLeagueStatus(state, message) {
+    const el = document.getElementById('league-status');
+    el.className = `field-status ${state}`;
+    el.innerHTML = message;
+}
+
+const validateLeague = debounce(async () => {
+    const raw = document.getElementById('league-input').value.trim();
+    currentLeagueId = null;
+    if (!raw) {
+        setLeagueStatus('', '');
+        return;
+    }
+    setLeagueStatus('checking', 'Checking league on Citadel...');
+    try {
+        const resp = await API.post('/admin/api/tournament/league-lookup', { league: raw });
+        const league = resp.league;
+        currentLeagueId = league.id;
+        let status = `✅ <strong>${escapeHtml(league.name)}</strong>` +
+            ` — league ${league.id}, ${league.division_count} divisions, ${league.team_count} teams`;
+        if (resp.already_started) {
+            status += ' <span class="text-warning">· already generated</span>';
+        }
+        setLeagueStatus('ok', status);
+        // Prefill saved overrides once per league (don't clobber manual edits if none saved).
+        if (prefilledFor !== league.id) {
+            prefilledFor = league.id;
+            if (Array.isArray(resp.role_overrides) && resp.role_overrides.length) {
+                document.getElementById('override-roles').innerHTML = '';
+                for (const entry of resp.role_overrides) {
+                    if (entry.role) addOverrideRow(entry.role, entry.team, entry.match);
+                }
+            }
+        }
+    } catch (e) {
+        setLeagueStatus('error', `❌ ${escapeHtml(e.message)}`);
+    }
+}, 1200);
+
+document.getElementById('league-input').addEventListener('input', () => {
+    currentLeagueId = null;
+    setLeagueStatus('checking', 'Typing...');
+    validateLeague();
+});
+
+/* ── Preview rendering ────────────────────────────────────── */
+
+function roleList(roles) {
+    if (!roles || !roles.length) return '<span style="color:var(--text-muted);">None</span>';
+    return roles
+        .map(r => `<span class="role-badge" style="background:var(--bg-input);color:var(--text-primary);">${escapeHtml(r.name)}</span>`)
+        .join(' ');
+}
+
+function renderOverrideEntries(overrides) {
+    const entries = (overrides && overrides.entries) || [];
+    if (!entries.length) {
+        return '<p class="preview-meta">No extra role overrides.</p>';
+    }
+    return entries.map(entry => {
+        const role = entry.role || {};
+        const defaultTag = role.is_default ? ' <span class="default-badge">Default</span>' : '';
+        return `<p class="preview-meta">
+            <strong>${escapeHtml(role.name)}</strong>${defaultTag}
+            — team: <span class="preview-tag">${escapeHtml(levelLabel(entry.team))}</span>
+            · match: <span class="preview-tag">${escapeHtml(levelLabel(entry.match))}</span>
+        </p>`;
+    }).join('');
+}
+
+function renderPreview(plan) {
+    const s = plan.summary || {};
+    const overrides = plan.role_overrides || { entries: [], missing: [] };
+    const warnings = (plan.warnings || [])
+        .map(w => `<div class="alert alert-error">${escapeHtml(w)}</div>`)
+        .join('');
+
+    const divisionsHtml = (plan.divisions || []).map(div => `
+        <div class="preview-division">
+            <div class="preview-division-head">
+                <strong>${escapeHtml(div.name)}</strong>
+                <span class="preview-meta">category: <code>${escapeHtml(div.category_name)}</code></span>
+                <span class="preview-meta">role: <code>${escapeHtml(div.role_name)}</code></span>
+            </div>
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead><tr><th>Team</th><th>Role</th><th>Channel</th></tr></thead>
+                    <tbody>
+                        ${(div.teams || []).map(t => `
+                            <tr>
+                                <td>${escapeHtml(t.name)}${t.name_trimmed ? ' <span title="name trimmed to fit">✂️</span>' : ''}</td>
+                                <td><code>${escapeHtml(t.role_name)}</code></td>
+                                <td><code>${escapeHtml(t.channel_name)}</code></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `).join('');
+
+    let assignmentsHtml = '';
+    if (plan.assignments) {
+        const a = plan.assignments;
+        const badgeFor = status => ({
+            will_assign: '<span class="status-badge status-active">will assign</span>',
+            not_linked: '<span class="status-badge status-pending">no Discord linked</span>',
+            not_in_server: '<span class="status-badge status-cancelled">not in server</span>',
+        }[status] || escapeHtml(status));
+        const rows = (a.players || []).map(p => `
+            <tr>
+                <td>${escapeHtml(p.division)}</td>
+                <td>${escapeHtml(p.team_name)}</td>
+                <td>${escapeHtml(p.player_name)}</td>
+                <td>${badgeFor(p.status)}</td>
+                <td>${escapeHtml((p.roles || []).join(', '))}</td>
+            </tr>
+        `).join('');
+        assignmentsHtml = `
+            <h3>Captain Role Assignments</h3>
+            <p class="preview-meta">
+                Will assign: ${a.summary.will_assign} ·
+                No Discord linked: ${a.summary.not_linked} ·
+                Not in server: ${a.summary.not_in_server}${a.summary.errors ? ` · Lookup errors: ${a.summary.errors}` : ''}
+            </p>
+            ${(a.players || []).length ? `
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead><tr><th>Division</th><th>Team</th><th>Captain</th><th>Status</th><th>Roles</th></tr></thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>
+            ` : '<p class="preview-meta">No captains found to assign.</p>'}
+        `;
+    } else {
+        assignmentsHtml = '<p class="preview-meta">Assignment preview was skipped.</p>';
+    }
+
+    return `
+        <h3>Preview — ${escapeHtml(plan.league_name)} (${escapeHtml(plan.league_shortcode)})</h3>
+        <div class="preview-stats">
+            <span><strong>${s.divisions}</strong> divisions</span>
+            <span><strong>${s.teams}</strong> teams</span>
+            <span><strong>${s.categories}</strong> categories</span>
+            <span><strong>${s.roles}</strong> roles</span>
+            <span><strong>${s.channels}</strong> channels</span>
+        </div>
+        ${warnings}
+        <p class="preview-meta">Category access: ${roleList(plan.category_access)}</p>
+        <p class="preview-meta">Team channel access: ${roleList(plan.team_access)}</p>
+        <p class="preview-meta">Match channel access: ${roleList(plan.match_access)}</p>
+        <h3>Role Overrides</h3>
+        ${renderOverrideEntries(overrides)}
+        ${(overrides.missing || []).length ? `<div class="alert alert-error">Unmatched overrides: ${escapeHtml(overrides.missing.join(', '))}</div>` : ''}
+        ${divisionsHtml}
+        ${assignmentsHtml}
+    `;
+}
+
+function startFormPayload() {
+    return {
+        league_id: currentLeagueId,
+        league_shortcode: document.getElementById('shortcode-input').value.trim(),
+        role_overrides: collectOverrides(),
+    };
+}
+
+function validateStartForm() {
+    if (!currentLeagueId) {
+        API.toast('Enter a valid league first', 'error');
+        return false;
+    }
+    if (!document.getElementById('shortcode-input').value.trim()) {
+        API.toast('A league shortcode is required', 'error');
+        return false;
+    }
+    return true;
+}
+
+/* ── Actions ──────────────────────────────────────────────── */
+
+document.getElementById('btn-preview').addEventListener('click', async () => {
+    if (!validateStartForm()) return;
+    const btn = document.getElementById('btn-preview');
+    const panel = document.getElementById('start-preview');
+    const result = document.getElementById('start-result');
+    const payload = startFormPayload();
+    payload.include_assignments = document.getElementById('start-include-assignments').checked;
+    btn.disabled = true;
+    btn.textContent = 'Building preview...';
+    result.style.display = 'none';
+    try {
+        const resp = await API.post('/admin/api/tournament/preview', payload);
+        panel.innerHTML = renderPreview(resp.plan);
+        panel.style.display = 'block';
+        API.toast('Preview generated', 'success');
+    } catch (e) {
+        panel.style.display = 'none';
+        result.textContent = e.message;
+        result.className = 'result-box result-error';
+        result.style.display = 'block';
+        API.toast(e.message, 'error');
+    }
+    btn.disabled = false;
+    btn.textContent = 'Preview';
+});
+
 document.getElementById('btn-start').addEventListener('click', async () => {
+    if (!validateStartForm()) return;
     const btn = document.getElementById('btn-start');
     const result = document.getElementById('start-result');
     btn.disabled = true;
     btn.textContent = 'Starting...';
     result.style.display = 'none';
     try {
-        const taskResult = await API.runTask('/admin/api/tournament/start', {
-            league_id: parseInt(document.getElementById('start-league-id').value),
-            league_shortcode: document.getElementById('start-shortcode').value,
-            role_overrides: document.getElementById('start-overrides').value || null,
-        }, 'start-progress');
+        const taskResult = await API.runTask('/admin/api/tournament/start', startFormPayload(), 'start-progress');
         API.toast(taskResult.message, 'success');
         result.textContent = taskResult.message;
         result.className = 'result-box result-success';
@@ -191,5 +634,17 @@ document.getElementById('btn-end').addEventListener('click', async () => {
     btn.disabled = false;
     btn.textContent = 'End Tournament';
 });
+
+/* ── Init ─────────────────────────────────────────────────── */
+
+(async function initStartForm() {
+    try {
+        const resp = await API.get('/admin/api/tournament/override-options');
+        OVERRIDE_LEVELS.push(...(resp.levels || []));
+    } catch (e) {
+        API.toast('Could not load role override levels', 'error');
+    }
+    initOverrideSearch();
+})();
 </script>
 {% endblock %}

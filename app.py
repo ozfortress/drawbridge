@@ -149,8 +149,11 @@ async def on_ready():
     health_monitor = initialize_health_monitor(client, db)
     health_monitor.start_monitoring()
     logger.info('Health monitoring system initialized')
-    
-    await Drawbridge.initialize(client, db, cit, logger)
+
+    try:
+        await Drawbridge.initialize(client, db, cit, logger)
+    except Exception as e:
+        logger.error(f'Failed to initialize Drawbridge modules: {e}', exc_info=True)
     
     # Initialize web IPC handler if available
     try:
