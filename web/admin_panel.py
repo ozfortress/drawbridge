@@ -488,7 +488,7 @@ async def api_tournament_league_lookup():
                      '(e.g. 93 or https://ozfortress.com/leagues/93).'
         }), 400
     try:
-        league = _cit.getLeague(league_id)
+        league = await asyncio.to_thread(_cit.getLeague, league_id)
     except Exception as e:
         logger.warning(f'League lookup {league_id} failed: {e}')
         return jsonify({'error': f'Could not find league {league_id} on Citadel.'}), 404
@@ -586,7 +586,7 @@ async def api_tournament_start():
         )
         p(0, 'Starting tournament creation...')
         guild = _get_guild()
-        league = _cit.getLeague(league_id)
+        league = await asyncio.to_thread(_cit.getLeague, league_id)
         if league is None:
             raise ValueError(f'League {league_id} not found in Citadel.')
 
@@ -604,7 +604,7 @@ async def api_tournament_start():
             logger.warning(f'Failed to seed league {league_id}: {e}')
 
         # Shared, side-effect-free plan — the same builder powers the preview.
-        plan = build_tournament_plan(
+        plan = await build_tournament_plan(
             guild, _cit, league, league_shortcode, role_overrides, include_assignments=False)
 
         override_entries, _missing, _legacy = normalize_role_overrides(guild, role_overrides)
@@ -718,7 +718,7 @@ async def api_tournament_preview():
         guild = _get_guild()
         if not guild:
             return jsonify({'error': 'Guild not found'}), 500
-        league = _cit.getLeague(league_id)
+        league = await asyncio.to_thread(_cit.getLeague, league_id)
         if league is None:
             return jsonify({'error': f'League {league_id} not found in Citadel.'}), 404
         try:
@@ -727,7 +727,7 @@ async def api_tournament_preview():
             logger.warning(f'Preview could not check existing divisions for {league_id}: {e}')
             already_started = False
         from modules.Drawbridge.tournament_plan import build_tournament_plan
-        plan = build_tournament_plan(
+        plan = await build_tournament_plan(
             guild, _cit, league, league_shortcode, role_overrides,
             include_assignments=include_assignments,
             already_started=already_started,
@@ -776,7 +776,7 @@ async def api_tournament_assign_captain_roles():
             team_id = team['team_id']
             team_role_id = team['role_id']
             team_role = guild.get_role(team_role_id)
-            cit_team = _cit.getTeam(team_id)
+            cit_team = await asyncio.to_thread(_cit.getTeam, team_id)
             if not cit_team:
                 continue
             for user in cit_team.players:
@@ -898,7 +898,7 @@ async def api_tournament_matchgen():
     if not match_id:
         return jsonify({'error': 'match_id is required'}), 400
     try:
-        match = _cit.getMatch(match_id)
+        match = await asyncio.to_thread(_cit.getMatch, match_id)
         if not match:
             return jsonify({'error': 'Match not found in Citadel'}), 404
         result = await _get_tournament_cog()._generate_match(match, role_overrides)
@@ -925,7 +925,7 @@ async def api_tournament_matchgen_round():
 
     async def _run(p):
         p(0, 'Loading matches...')
-        league = _cit.getLeague(league_id)
+        league = await asyncio.to_thread(_cit.getLeague, league_id)
         matches = league.matches
         filtered = []
         for m in matches:
@@ -949,7 +949,7 @@ async def api_tournament_matchgen_round():
             p(int((idx + 1) / total * 95), f'Generating match {idx + 1}/{total} (ID: {pm.id})...')
             c += 1
             try:
-                full = _cit.getMatch(pm.id)
+                full = await asyncio.to_thread(_cit.getMatch, pm.id)
                 await _get_tournament_cog()._generate_match(full, role_overrides)
             except discord.HTTPException as e:
                 if e.status == 429:
@@ -957,7 +957,7 @@ async def api_tournament_matchgen_round():
                     p(int((idx + 1) / total * 95), f'Rate limited, waiting {retry_after}s before match {pm.id}...')
                     await asyncio.sleep(retry_after + 1.0)
                     try:
-                        full = _cit.getMatch(pm.id)
+                        full = await asyncio.to_thread(_cit.getMatch, pm.id)
                         await _get_tournament_cog()._generate_match(full, role_overrides)
                     except Exception as e2:
                         errors.append(f'Match {pm.id} (retry): {e2}')
@@ -986,7 +986,7 @@ async def api_tournament_force_matchgen():
         existing = _db.matches.get_by_id(match_id)
         if existing:
             await _get_tournament_cog()._delete_match(match_id)
-        match = _cit.getMatch(match_id)
+        match = await asyncio.to_thread(_cit.getMatch, match_id)
         if not match:
             return jsonify({'error': 'Match not found'}), 404
         await _get_tournament_cog()._generate_match(match, role_overrides)
@@ -1046,7 +1046,7 @@ async def api_tournament_round_archive():
     if not league_id or round_number is None:
         return jsonify({'error': 'league_id and round_number required'}), 400
     try:
-        league = _cit.getLeague(league_id)
+        league = await asyncio.to_thread(_cit.getLeague, league_id)
         if not league:
             return jsonify({'error': 'League not found'}), 404
         cit_matches = getattr(league, 'matches', []) or []
@@ -1098,7 +1098,7 @@ async def api_tournament_round_delete():
     if not league_id or round_number is None:
         return jsonify({'error': 'league_id and round_number required'}), 400
     try:
-        league = _cit.getLeague(league_id)
+        league = await asyncio.to_thread(_cit.getLeague, league_id)
         if not league:
             return jsonify({'error': 'League not found'}), 404
         cit_matches = getattr(league, 'matches', []) or []
@@ -1313,7 +1313,7 @@ async def api_tournament_random_demo_check():
     try:
         import random
         import modules.citadel as citadel_module
-        league = _cit.getLeague(league_id)
+        league = await asyncio.to_thread(_cit.getLeague, league_id)
         if not league:
             return jsonify({'error': 'League not found'}), 404
         if not _db.divisions.get_by_league(league_id):
@@ -1322,22 +1322,22 @@ async def api_tournament_random_demo_check():
         match_chosen = None
         db_team = None
         if spes_user == 0:
-            matches = [_cit.getMatch(m['id']) for m in league.matches]
+            matches = [await asyncio.to_thread(_cit.getMatch, m['id']) for m in league.matches]
             filtered = [m for m in matches if (round_no == 0 or m.round_number == round_no) and m.forfeit_by != 'no_forfeit' and m.away_team is not None]
             if not filtered:
                 return jsonify({'error': 'No matches found for this round'}), 404
             random.shuffle(filtered)
             part = filtered[random.randint(0, len(filtered) - 1)]
-            match_chosen = _cit.getMatch(part['id'])
+            match_chosen = await asyncio.to_thread(_cit.getMatch, part['id'])
             chosen_team = match_chosen.home_team if random.randint(0, 1) == 0 else match_chosen.away_team
             pot_players = chosen_team['players']
             pl_id = pot_players[random.randint(0, len(pot_players) - 1)]
-            player_chosen = _cit.getUser(pl_id['id'])
+            player_chosen = await asyncio.to_thread(_cit.getUser, pl_id['id'])
             db_team = _db.teams.get_by_team_id(chosen_team['team_id'])
             if not db_team:
                 return jsonify({'error': f'Team {chosen_team["team_id"]} not found in database'}), 404
         else:
-            player_chosen = _cit.getUser(spes_user)
+            player_chosen = await asyncio.to_thread(_cit.getUser, spes_user)
             if not player_chosen:
                 return jsonify({'error': 'Player not found'}), 404
             for roster in player_chosen.rosters:
@@ -1346,12 +1346,12 @@ async def api_tournament_random_demo_check():
                     break
             if not db_team:
                 return jsonify({'error': 'Player not found on a roster in this league'}), 404
-            pl_roster = _cit.getRoster(db_team['roster_id'])
+            pl_roster = await asyncio.to_thread(_cit.getRoster, db_team['roster_id'])
             all_matches = pl_roster.matches if hasattr(pl_roster, 'matches') else []
             if not all_matches:
                 return jsonify({'error': 'No matches found for this player'}), 404
             part = all_matches[random.randint(0, len(all_matches) - 1)]
-            match_chosen = _cit.getMatch(part['id'])
+            match_chosen = await asyncio.to_thread(_cit.getMatch, part['id'])
         round_str = str(match_chosen.round_number)
         raw_msg = get_template('democheck.json')
         from modules.Drawbridge.functions import Functions as Funcs
@@ -1448,7 +1448,7 @@ async def api_admin_leagues():
             shortcode = db_league.get('league_shortcode') or ''
             if _cit:
                 try:
-                    cit_league = _cit.getLeague(lid)
+                    cit_league = await asyncio.to_thread(_cit.getLeague, lid)
                     name = cit_league.name
                     shortcode = getattr(cit_league, 'shortcode', shortcode) or shortcode
                 except Exception:
@@ -1484,7 +1484,7 @@ async def api_admin_leagues_active():
             # Try to enrich with Citadel data
             if _cit:
                 try:
-                    cit_league = _cit.getLeague(lid)
+                    cit_league = await asyncio.to_thread(_cit.getLeague, lid)
                     name = cit_league.name
                     shortcode = getattr(cit_league, 'shortcode', shortcode) or shortcode
                 except Exception:
@@ -1537,7 +1537,7 @@ async def api_tournament_detail(league_id: int):
     try:
         league = None
         if _cit and league_id != 99999:
-            league = _cit.getLeague(league_id)
+            league = await asyncio.to_thread(_cit.getLeague, league_id)
 
         db_league = _db.leagues.get_by_id(league_id)
 

@@ -1,6 +1,7 @@
 from ..checks import *
 from ..functions import *
 from ..logging import *
+import asyncio
 import logging
 import discord
 import os
@@ -78,7 +79,7 @@ class Sync(discord_commands.Cog):
         about_self = (src.id == target.id) if src else False
         forced_log = f" (Forced by <@{src.id}>)" if not about_self else ""
         automated = " (Automated on join)" if src is None else ""
-        user: Optional[citadel.Citadel.User] = self.cit.getUserByDiscordID(target.id)
+        user: Optional[citadel.Citadel.User] = await asyncio.to_thread(self.cit.getUserByDiscordID, target.id)
         name = target.name + "'s" if not about_self else "Your"
         
         if user is None:
@@ -142,7 +143,7 @@ class Sync(discord_commands.Cog):
             
             for team_data in user_teams:
                 team_id = team_data['id']  # Extract team ID from dictionary
-                full_team_data = self.cit.getTeam(team_id)
+                full_team_data = await asyncio.to_thread(self.cit.getTeam, team_id)
                 users = full_team_data.players if full_team_data else []
                 
                 # Check if user is captain of this team

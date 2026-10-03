@@ -52,8 +52,8 @@ class LogsTFEmbed(discord_commands.Cog):
                     # is this a match channel?
                     match = self.db.matches.get_by_channel_id(message.channel.id)
                     if match:
-                        team_home = self.cit.getTeam(match['team_home'])
-                        team_away = self.cit.getTeam(match['team_away'])
+                        team_home = await asyncio.to_thread(self.cit.getTeam, match['team_home'])
+                        team_away = await asyncio.to_thread(self.cit.getTeam, match['team_away'])
                         
                         
                         if team_home and team_away:

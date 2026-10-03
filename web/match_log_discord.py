@@ -1,5 +1,6 @@
 """Discord UI for submitting logs.tf links in match channels."""
 
+import asyncio
 import logging
 import datetime
 import discord
@@ -158,8 +159,8 @@ class MatchLogSubmitModal(Modal, title='Submit Match Log'):
                 return
 
         try:
-            team_home = _cit.getTeam(match['team_home'])
-            team_away = _cit.getTeam(match['team_away'])
+            team_home = await asyncio.to_thread(_cit.getTeam, match['team_home'])
+            team_away = await asyncio.to_thread(_cit.getTeam, match['team_away'])
         except Exception as e:
             logger.warning(f'Failed to fetch team data for match {self.match_id}: {e}')
             await interaction.followup.send('Failed to fetch team roster data.', ephemeral=True)

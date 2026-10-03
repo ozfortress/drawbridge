@@ -12,6 +12,7 @@ creation would actually do.
 
 from __future__ import annotations
 
+import asyncio
 import datetime
 import re
 from typing import Optional
@@ -309,7 +310,7 @@ def _division_names(rosters) -> list[str]:
     return names
 
 
-def _build_assignments(guild: discord.Guild, cit, divisions: list[dict], missing_roles: list[str]) -> dict:
+async def _build_assignments(guild: discord.Guild, cit, divisions: list[dict], missing_roles: list[str]) -> dict:
     """Work out which captains would receive their division/team roles.
 
     Mirrors ``Tournament._assign_roles``: only captains are considered, and
@@ -320,7 +321,7 @@ def _build_assignments(guild: discord.Guild, cit, divisions: list[dict], missing
     for division in divisions:
         for team in division['teams']:
             try:
-                cit_team = cit.getTeam(team['team_id'])
+                cit_team = await asyncio.to_thread(cit.getTeam, team['team_id'])
             except Exception:
                 summary['errors'] += 1
                 continue
@@ -349,7 +350,7 @@ def _build_assignments(guild: discord.Guild, cit, divisions: list[dict], missing
     return {'summary': summary, 'players': players, 'missing_roles': missing_roles}
 
 
-def build_tournament_plan(guild: discord.Guild, cit, league, league_shortcode: str,
+async def build_tournament_plan(guild: discord.Guild, cit, league, league_shortcode: str,
                           role_overrides: Optional[str] = None,
                           include_assignments: bool = True,
                           already_started: bool = False) -> dict:
@@ -466,5 +467,5 @@ def build_tournament_plan(guild: discord.Guild, cit, league, league_shortcode: s
         'warnings': warnings,
         'divisions': divisions,
     }
-    plan['assignments'] = _build_assignments(guild, cit, divisions, []) if include_assignments else None
+    plan['assignments'] = await _build_assignments(guild, cit, divisions, []) if include_assignments else None
     return plan
