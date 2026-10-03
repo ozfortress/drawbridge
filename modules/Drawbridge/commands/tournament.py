@@ -190,7 +190,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
                 if team['league_id'] not in leagueids:
                     leagueids.append(team['league_id'])
                     try:
-                        leagues.append(self.cit.getLeague(team['league_id']))
+                        leagues.append(await asyncio.to_thread(self.cit.getLeague, team['league_id']))
                     except Exception as e:
                         self.logger.error(f'Failed to fetch league {team["league_id"]} from Citadel: {e}')
                 if team['division'] not in divids:
@@ -308,7 +308,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
                 team_id = team['team_id']
                 team_role_id = team['role_id']
                 team_role = self.guild.get_role(team_role_id)
-                team = self.cit.getTeam(team_id)
+                team = await asyncio.to_thread(self.cit.getTeam, team_id)
                 for user in team.players:
                     if user['is_captain']:
                         # Check what their discord id is
@@ -368,7 +368,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
         """
 
         await interaction.response.send_message('Generating teams...', ephemeral=not share)
-        league = self.cit.getLeague(league_id)
+        league = await asyncio.to_thread(self.cit.getLeague, league_id)
         rosters = league.rosters
         divs = []
 
@@ -553,7 +553,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
             team_id = team['team_id']
             team_role_id = team['role_id']
             team_role = self.guild.get_role(team_role_id)
-            cit_team = self.cit.getTeam(team_id)
+            cit_team = await asyncio.to_thread(self.cit.getTeam, team_id)
             if not cit_team:
                 continue
             for user in cit_team.players:
@@ -914,7 +914,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
             await interaction.edit_original_response(content='Deleting existing match')
             await self._delete_match(match_id)
         try:
-            match = self.cit.getMatch(match_id)
+            match = await asyncio.to_thread(self.cit.getMatch, match_id)
             if match is None:
                 await interaction.edit_original_response(content='Match not found.')
                 return
@@ -950,7 +950,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
         await interaction.response.send_message('Finding matches...', ephemeral=True)
         try:
             # get the league
-            league = self.cit.getLeague(league_id)
+            league = await asyncio.to_thread(self.cit.getLeague, league_id)
             matches = league.matches
             filtered_matches = []
             for match in matches:
@@ -970,7 +970,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
                 match2 = citadel.Citadel.PartialMatch(match)
                 c=c+1
                 await interaction.edit_original_response(content=f'Generating {c}/{len(filtered_matches)} matches...')
-                fullmatch = self.cit.getMatch(match2.id)
+                fullmatch = await asyncio.to_thread(self.cit.getMatch, match2.id)
                 await self._generate_match(fullmatch, role_overrides)
             await interaction.edit_original_response(content='Matches generated.')
         except Exception as e:
@@ -1001,7 +1001,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
 
         await interaction.response.send_message('Generating matches...', ephemeral=True)
         try:
-            match = self.cit.getMatch(match_id)
+            match = await asyncio.to_thread(self.cit.getMatch, match_id)
             if match is None:
                 await interaction.edit_original_response(content='Match not found.')
                 return
@@ -1176,7 +1176,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
         """
         await interaction.response.send_message('Democheck is in progress ...', ephemeral=True)
         try:
-            league = self.cit.getLeague(league_id)
+            league = await asyncio.to_thread(self.cit.getLeague, league_id)
 
             player_chosen = None #player we're going to democheck
             match_chosen = None #The match they played on
@@ -1193,7 +1193,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
                 # to make life easier we need to remove the description field of all matches
 
                 # This method is a lot slower that my previous attempt but idgaf -ama
-                matches = [self.cit.getMatch(mt['id']) for mt in league.matches]
+                matches = [await asyncio.to_thread(self.cit.getMatch, mt['id']) for mt in league.matches]
                 filtered_matches = []
                 for m in matches:
                     if round_no > 0 and round_no != m.round_number:
@@ -1208,7 +1208,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
 
                 random.shuffle(filtered_matches)
                 part_match = filtered_matches[random.randint(0, len(filtered_matches)-1)] #partial match
-                match_chosen = self.cit.getMatch(part_match['id'])
+                match_chosen = await asyncio.to_thread(self.cit.getMatch, part_match['id'])
                 self.logger.debug(f'Chosen match: {match_chosen}')
 
                 if(random.randint(0, 1) == 0):
@@ -1218,27 +1218,27 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
 
                 pot_players = chosen_team['players']
                 pl_id = pot_players[random.randint(0, len(pot_players)-1)]
-                player_chosen = self.cit.getUser(pl_id['id'])
+                player_chosen = await asyncio.to_thread(self.cit.getUser, pl_id['id'])
                 db_team = self.db.teams.get_by_team_id(chosen_team['team_id'])
                 if db_team is None:
                     await interaction.edit_original_response(content=f'DB_Team was not assigned. Chosen team id:{chosen_team["id"]}. DB call returned: {self.db.teams.get_by_team_id(chosen_team["id"])} Aborting.')
                     return
             else:
-                player_chosen = self.cit.getUser(spes_user)
+                player_chosen = await asyncio.to_thread(self.cit.getUser, spes_user)
                 if player_chosen is None:
                     await interaction.edit_original_response(content=f'Player could not be found with ID:{spes_user}. Aborting.')
                     return
                 for roster in player_chosen.rosters:
                     db_team = self.db.teams.get_by_team_id(roster['team_id'])
                     if db_team is not None and db_team['league_id'] == league_id:
-                        pl_roster = self.cit.getRoster(roster['id'])
+                        pl_roster = await asyncio.to_thread(self.cit.getRoster, roster['id'])
                         break
                 if db_team is None:
                     await interaction.edit_original_response(content=f'Player {player_chosen.name} couldn\'t be found on a roster for league ID: {league_id} Aborting.')
                     return
                 matches = pl_roster.matches
                 part_match = matches[random.randint(0, len(matches)-1)]
-                match_chosen = self.cit.getMatch(part_match['id'])
+                match_chosen = await asyncio.to_thread(self.cit.getMatch, part_match['id'])
             round = match_chosen.round_number
             messageraw = get_template('democheck.json')
             tempmsg = str(messageraw)

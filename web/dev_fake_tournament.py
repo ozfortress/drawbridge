@@ -538,7 +538,7 @@ async def generate_fake_tournament(bot, db, cit, guild, tournament_cog=None,
         p(58, 'Creating match channels...')
         for idx, match in enumerate(match_list):
             try:
-                cit_match = cit.getMatch(match['id'])
+                cit_match = await asyncio.to_thread(cit.getMatch, match['id'])
                 await tournament_cog._generate_match(cit_match)
             except Exception as e:
                 logger.error(f'Fake tournament failed to generate match {match["id"]}: {e}', exc_info=True)
