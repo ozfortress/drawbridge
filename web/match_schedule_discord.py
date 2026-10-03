@@ -190,6 +190,13 @@ def log_schedule_event(db, match_id: int, action: str, *, user=None, team_id=Non
 
 # ── Propose flow (transient, ephemeral) ──────────────────────
 
+def _mark_selected(select: Select, value: str):
+    """Flag ``value`` as the select's default. Re-sending the view on edit_message
+    otherwise shows the select reset to its placeholder, even though the choice is kept."""
+    for opt in select.options:
+        opt.default = (opt.value == value)
+
+
 class _DaySelect(Select):
     def __init__(self, days: list[int], selected: int | None):
         options = [
@@ -202,6 +209,7 @@ class _DaySelect(Select):
     async def callback(self, interaction: discord.Interaction):
         view: ProposeView = self.view
         view.day = int(self.values[0])
+        _mark_selected(self, self.values[0])
         await interaction.response.edit_message(embed=view.build_embed(), view=view)
 
 
@@ -217,6 +225,7 @@ class _TimeSelect(Select):
     async def callback(self, interaction: discord.Interaction):
         view: ProposeView = self.view
         view.time = self.values[0]
+        _mark_selected(self, self.values[0])
         await interaction.response.edit_message(embed=view.build_embed(), view=view)
 
 
