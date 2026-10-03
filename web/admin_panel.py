@@ -10,11 +10,17 @@ import discord
 from quart import Blueprint, render_template, request, jsonify, redirect, make_response
 from modules.logging_config import get_logger
 from modules.Drawbridge.checks import Checks
+from modules.Drawbridge import action_guard
 
 logger = get_logger('drawbridge.web.admin', 'web.log')
 checks = Checks()
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
+
+
+@admin_bp.errorhandler(action_guard.ActionInProgress)
+async def _action_in_progress(e):
+    return jsonify({'error': str(e)}), 409
 
 # Injected at startup from app.py
 _bot = None
@@ -56,11 +62,17 @@ async def _discord_safe(coro, retries=3):
 _tasks: dict[str, dict] = {}
 
 
-def _start_task(coro_factory):
+def _start_task(coro_factory, guard: tuple | None = None):
     """Start ``coro_factory(progress_cb)`` as a background asyncio task.
     Returns a task ID string.  The factory receives a callable with
     signature ``(progress: int, message: str) -> None``.
+
+    ``guard`` is an optional ``(label, action, *targets)`` for action_guard: it's
+    claimed now (raising ActionInProgress, answered with a 409, if that action is
+    already running) and released when the task finishes.
     """
+    if guard:
+        action_guard.claim(*guard)
     task_id = str(uuid.uuid4())
     _tasks[task_id] = {
         'id': task_id,
@@ -85,6 +97,9 @@ def _start_task(coro_factory):
         except Exception as e:
             _tasks[task_id].update({'status': 'failed', 'error': str(e)})
             logger.error(f'Task {task_id} failed: {e}', exc_info=True)
+        finally:
+            if guard:
+                action_guard.release(*guard[1:])
 
     asyncio.ensure_future(_run())
     return task_id
@@ -696,7 +711,7 @@ async def api_tournament_start():
         await _get_tournament_cog().update_launchpad()
         return {'success': True, 'message': f'Tournament started. Divisions: {d}, Teams: {r}.', 'errors': err_msg}
 
-    task_id = _start_task(_run)
+    task_id = _start_task(_run, guard=(f'Starting league {league_id}', 'start', league_id))
     return jsonify({'task_id': task_id}), 202
 
 
@@ -766,6 +781,7 @@ async def api_tournament_assign_captain_roles():
     league_id = data.get('league_id')
     if not league_id:
         return jsonify({'error': 'league_id is required'}), 400
+    action_guard.claim(f'Captain role assignment for league {league_id}', 'assign_captain_roles', league_id)
     try:
         guild = _get_guild()
         assigned = []
@@ -809,6 +825,8 @@ async def api_tournament_assign_captain_roles():
     except Exception as e:
         logger.error(f'Assign captain roles error: {e}')
         return _db_error(e)
+    finally:
+        action_guard.release('assign_captain_roles', league_id)
 
 
 @admin_bp.route('/api/tournament/end', methods=['POST'])
@@ -883,7 +901,7 @@ async def api_tournament_end():
         await _get_tournament_cog().update_launchpad()
         return {'success': True, 'message': 'Tournament ended and all channels/roles archived.'}
 
-    task_id = _start_task(_run)
+    task_id = _start_task(_run, guard=(f'Ending league {league_id}', 'end', league_id))
     return jsonify({'task_id': task_id}), 202
 
 
@@ -968,7 +986,7 @@ async def api_tournament_matchgen_round():
             await asyncio.sleep(_DISCORD_OP_DELAY)
         return {'success': True, 'generated': c, 'errors': errors}
 
-    task_id = _start_task(_run)
+    task_id = _start_task(_run, guard=(f'Match generation for league {league_id}', 'matchgen_round', league_id))
     return jsonify({'task_id': task_id}), 202
 
 
@@ -982,6 +1000,7 @@ async def api_tournament_force_matchgen():
     role_overrides = data.get('role_overrides')
     if not match_id:
         return jsonify({'error': 'match_id is required'}), 400
+    action_guard.claim(f'Force-regenerating match {match_id}', 'force_matchgen', match_id)
     try:
         existing = _db.matches.get_by_id(match_id)
         if existing:
@@ -994,6 +1013,8 @@ async def api_tournament_force_matchgen():
     except Exception as e:
         logger.error(f'Force matchgen error: {e}')
         return _db_error(e)
+    finally:
+        action_guard.release('force_matchgen', match_id)
 
 
 @admin_bp.route('/api/tournament/matchend', methods=['POST'])
@@ -1005,6 +1026,7 @@ async def api_tournament_matchend():
     match_id = data.get('match_id')
     if not match_id:
         return jsonify({'error': 'match_id is required'}), 400
+    action_guard.claim(f'Ending match {match_id}', 'matchend', match_id)
     try:
         match = _db.matches.get_by_id(match_id)
         if not match:
@@ -1033,6 +1055,8 @@ async def api_tournament_matchend():
     except Exception as e:
         logger.error(f'Matchend error: {e}')
         return _db_error(e)
+    finally:
+        action_guard.release('matchend', match_id)
 
 
 @admin_bp.route('/api/tournament/round-archive', methods=['POST'])
@@ -1045,6 +1069,7 @@ async def api_tournament_round_archive():
     round_number = data.get('round_number')
     if not league_id or round_number is None:
         return jsonify({'error': 'league_id and round_number required'}), 400
+    action_guard.claim(f'Archiving round {round_number} of league {league_id}', 'round_archive', league_id, round_number)
     try:
         league = await asyncio.to_thread(_cit.getLeague, league_id)
         if not league:
@@ -1085,6 +1110,8 @@ async def api_tournament_round_archive():
     except Exception as e:
         logger.error(f'Round archive error: {e}')
         return _db_error(e)
+    finally:
+        action_guard.release('round_archive', league_id, round_number)
 
 
 @admin_bp.route('/api/tournament/round-delete', methods=['POST'])
@@ -1097,6 +1124,7 @@ async def api_tournament_round_delete():
     round_number = data.get('round_number')
     if not league_id or round_number is None:
         return jsonify({'error': 'league_id and round_number required'}), 400
+    action_guard.claim(f'Deleting round {round_number} of league {league_id}', 'round_delete', league_id, round_number)
     try:
         league = await asyncio.to_thread(_cit.getLeague, league_id)
         if not league:
@@ -1136,6 +1164,8 @@ async def api_tournament_round_delete():
     except Exception as e:
         logger.error(f'Round delete error: {e}')
         return _db_error(e)
+    finally:
+        action_guard.release('round_delete', league_id, round_number)
 
 
 @admin_bp.route('/match/<int:match_id>')
@@ -1245,6 +1275,7 @@ async def api_match_logs(match_id: int):
 async def api_match_delete_channel(match_id: int):
     if not _check_bot_ready():
         return jsonify({'error': 'Bot not ready', 'success': False}), 503
+    action_guard.claim(f'A channel change for match {match_id}', 'match_channel', match_id)
     try:
         m = _db.matches.get_by_id(match_id)
         if not m:
@@ -1268,6 +1299,8 @@ async def api_match_delete_channel(match_id: int):
         return jsonify({'message': 'Channel deleted', 'success': True})
     except Exception as e:
         return jsonify({'error': str(e), 'success': False}), 500
+    finally:
+        action_guard.release('match_channel', match_id)
 
 
 @admin_bp.route('/api/match/<int:match_id>/rebuild-channel', methods=['POST'])
@@ -1275,6 +1308,7 @@ async def api_match_delete_channel(match_id: int):
 async def api_match_rebuild_channel(match_id: int):
     if not _check_bot_ready():
         return jsonify({'error': 'Bot not ready', 'success': False}), 503
+    action_guard.claim(f'A channel change for match {match_id}', 'match_channel', match_id)
     try:
         from modules.Drawbridge.channel_monitor import rebuild_match_channel
         m = _db.matches.get_by_id(match_id)
@@ -1297,6 +1331,8 @@ async def api_match_rebuild_channel(match_id: int):
             return jsonify({'error': 'Failed to rebuild channel', 'success': False}), 500
     except Exception as e:
         return jsonify({'error': str(e), 'success': False}), 500
+    finally:
+        action_guard.release('match_channel', match_id)
 
 
 @admin_bp.route('/api/tournament/random-demo-check', methods=['POST'])
@@ -1715,7 +1751,7 @@ async def api_dev_generate_fake():
             admin_discord_id=admin_discord_id, force=force, progress=p)
         return {'success': True, 'league_id': league_id, 'message': message}
 
-    task_id = _start_task(_run)
+    task_id = _start_task(_run, guard=('Fake tournament generation', 'dev_fake_tournament'))
     return jsonify({'task_id': task_id}), 202
 
 

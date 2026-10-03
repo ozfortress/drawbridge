@@ -1,6 +1,8 @@
 from ..checks import *
 from ..functions import *
 from ..logging import *
+from .. import action_guard
+from ..action_guard import exclusive_command
 import discord
 import os
 import re
@@ -130,7 +132,18 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
         self.logging = Logging(self.bot, self.db, self.cit)
         self.perms_last_fixed = 0.0
         self.guild = self.bot.get_guild(int(os.getenv('DISCORD_GUILD_ID','')))
-        
+
+    async def cog_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
+        original = getattr(error, 'original', error)
+        if not isinstance(original, action_guard.ActionInProgress):
+            # Having a handler here switches off discord.py's default logging for this cog.
+            self.logger.error(f'Ignoring exception in command {interaction.command.name if interaction.command else "?"}: {error}', exc_info=error)
+            return
+        if interaction.response.is_done():
+            await interaction.followup.send(str(original), ephemeral=True)
+        else:
+            await interaction.response.send_message(str(original), ephemeral=True)
+
     @app_commands.command(
         name='launchpad'
     )
@@ -295,6 +308,10 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
         await self.bot.wait_until_ready()
 
     async def _assign_roles(self, league_id: int):
+        with action_guard.exclusive(f'Role assignment for league {league_id}', 'assign_roles', league_id):
+            return await self._assign_roles_unguarded(league_id)
+
+    async def _assign_roles_unguarded(self, league_id: int):
         # This needs a fair few requests to Citadel, unfortunately
         # AFAIK there’s no way to get whether a user is a captain from
         # the roster (which we already query)
@@ -355,6 +372,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
         'HEAD',
         'DEVELOPER',
     )
+    @exclusive_command('start', 'league_id', label='Starting league {league_id}')
     async def start(self, interaction : discord.Interaction, league_id : int, league_shortcode: str, role_overrides: Optional[str], share : bool=False):
         """Generate team roles and channels for a given league. Assign all users with linked Citadel accounts roles.
         Parameters
@@ -534,6 +552,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
         'TRIAL',
         'DEVELOPER',
     )
+    @exclusive_command('assign_captain_roles', 'league_id', label='Captain role assignment for league {league_id}')
     async def assign_captain_roles(self, interaction: discord.Interaction, league_id: int):
         """Find all team captains in a league and assign them their team role in Discord.
 
@@ -603,6 +622,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
         warned_for='end_tournament',
         warning_message='This command will archive all channels and roles for this tournament. Rerun the comamnd if you are prepared to proceed.'
     )
+    @exclusive_command('end', 'league_id', label='Ending league {league_id}')
     async def end(self, interaction : discord.Interaction, league_id : int, share : bool=False):
         """End a tournament and archive all channels and roles
 
@@ -715,6 +735,14 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
         Exception
             If the match could not be found or an error occurred
         """
+        # Another run is creating this match's channel right now; it isn't in the
+        # database yet, so without this both runs would create a channel.
+        if action_guard.is_running('generate_match', match.id):
+            return False
+        with action_guard.exclusive(f'Generating match {match.id}', 'generate_match', match.id):
+            return await self._generate_match_unguarded(match, role_overrides)
+
+    async def _generate_match_unguarded(self, match: Citadel.Citadel.Match, role_overrides: Optional[str] = None):
         if self.db.matches.get_by_id(match.id) is not None:
             return False # It's already in the Database, must already be generated.
         if match.away_team is None:
@@ -907,6 +935,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
         'ADMIN',
         'TRIAL'
     )
+    @exclusive_command('force_matchgen', 'match_id', label='Force-regenerating match {match_id}')
     async def force_matchgen(self, interaction: discord.Interaction, match_id: int, role_overrides : Optional[str]):
         # Clean up anything existing
         await interaction.response.send_message('Force regenerating match', ephemeral=True)
@@ -935,6 +964,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
         'ADMIN',
         'TRIAL',
     )
+    @exclusive_command('matchgen_round', 'league_id', label='Match generation for league {league_id}')
     async def matchgenround(self, interaction : discord.Interaction, league_id : int, round_number : Optional[int], role_overrides : Optional[str]):
         """Generate ALL match channels for a given league (optionally limiting to a specific round). Attempts to skip matches already generated.
 
@@ -1022,6 +1052,7 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
         'ADMIN',
         'TRIAL',
     )
+    @exclusive_command('matchend', 'match_id', label='Ending match {match_id}')
     async def matchend(self, interaction : discord.Interaction, match_id : int):
         """End a match and archive all channels
 
