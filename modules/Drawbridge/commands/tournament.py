@@ -896,17 +896,6 @@ class Tournament(discord_commands.GroupCog, group_name='tournament', group_descr
                     'league_id': match.league_id,
                 }, settings)
 
-            # Lets also say something in their team channel
-            try:
-                team_home_channel = self.bot.get_channel(team_home['team_channel']) # team_channel
-                team_away_channel = self.bot.get_channel(team_away['team_channel']) # team_channel
-                await team_home_channel.send(f'Match for round {match.round_number} has been generated. Please head to {match_channel.mention} to organise your match.')
-                await team_away_channel.send(f'Match for round {match.round_number} has been generated. Please head to {match_channel.mention} to organise your match.')
-                if trimmed:
-                    await team_home_channel.send(f'Heads up: Due to a discord limitation, we had to trim your match name down to {channel_name}. We apologise for any inconvenience.')
-                    await team_away_channel.send(f'Heads up: Due to a discord limitation, we had to trim your match name down to {channel_name}. We apologise for any inconvenience.')
-            except Exception as e:
-                self.logger.error(f'Error sending message to team channels: {e}')
             return True
     
     async def _delete_match(self, match_id: int):
