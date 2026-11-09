@@ -93,6 +93,16 @@ def _slot_label(day: int, time_str: str) -> str:
     return f'{DAY_NAMES[day]} {_fmt_time(time_str)}'
 
 
+def _slot_label_ts(day: int, time_str: str) -> str:
+    """Like ``_slot_label`` but the time is a Discord timestamp, so it renders
+    in each viewer's own timezone. The day name stays as the Sydney day."""
+    try:
+        unix = int(next_occurrence(day, time_str).timestamp())
+        return f'{DAY_NAMES[day]} <t:{unix}:t>'
+    except Exception:
+        return _slot_label(day, time_str)
+
+
 # ── DB / context helpers ─────────────────────────────────────
 
 def _get_db():
@@ -266,7 +276,7 @@ class ProposeView(View):
             e.add_field(name='Currently scheduled',
                         value=f'<t:{self.current_unix}:F> — pick a new time below to reschedule.',
                         inline=False)
-        chosen = _slot_label(self.day, self.time) if (self.day is not None and self.day >= 0 and self.time) else 'Nothing selected yet'
+        chosen = _slot_label_ts(self.day, self.time) if (self.day is not None and self.day >= 0 and self.time) else 'Nothing selected yet'
         e.add_field(name='Your proposal', value=chosen, inline=False)
         e.add_field(
             name='Note', inline=False,
@@ -297,7 +307,7 @@ class ProposeView(View):
         embed = discord.Embed(
             title='📅 Proposed Match Time',
             description=f"**{proposer['team_name'] if proposer else 'A team'}** proposed "
-                        f"**{_slot_label(day, time)}**.",
+                        f"**{_slot_label_ts(day, time)}**.",
             color=discord.Color.gold(),
         )
         embed.add_field(
@@ -357,7 +367,7 @@ class CustomTimeModal(Modal, title='Propose a custom time'):
             return
         if await view._commit(interaction, view.day, norm):
             await interaction.response.send_message(
-                f'✅ Proposal sent: {_slot_label(view.day, norm)}.', ephemeral=True)
+                f'✅ Proposal sent: {_slot_label_ts(view.day, norm)}.', ephemeral=True)
         else:
             await interaction.response.send_message('This match is no longer being scheduled.', ephemeral=True)
 
