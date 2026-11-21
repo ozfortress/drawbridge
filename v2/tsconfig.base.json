@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "types": ["node"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "useUnknownInCatchVariables": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true,
+    "paths": {
+      "@drawbridge/config": ["./packages/config/src/index.ts"],
+      "@drawbridge/logging": ["./packages/logging/src/index.ts"],
+      "@drawbridge/health": ["./packages/health/src/index.ts"],
+      "@drawbridge/web": ["./apps/web/src/index.ts"],
+      "@drawbridge/bot": ["./apps/bot/src/index.ts"],
+      "@drawbridge/worker": ["./apps/worker/src/index.ts"]
+    }
+  }
+}

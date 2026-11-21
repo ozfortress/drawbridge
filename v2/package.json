@@ -1,0 +1,27 @@
+{
+  "name": "drawbridge",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Drawbridge v2 - Discord and Citadel tournament operations",
+  "type": "module",
+  "packageManager": "pnpm@12.16.1",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -p tsconfig.check.json",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "start": "node apps/server/dist/main.js",
+    "dev:web": "node --watch --env-file-if-exists=.env.local apps/server/dist/main.js"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.8",
+    "@types/node": "24.19.2",
+    "typescript": "7.0.2",
+    "vitest": "5.1.1"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src/**/*.ts"],
+  "references": [
+    { "path": "../../packages/config/tsconfig.lib.json" },
+    { "path": "../../packages/logging/tsconfig.lib.json" },
+    { "path": "../web/tsconfig.lib.json" },
+    { "path": "../bot/tsconfig.lib.json" },
+    { "path": "../worker/tsconfig.lib.json" }
+  ]
+}

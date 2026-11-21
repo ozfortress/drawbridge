@@ -1,0 +1,12 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/config/tsconfig.lib.json" },
+    { "path": "packages/logging/tsconfig.lib.json" },
+    { "path": "packages/health/tsconfig.lib.json" },
+    { "path": "apps/web/tsconfig.lib.json" },
+    { "path": "apps/bot/tsconfig.lib.json" },
+    { "path": "apps/worker/tsconfig.lib.json" },
+    { "path": "apps/server/tsconfig.lib.json" }
+  ]
+}

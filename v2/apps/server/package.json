@@ -1,0 +1,13 @@
+{
+  "name": "@drawbridge/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@drawbridge/bot": "workspace:*",
+    "@drawbridge/config": "workspace:*",
+    "@drawbridge/logging": "workspace:*",
+    "@drawbridge/web": "workspace:*",
+    "@drawbridge/worker": "workspace:*"
+  }
+}
