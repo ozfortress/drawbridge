@@ -2,6 +2,12 @@
 
 Implementation decisions and deviations from the plan. Newest first.
 
+## P2 (2026-11-22)
+
+- **`previews` table added to the schema.** Plan `03` §2.4 did not name it; the preview-and-approve flow needs the plan and its Citadel snapshot stored against a hash. Columns per todo 10: `id uuid pk`, `league_id` (fk, cascade), `created_by_user_id` (fk, set null, nullable like the other creator columns), `plan`/`snapshot` jsonb not null, `plan_hash` text not null, `citadel_snapshot_at`/`expires_at`/`consumed_at` nullable timestamptz (lifecycle set by the API, not defaulted), `created_at`; index `(league_id, created_at desc)`. Previews are deliberately not unique: re-previewing stores a new row and the API layer treats consumed or expired rows as unusable.
+- **No `guilds.capture_all_text`.** A6 forbids capture-all; capture stays scoped to rows in `managed_channels` only.
+- **`leagues.citadel_league_id` stays `integer`.** Citadel league ids are Rails serials, so integer is sufficient; changing it would churn the P1 unique key for no precision gain.
+
 ## P1 (2026-11-22)
 
 - **Snowflakes as strings end to end.** Postgres columns are `numeric(20,0)` (not `bigint`) so drivers and JSON never round them. Drizzle returns strings; no `BigInt` conversion at boundaries.

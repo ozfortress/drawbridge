@@ -1,7 +1,7 @@
 /**
  * P1 schema: identity and access, guilds, leagues, league roles, managed
  * channels, audit and settings. Later phases add their own tables and
- * migrations (jobs in P3, tournament structure in P4, capture in P6, ...).
+ * migrations (previews in P2, jobs in P3, tournament structure in P4, capture in P6, ...).
  *
  * Conventions (plan 03):
  *  - Internal ids are uuid; Discord and Citadel ids are numeric(20,0) exposed
@@ -344,6 +344,27 @@ export const settingsKv = pgTable('settings_kv', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const previews = pgTable(
+  'previews',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    leagueId: uuid('league_id')
+      .notNull()
+      .references(() => leagues.id, { onDelete: 'cascade' }),
+    createdByUserId: uuid('created_by_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    plan: jsonb('plan').$type<Record<string, unknown>>().notNull(),
+    planHash: text('plan_hash').notNull(),
+    snapshot: jsonb('snapshot').$type<Record<string, unknown>>().notNull(),
+    citadelSnapshotAt: timestamp('citadel_snapshot_at', { withTimezone: true }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    consumedAt: timestamp('consumed_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (table) => [index('previews_league_created_idx').on(table.leagueId, table.createdAt.desc())],
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type UserInviteRow = typeof userInvites.$inferSelect;
 export type SessionRow = typeof sessions.$inferSelect;
@@ -351,3 +372,4 @@ export type LeagueRow = typeof leagues.$inferSelect;
 export type LeagueRoleRow = typeof leagueRoles.$inferSelect;
 export type LeagueMembershipRow = typeof leagueMemberships.$inferSelect;
 export type GuildRow = typeof guilds.$inferSelect;
+export type PreviewRow = typeof previews.$inferSelect;

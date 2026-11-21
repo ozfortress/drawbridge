@@ -34,6 +34,7 @@ const TABLES = [
   'guild_roles',
   'guild_role_mappings',
   'settings_kv',
+  'previews',
 ];
 
 function testUrl(): string {
