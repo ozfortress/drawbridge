@@ -20,6 +20,7 @@ The plan folder is read-only for build agents. Implementation choices go in `v2/
 - Commits:
   - `402ca42` P0 foundations
   - `db01586` P1 data, auth, RBAC and panel shell
+  - handoff docs follow P1; use `git log --oneline` for the exact head
 - Latest green state: `pnpm typecheck`, `pnpm lint`, `pnpm test` (85 tests), `pnpm build`.
 - Runtime smoke verified: migrations applied, root admin seeded, panel served at `/signin`, `/api/v1/me` returns 401 without a session.
 - Commits are currently unsigned because GPG pinentry times out. The owner will sign later. Build agents must commit with `git -c commit.gpgsign=false commit` and must not change git configuration.

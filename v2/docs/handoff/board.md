@@ -2,7 +2,7 @@
 
 Owned by the integrator (WS-A). Agents read this; they do not edit it. Report status in your PR and final message.
 
-Baseline: `drawbridge-v2` at `db01586` (P1). Last updated: 2026-11-22.
+Baseline: `drawbridge-v2` at `db01586` (P1), plus the handoff docs on top. Last updated: 2026-11-22.
 
 ## Status
 
