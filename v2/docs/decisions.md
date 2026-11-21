@@ -2,6 +2,23 @@
 
 Implementation decisions and deviations from the plan. Newest first.
 
+## P1 (2026-11-22)
+
+- **Snowflakes as strings end to end.** Postgres columns are `numeric(20,0)` (not `bigint`) so drivers and JSON never round them. Drizzle returns strings; no `BigInt` conversion at boundaries.
+- **Sessions are opaque tokens.** 256-bit random token in an `HttpOnly` cookie; only the SHA-256 hash is stored. Idle timeout 12 hours, absolute 7 days. Cookie name is `__Host-drawbridge_session` over HTTPS and `drawbridge_session` over plain HTTP, because `__Host-` requires `Secure` and local development runs on HTTP.
+- **CSRF is double-submit.** A readable `drawbridge_csrf` cookie plus an `x-csrf-token` header, compared with a constant-time check. Applied by a global preHandler to mutating `/api/v1` routes.
+- **OAuth is injected.** `createDiscordOAuth` takes `fetchImpl`, so tests assert the authorize URL, token body, Basic auth and bearer user lookup without network access. The web app accepts an injected `oauth` for the same reason.
+- **Capability checks are pure.** `@drawbridge/authz` holds tiers, the capability catalogue, default league templates and the rank rules, with a matrix test. The web layer resolves them against the database.
+- **Invite consumption promotes only.** An invite never demotes an existing tier, and it is consumed once inside a transaction; it also inserts league memberships from its grants.
+- **Users are never reactivated by sign-in.** `upsertDiscordUser` updates profile and last login only. Disabled accounts stay disabled and are refused at the callback.
+- **Migration workflow.** drizzle-kit generates SQL into `packages/db/drizzle`; the `migrate` role and `RUN_MODE=all` apply it. Migrations are committed. Only one agent may generate a migration at a time (see the handoff document).
+- **Test database.** Integration tests use `TEST_DATABASE_URL` (defaults to the local compose database on port 5433), create `drawbridge_test` on demand, and truncate between tests. `fileParallelism` is off because the files share one database. Tests skip when Postgres is unreachable; CI provides a service.
+- **CI.** The `checks` job now runs a Postgres 16 service and sets `TEST_DATABASE_URL`, so integration tests run in CI rather than skipping.
+- **Panel styling is plain CSS for now.** The plan names Tailwind and shadcn; installing them was deferred to keep P1 focused on auth and data. Revisit before P4 when the panel grows. Recorded as a deviation.
+- **Panel is optional at runtime.** `buildApp({ servePanel: false })` keeps API-only tests deterministic; production serves `apps/panel/dist` with an SPA fallback. There is exactly one `setNotFoundHandler`.
+- **Fastify's own logger stays off.** All request logging goes through the redacting logger. Health probes are not logged as requests.
+- **pnpm 12 uses `allowBuilds`.** `pnpm-workspace.yaml` allows the `esbuild` build (needed by drizzle-kit and Vite). Do not approve other build scripts without review.
+
 ## P0 (2026-11-21)
 
 - **Node 24 LTS, pnpm 12 via corepack.** Pinned in `.nvmrc`, `engines` and `packageManager`. CI reads the same files.

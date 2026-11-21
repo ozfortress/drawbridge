@@ -9,14 +9,15 @@
     "node": ">=24"
   },
   "scripts": {
-    "build": "tsc -b",
-    "typecheck": "tsc -p tsconfig.check.json",
+    "build": "tsc -b && pnpm -F @drawbridge/panel build",
+    "typecheck": "tsc -p tsconfig.check.json && tsc -p apps/panel/tsconfig.json",
     "lint": "biome check .",
     "format": "biome check --write .",
     "test": "vitest run",
     "test:watch": "vitest",
     "start": "node apps/server/dist/main.js",
-    "dev:web": "node --watch --env-file-if-exists=.env.local apps/server/dist/main.js"
+    "dev:web": "node --watch --env-file-if-exists=.env.local apps/server/dist/main.js",
+    "dev:panel": "pnpm -F @drawbridge/panel dev"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.8",

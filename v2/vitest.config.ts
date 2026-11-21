@@ -11,6 +11,10 @@ export default {
       '@drawbridge/config': pkg('config'),
       '@drawbridge/logging': pkg('logging'),
       '@drawbridge/health': pkg('health'),
+      '@drawbridge/crypto': pkg('crypto'),
+      '@drawbridge/authz': pkg('authz'),
+      '@drawbridge/db': pkg('db'),
+      '@drawbridge/testkit': pkg('testkit'),
       '@drawbridge/web': app('web'),
       '@drawbridge/bot': app('bot'),
       '@drawbridge/worker': app('worker'),
@@ -20,5 +24,7 @@ export default {
     include: ['packages/*/test/**/*.test.ts', 'apps/*/test/**/*.test.ts'],
     environment: 'node',
     restoreMocks: true,
+    // Integration files share one Postgres database and truncate between tests.
+    fileParallelism: false,
   },
 };

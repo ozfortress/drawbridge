@@ -22,6 +22,22 @@ jobs:
   checks:
     name: lint, typecheck, test, build
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: drawbridge
+          POSTGRES_PASSWORD: drawbridge
+          POSTGRES_DB: drawbridge
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U drawbridge -d drawbridge"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgres://drawbridge:drawbridge@127.0.0.1:5432/drawbridge_test
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -38,7 +54,7 @@ jobs:
         run: pnpm typecheck
       - name: Lint
         run: pnpm lint
-      - name: Unit tests
+      - name: Unit and integration tests
         run: pnpm test
       - name: Build
         run: pnpm build

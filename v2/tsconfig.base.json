@@ -24,6 +24,10 @@
       "@drawbridge/config": ["./packages/config/src/index.ts"],
       "@drawbridge/logging": ["./packages/logging/src/index.ts"],
       "@drawbridge/health": ["./packages/health/src/index.ts"],
+      "@drawbridge/crypto": ["./packages/crypto/src/index.ts"],
+      "@drawbridge/authz": ["./packages/authz/src/index.ts"],
+      "@drawbridge/db": ["./packages/db/src/index.ts"],
+      "@drawbridge/testkit": ["./packages/testkit/src/index.ts"],
       "@drawbridge/web": ["./apps/web/src/index.ts"],
       "@drawbridge/bot": ["./apps/bot/src/index.ts"],
       "@drawbridge/worker": ["./apps/worker/src/index.ts"]

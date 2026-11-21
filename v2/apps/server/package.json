@@ -6,6 +6,7 @@
   "dependencies": {
     "@drawbridge/bot": "workspace:*",
     "@drawbridge/config": "workspace:*",
+    "@drawbridge/db": "workspace:*",
     "@drawbridge/logging": "workspace:*",
     "@drawbridge/web": "workspace:*",
     "@drawbridge/worker": "workspace:*"

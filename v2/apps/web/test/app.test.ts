@@ -28,6 +28,7 @@ async function makeApp(dependencies?: Dependency[]) {
   const ctx = await buildApp({
     config,
     logger,
+    servePanel: false,
     ...(dependencies ? { readinessDependencies: dependencies } : {}),
   });
   app = ctx.app;

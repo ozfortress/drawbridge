@@ -12,5 +12,6 @@
     "apps/*/src/**/*.ts",
     "apps/*/test/**/*.ts",
     "vitest.config.ts"
-  ]
+  ],
+  "exclude": ["apps/panel/**"]
 }
