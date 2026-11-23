@@ -9,6 +9,7 @@ export default {
   resolve: {
     alias: {
       '@drawbridge/config': pkg('config'),
+      '@drawbridge/domain': pkg('domain'),
       '@drawbridge/citadel': pkg('citadel'),
       '@drawbridge/logging': pkg('logging'),
       '@drawbridge/health': pkg('health'),
@@ -31,6 +32,7 @@ export default {
       provider: 'v8',
       thresholds: {
         'packages/citadel/src/**': { lines: 75 },
+        'packages/domain/src/**': { lines: 90 },
       },
     },
   },
