@@ -1,9 +1,13 @@
 /**
- * Integration-test database helpers.
+ * Integration-test helpers.
  *
- * Uses TEST_DATABASE_URL when set, otherwise the local dev compose database on
- * port 5433. The database is created on demand, migrations are applied once, and
- * `resetTestDatabase` truncates every table between tests.
+ * The database helpers use TEST_DATABASE_URL when set, otherwise the local dev
+ * compose database on port 5433. The database is created on demand, migrations
+ * are applied once, and `resetTestDatabase` truncates every table between
+ * tests.
+ *
+ * `createFakeCitadel` serves recorded Citadel responses over real HTTP so
+ * clients can be exercised without a live Citadel instance.
  */
 
 import {
@@ -15,6 +19,8 @@ import {
 } from '@drawbridge/db';
 import { sql } from 'drizzle-orm';
 import { Pool } from 'pg';
+
+export * from './fake-citadel.js';
 
 const DEFAULT_TEST_URL = 'postgres://drawbridge:drawbridge@127.0.0.1:5433/drawbridge_test';
 
