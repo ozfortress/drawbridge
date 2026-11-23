@@ -1,0 +1,962 @@
+{
+  "capacity": {
+    "categories": [
+      {
+        "channelCount": 3,
+        "name": "Division A - OZL"
+      },
+      {
+        "channelCount": 3,
+        "name": "Division B - OZL"
+      }
+    ],
+    "categoryCount": 2,
+    "channelCount": 6,
+    "refusals": [],
+    "roleCount": 8,
+    "splits": [],
+    "status": "fit"
+  },
+  "captainReport": {
+    "captains": [
+      {
+        "citadelTeamId": "team-a1",
+        "citadelUserId": "user-a1",
+        "discordId": "100000000000000001",
+        "division": "Division A",
+        "entryName": "Alpha One",
+        "name": "Ana",
+        "roleNames": ["Division A - OZL", "Alpha One (OZL)"],
+        "status": "will-assign"
+      },
+      {
+        "citadelTeamId": "team-a3",
+        "citadelUserId": "user-a3",
+        "discordId": "100000000000000003",
+        "division": "Division A",
+        "entryName": "Alpha Three With A Very Long Name",
+        "name": "Cleo",
+        "roleNames": ["Division A - OZL", "Alpha Three With A V (OZL)"],
+        "status": "will-assign"
+      },
+      {
+        "citadelTeamId": "team-a2",
+        "citadelUserId": "user-a2",
+        "discordId": null,
+        "division": "Division A",
+        "entryName": "Alpha Two",
+        "name": "Ben",
+        "roleNames": ["Division A - OZL", "Alpha Two (OZL)"],
+        "status": "not-linked"
+      },
+      {
+        "citadelTeamId": "team-b1",
+        "citadelUserId": "user-b1",
+        "discordId": "100000000000000004",
+        "division": "Division B",
+        "entryName": "Bravo One",
+        "name": "Dee",
+        "roleNames": ["Division B - OZL", "Bravo One (OZL)"],
+        "status": "will-assign"
+      },
+      {
+        "citadelTeamId": "team-b1",
+        "citadelUserId": "user-b2",
+        "discordId": "100000000000000005",
+        "division": "Division B",
+        "entryName": "Bravo One",
+        "name": "Eve",
+        "roleNames": ["Division B - OZL", "Bravo One (OZL)"],
+        "status": "will-assign"
+      },
+      {
+        "citadelTeamId": "team-b3",
+        "citadelUserId": "user-b4",
+        "discordId": "100000000000000007",
+        "division": "Division B",
+        "entryName": "Bravo Two",
+        "name": "Gus",
+        "roleNames": ["Division B - OZL", "Bravo Two-roster-b3 (OZL)"],
+        "status": "will-assign"
+      }
+    ],
+    "notLinked": 1,
+    "total": 6,
+    "willAssign": 5
+  },
+  "counts": {
+    "categories": 2,
+    "channels": 6,
+    "divisions": 2,
+    "entries": 6,
+    "roles": 8,
+    "steps": 42
+  },
+  "divisions": [
+    {
+      "categoryName": "Division A - OZL",
+      "entries": [
+        {
+          "channelName": "🛡️Alpha One (OZL)",
+          "citadelRosterId": "roster-a1",
+          "citadelTeamId": "team-a1",
+          "name": "Alpha One",
+          "roleName": "Alpha One (OZL)"
+        },
+        {
+          "channelName": "🛡️Alpha Three With A V (OZL)",
+          "citadelRosterId": "roster-a3",
+          "citadelTeamId": "team-a3",
+          "name": "Alpha Three With A Very Long Name",
+          "roleName": "Alpha Three With A V (OZL)"
+        },
+        {
+          "channelName": "🛡️Alpha Two (OZL)",
+          "citadelRosterId": "roster-a2",
+          "citadelTeamId": "team-a2",
+          "name": "Alpha Two",
+          "roleName": "Alpha Two (OZL)"
+        }
+      ],
+      "name": "Division A",
+      "roleName": "Division A - OZL"
+    },
+    {
+      "categoryName": "Division B - OZL",
+      "entries": [
+        {
+          "channelName": "🛡️Bravo One (OZL)",
+          "citadelRosterId": "roster-b1",
+          "citadelTeamId": "team-b1",
+          "name": "Bravo One",
+          "roleName": "Bravo One (OZL)"
+        },
+        {
+          "channelName": "🛡️Bravo Two-roster-b2 (OZL)",
+          "citadelRosterId": "roster-b2",
+          "citadelTeamId": "team-b2",
+          "name": "Bravo Two",
+          "roleName": "Bravo Two-roster-b2 (OZL)"
+        },
+        {
+          "channelName": "🛡️Bravo Two-roster-b3 (OZL)",
+          "citadelRosterId": "roster-b3",
+          "citadelTeamId": "team-b3",
+          "name": "Bravo Two",
+          "roleName": "Bravo Two-roster-b3 (OZL)"
+        }
+      ],
+      "name": "Division B",
+      "roleName": "Division B - OZL"
+    }
+  ],
+  "leagueShortcode": "OZL",
+  "planHash": "dacccce544269f38c0ca5f407030c1ab051326449c772a7d9022692d2a30d9cd",
+  "steps": [
+    {
+      "citadelRosterId": null,
+      "division": "Division A",
+      "key": "role:division:Division A",
+      "kind": "create-role",
+      "name": "Division A - OZL",
+      "order": 1,
+      "scope": "division"
+    },
+    {
+      "citadelRosterId": "roster-a1",
+      "division": "Division A",
+      "key": "role:entry:roster-a1",
+      "kind": "create-role",
+      "name": "Alpha One (OZL)",
+      "order": 2,
+      "scope": "entry"
+    },
+    {
+      "citadelRosterId": "roster-a3",
+      "division": "Division A",
+      "key": "role:entry:roster-a3",
+      "kind": "create-role",
+      "name": "Alpha Three With A V (OZL)",
+      "order": 3,
+      "scope": "entry"
+    },
+    {
+      "citadelRosterId": "roster-a2",
+      "division": "Division A",
+      "key": "role:entry:roster-a2",
+      "kind": "create-role",
+      "name": "Alpha Two (OZL)",
+      "order": 4,
+      "scope": "entry"
+    },
+    {
+      "citadelRosterId": null,
+      "division": "Division B",
+      "key": "role:division:Division B",
+      "kind": "create-role",
+      "name": "Division B - OZL",
+      "order": 5,
+      "scope": "division"
+    },
+    {
+      "citadelRosterId": "roster-b1",
+      "division": "Division B",
+      "key": "role:entry:roster-b1",
+      "kind": "create-role",
+      "name": "Bravo One (OZL)",
+      "order": 6,
+      "scope": "entry"
+    },
+    {
+      "citadelRosterId": "roster-b2",
+      "division": "Division B",
+      "key": "role:entry:roster-b2",
+      "kind": "create-role",
+      "name": "Bravo Two-roster-b2 (OZL)",
+      "order": 7,
+      "scope": "entry"
+    },
+    {
+      "citadelRosterId": "roster-b3",
+      "division": "Division B",
+      "key": "role:entry:roster-b3",
+      "kind": "create-role",
+      "name": "Bravo Two-roster-b3 (OZL)",
+      "order": 8,
+      "scope": "entry"
+    },
+    {
+      "division": "Division A",
+      "key": "category:Division A",
+      "kind": "create-category",
+      "name": "Division A - OZL",
+      "order": 9
+    },
+    {
+      "division": "Division B",
+      "key": "category:Division B",
+      "kind": "create-category",
+      "name": "Division B - OZL",
+      "order": 10
+    },
+    {
+      "citadelRosterId": "roster-a1",
+      "division": "Division A",
+      "key": "channel:entry:roster-a1",
+      "kind": "create-channel",
+      "name": "🛡️Alpha One (OZL)",
+      "order": 11
+    },
+    {
+      "citadelRosterId": "roster-a3",
+      "division": "Division A",
+      "key": "channel:entry:roster-a3",
+      "kind": "create-channel",
+      "name": "🛡️Alpha Three With A V (OZL)",
+      "order": 12
+    },
+    {
+      "citadelRosterId": "roster-a2",
+      "division": "Division A",
+      "key": "channel:entry:roster-a2",
+      "kind": "create-channel",
+      "name": "🛡️Alpha Two (OZL)",
+      "order": 13
+    },
+    {
+      "citadelRosterId": "roster-b1",
+      "division": "Division B",
+      "key": "channel:entry:roster-b1",
+      "kind": "create-channel",
+      "name": "🛡️Bravo One (OZL)",
+      "order": 14
+    },
+    {
+      "citadelRosterId": "roster-b2",
+      "division": "Division B",
+      "key": "channel:entry:roster-b2",
+      "kind": "create-channel",
+      "name": "🛡️Bravo Two-roster-b2 (OZL)",
+      "order": 15
+    },
+    {
+      "citadelRosterId": "roster-b3",
+      "division": "Division B",
+      "key": "channel:entry:roster-b3",
+      "kind": "create-channel",
+      "name": "🛡️Bravo Two-roster-b3 (OZL)",
+      "order": 16
+    },
+    {
+      "channelKey": "category:Division A",
+      "channelKind": "category",
+      "channelName": "Division A - OZL",
+      "division": "Division A",
+      "key": "overwrites:category:Division A",
+      "kind": "set-overwrites",
+      "order": 17,
+      "overwrites": [
+        {
+          "level": "none",
+          "purposeIds": [],
+          "targetId": "everyone",
+          "targetKind": "everyone",
+          "targetName": "@everyone"
+        }
+      ]
+    },
+    {
+      "channelKey": "channel:entry:roster-a1",
+      "channelKind": "team",
+      "channelName": "🛡️Alpha One (OZL)",
+      "division": "Division A",
+      "key": "overwrites:channel:entry:roster-a1",
+      "kind": "set-overwrites",
+      "order": 18,
+      "overwrites": [
+        {
+          "level": "none",
+          "purposeIds": [],
+          "targetId": "everyone",
+          "targetKind": "everyone",
+          "targetName": "@everyone"
+        },
+        {
+          "level": "send",
+          "purposeIds": [],
+          "targetId": "role:entry:roster-a1",
+          "targetKind": "role",
+          "targetName": "Alpha One (OZL)"
+        }
+      ]
+    },
+    {
+      "channelKey": "channel:entry:roster-a2",
+      "channelKind": "team",
+      "channelName": "🛡️Alpha Two (OZL)",
+      "division": "Division A",
+      "key": "overwrites:channel:entry:roster-a2",
+      "kind": "set-overwrites",
+      "order": 19,
+      "overwrites": [
+        {
+          "level": "none",
+          "purposeIds": [],
+          "targetId": "everyone",
+          "targetKind": "everyone",
+          "targetName": "@everyone"
+        },
+        {
+          "level": "send",
+          "purposeIds": [],
+          "targetId": "role:entry:roster-a2",
+          "targetKind": "role",
+          "targetName": "Alpha Two (OZL)"
+        }
+      ]
+    },
+    {
+      "channelKey": "channel:entry:roster-a3",
+      "channelKind": "team",
+      "channelName": "🛡️Alpha Three With A V (OZL)",
+      "division": "Division A",
+      "key": "overwrites:channel:entry:roster-a3",
+      "kind": "set-overwrites",
+      "order": 20,
+      "overwrites": [
+        {
+          "level": "none",
+          "purposeIds": [],
+          "targetId": "everyone",
+          "targetKind": "everyone",
+          "targetName": "@everyone"
+        },
+        {
+          "level": "send",
+          "purposeIds": [],
+          "targetId": "role:entry:roster-a3",
+          "targetKind": "role",
+          "targetName": "Alpha Three With A V (OZL)"
+        }
+      ]
+    },
+    {
+      "channelKey": "category:Division B",
+      "channelKind": "category",
+      "channelName": "Division B - OZL",
+      "division": "Division B",
+      "key": "overwrites:category:Division B",
+      "kind": "set-overwrites",
+      "order": 21,
+      "overwrites": [
+        {
+          "level": "none",
+          "purposeIds": [],
+          "targetId": "everyone",
+          "targetKind": "everyone",
+          "targetName": "@everyone"
+        }
+      ]
+    },
+    {
+      "channelKey": "channel:entry:roster-b1",
+      "channelKind": "team",
+      "channelName": "🛡️Bravo One (OZL)",
+      "division": "Division B",
+      "key": "overwrites:channel:entry:roster-b1",
+      "kind": "set-overwrites",
+      "order": 22,
+      "overwrites": [
+        {
+          "level": "none",
+          "purposeIds": [],
+          "targetId": "everyone",
+          "targetKind": "everyone",
+          "targetName": "@everyone"
+        },
+        {
+          "level": "send",
+          "purposeIds": [],
+          "targetId": "role:entry:roster-b1",
+          "targetKind": "role",
+          "targetName": "Bravo One (OZL)"
+        }
+      ]
+    },
+    {
+      "channelKey": "channel:entry:roster-b2",
+      "channelKind": "team",
+      "channelName": "🛡️Bravo Two-roster-b2 (OZL)",
+      "division": "Division B",
+      "key": "overwrites:channel:entry:roster-b2",
+      "kind": "set-overwrites",
+      "order": 23,
+      "overwrites": [
+        {
+          "level": "none",
+          "purposeIds": [],
+          "targetId": "everyone",
+          "targetKind": "everyone",
+          "targetName": "@everyone"
+        },
+        {
+          "level": "send",
+          "purposeIds": [],
+          "targetId": "role:entry:roster-b2",
+          "targetKind": "role",
+          "targetName": "Bravo Two-roster-b2 (OZL)"
+        }
+      ]
+    },
+    {
+      "channelKey": "channel:entry:roster-b3",
+      "channelKind": "team",
+      "channelName": "🛡️Bravo Two-roster-b3 (OZL)",
+      "division": "Division B",
+      "key": "overwrites:channel:entry:roster-b3",
+      "kind": "set-overwrites",
+      "order": 24,
+      "overwrites": [
+        {
+          "level": "none",
+          "purposeIds": [],
+          "targetId": "everyone",
+          "targetKind": "everyone",
+          "targetName": "@everyone"
+        },
+        {
+          "level": "send",
+          "purposeIds": [],
+          "targetId": "role:entry:roster-b3",
+          "targetKind": "role",
+          "targetName": "Bravo Two-roster-b3 (OZL)"
+        }
+      ]
+    },
+    {
+      "channelKey": "category:Division A",
+      "channelName": "Division A - OZL",
+      "content": "Welcome to the Division A division. Your team channel is listed below. Good luck!",
+      "division": "Division A",
+      "key": "welcome:category:Division A",
+      "kind": "send-welcome-message",
+      "order": 25
+    },
+    {
+      "channelKey": "category:Division B",
+      "channelName": "Division B - OZL",
+      "content": "Welcome to the Division B division. Your team channel is listed below. Good luck!",
+      "division": "Division B",
+      "key": "welcome:category:Division B",
+      "kind": "send-welcome-message",
+      "order": 26
+    },
+    {
+      "division": "Division A",
+      "key": "db:guild_roles:role:division:Division A",
+      "kind": "insert-db-row",
+      "order": 27,
+      "table": "guild_roles",
+      "values": [
+        {
+          "cell": {
+            "field": "discordId",
+            "kind": "reference",
+            "stepKey": "role:division:Division A"
+          },
+          "column": "discordRoleId"
+        },
+        {
+          "cell": {
+            "kind": "literal",
+            "value": true
+          },
+          "column": "managed"
+        },
+        {
+          "cell": {
+            "kind": "literal",
+            "value": "Division A - OZL"
+          },
+          "column": "name"
+        }
+      ]
+    },
+    {
+      "division": "Division B",
+      "key": "db:guild_roles:role:division:Division B",
+      "kind": "insert-db-row",
+      "order": 28,
+      "table": "guild_roles",
+      "values": [
+        {
+          "cell": {
+            "field": "discordId",
+            "kind": "reference",
+            "stepKey": "role:division:Division B"
+          },
+          "column": "discordRoleId"
+        },
+        {
+          "cell": {
+            "kind": "literal",
+            "value": true
+          },
+          "column": "managed"
+        },
+        {
+          "cell": {
+            "kind": "literal",
+            "value": "Division B - OZL"
+          },
+          "column": "name"
+        }
+      ]
+    },
+    {
+      "division": "Division A",
+      "key": "db:guild_roles:role:entry:roster-a1",
+      "kind": "insert-db-row",
+      "order": 29,
+      "table": "guild_roles",
+      "values": [
+        {
+          "cell": {
+            "field": "discordId",
+            "kind": "reference",
+            "stepKey": "role:entry:roster-a1"
+          },
+          "column": "discordRoleId"
+        },
+        {
+          "cell": {
+            "kind": "literal",
+            "value": true
+          },
+          "column": "managed"
+        },
+        {
+          "cell": {
+            "kind": "literal",
+            "value": "Alpha One (OZL)"
+          },
+          "column": "name"
+        }
+      ]
+    },
+    {
+      "division": "Division A",
+      "key": "db:guild_roles:role:entry:roster-a2",
+      "kind": "insert-db-row",
+      "order": 30,
+      "table": "guild_roles",
+      "values": [
+        {
+          "cell": {
+            "field": "discordId",
+            "kind": "reference",
+            "stepKey": "role:entry:roster-a2"
+          },
+          "column": "discordRoleId"
+        },
+        {
+          "cell": {
+            "kind": "literal",
+            "value": true
+          },
+          "column": "managed"
+        },
+        {
+          "cell": {
+            "kind": "literal",
+            "value": "Alpha Two (OZL)"
+          },
+          "column": "name"
+        }
+      ]
+    },
+    {
+      "division": "Division A",
+      "key": "db:guild_roles:role:entry:roster-a3",
+      "kind": "insert-db-row",
+      "order": 31,
+      "table": "guild_roles",
+      "values": [
+        {
+          "cell": {
+            "field": "discordId",
+            "kind": "reference",
+            "stepKey": "role:entry:roster-a3"
+          },
+          "column": "discordRoleId"
+        },
+        {
+          "cell": {
+            "kind": "literal",
+            "value": true
+          },
+          "column": "managed"
+        },
+        {
+          "cell": {
+            "kind": "literal",
+            "value": "Alpha Three With A V (OZL)"
+          },
+          "column": "name"
+        }
+      ]
+    },
+    {
+      "division": "Division B",
+      "key": "db:guild_roles:role:entry:roster-b1",
+      "kind": "insert-db-row",
+      "order": 32,
+      "table": "guild_roles",
+      "values": [
+        {
+          "cell": {
+            "field": "discordId",
+            "kind": "reference",
+            "stepKey": "role:entry:roster-b1"
+          },
+          "column": "discordRoleId"
+        },
+        {
+          "cell": {
+            "kind": "literal",
+            "value": true
+          },
+          "column": "managed"
+        },
+        {
+          "cell": {
+            "kind": "literal",
+            "value": "Bravo One (OZL)"
+          },
+          "column": "name"
+        }
+      ]
+    },
+    {
+      "division": "Division B",
+      "key": "db:guild_roles:role:entry:roster-b2",
+      "kind": "insert-db-row",
+      "order": 33,
+      "table": "guild_roles",
+      "values": [
+        {
+          "cell": {
+            "field": "discordId",
+            "kind": "reference",
+            "stepKey": "role:entry:roster-b2"
+          },
+          "column": "discordRoleId"
+        },
+        {
+          "cell": {
+            "kind": "literal",
+            "value": true
+          },
+          "column": "managed"
+        },
+        {
+          "cell": {
+            "kind": "literal",
+            "value": "Bravo Two-roster-b2 (OZL)"
+          },
+          "column": "name"
+        }
+      ]
+    },
+    {
+      "division": "Division B",
+      "key": "db:guild_roles:role:entry:roster-b3",
+      "kind": "insert-db-row",
+      "order": 34,
+      "table": "guild_roles",
+      "values": [
+        {
+          "cell": {
+            "field": "discordId",
+            "kind": "reference",
+            "stepKey": "role:entry:roster-b3"
+          },
+          "column": "discordRoleId"
+        },
+        {
+          "cell": {
+            "kind": "literal",
+            "value": true
+          },
+          "column": "managed"
+        },
+        {
+          "cell": {
+            "kind": "literal",
+            "value": "Bravo Two-roster-b3 (OZL)"
+          },
+          "column": "name"
+        }
+      ]
+    },
+    {
+      "division": "Division A",
+      "key": "db:managed_channels:category:Division A",
+      "kind": "insert-db-row",
+      "order": 35,
+      "table": "managed_channels",
+      "values": [
+        {
+          "cell": {
+            "field": "discordId",
+            "kind": "reference",
+            "stepKey": "category:Division A"
+          },
+          "column": "discordChannelId"
+        },
+        {
+          "cell": {
+            "kind": "literal",
+            "value": "division"
+          },
+          "column": "kind"
+        }
+      ]
+    },
+    {
+      "division": "Division B",
+      "key": "db:managed_channels:category:Division B",
+      "kind": "insert-db-row",
+      "order": 36,
+      "table": "managed_channels",
+      "values": [
+        {
+          "cell": {
+            "field": "discordId",
+            "kind": "reference",
+            "stepKey": "category:Division B"
+          },
+          "column": "discordChannelId"
+        },
+        {
+          "cell": {
+            "kind": "literal",
+            "value": "division"
+          },
+          "column": "kind"
+        }
+      ]
+    },
+    {
+      "division": "Division A",
+      "key": "db:managed_channels:channel:entry:roster-a1",
+      "kind": "insert-db-row",
+      "order": 37,
+      "table": "managed_channels",
+      "values": [
+        {
+          "cell": {
+            "field": "discordId",
+            "kind": "reference",
+            "stepKey": "channel:entry:roster-a1"
+          },
+          "column": "discordChannelId"
+        },
+        {
+          "cell": {
+            "kind": "literal",
+            "value": "team"
+          },
+          "column": "kind"
+        }
+      ]
+    },
+    {
+      "division": "Division A",
+      "key": "db:managed_channels:channel:entry:roster-a2",
+      "kind": "insert-db-row",
+      "order": 38,
+      "table": "managed_channels",
+      "values": [
+        {
+          "cell": {
+            "field": "discordId",
+            "kind": "reference",
+            "stepKey": "channel:entry:roster-a2"
+          },
+          "column": "discordChannelId"
+        },
+        {
+          "cell": {
+            "kind": "literal",
+            "value": "team"
+          },
+          "column": "kind"
+        }
+      ]
+    },
+    {
+      "division": "Division A",
+      "key": "db:managed_channels:channel:entry:roster-a3",
+      "kind": "insert-db-row",
+      "order": 39,
+      "table": "managed_channels",
+      "values": [
+        {
+          "cell": {
+            "field": "discordId",
+            "kind": "reference",
+            "stepKey": "channel:entry:roster-a3"
+          },
+          "column": "discordChannelId"
+        },
+        {
+          "cell": {
+            "kind": "literal",
+            "value": "team"
+          },
+          "column": "kind"
+        }
+      ]
+    },
+    {
+      "division": "Division B",
+      "key": "db:managed_channels:channel:entry:roster-b1",
+      "kind": "insert-db-row",
+      "order": 40,
+      "table": "managed_channels",
+      "values": [
+        {
+          "cell": {
+            "field": "discordId",
+            "kind": "reference",
+            "stepKey": "channel:entry:roster-b1"
+          },
+          "column": "discordChannelId"
+        },
+        {
+          "cell": {
+            "kind": "literal",
+            "value": "team"
+          },
+          "column": "kind"
+        }
+      ]
+    },
+    {
+      "division": "Division B",
+      "key": "db:managed_channels:channel:entry:roster-b2",
+      "kind": "insert-db-row",
+      "order": 41,
+      "table": "managed_channels",
+      "values": [
+        {
+          "cell": {
+            "field": "discordId",
+            "kind": "reference",
+            "stepKey": "channel:entry:roster-b2"
+          },
+          "column": "discordChannelId"
+        },
+        {
+          "cell": {
+            "kind": "literal",
+            "value": "team"
+          },
+          "column": "kind"
+        }
+      ]
+    },
+    {
+      "division": "Division B",
+      "key": "db:managed_channels:channel:entry:roster-b3",
+      "kind": "insert-db-row",
+      "order": 42,
+      "table": "managed_channels",
+      "values": [
+        {
+          "cell": {
+            "field": "discordId",
+            "kind": "reference",
+            "stepKey": "channel:entry:roster-b3"
+          },
+          "column": "discordChannelId"
+        },
+        {
+          "cell": {
+            "kind": "literal",
+            "value": "team"
+          },
+          "column": "kind"
+        }
+      ]
+    }
+  ],
+  "warnings": [
+    {
+      "code": "duplicate-name",
+      "message": "The name of entry \"Bravo Two\" collides with another entry of division \"Division B\"; the roster id was added to its role and channel names.",
+      "subject": "roster-b2"
+    },
+    {
+      "code": "duplicate-name",
+      "message": "The name of entry \"Bravo Two\" collides with another entry of division \"Division B\"; the roster id was added to its role and channel names.",
+      "subject": "roster-b3"
+    },
+    {
+      "code": "missing-roster",
+      "message": "Team \"team-ghost\" is referenced by match \"match-3\" but has no roster in the snapshot.",
+      "subject": "team-ghost"
+    },
+    {
+      "code": "missing-team",
+      "message": "Roster \"roster-b2\" references team \"team-b2\", which is missing from the snapshot.",
+      "subject": "roster-b2"
+    },
+    {
+      "code": "name-truncated",
+      "message": "The name of entry \"Alpha Three With A Very Long Name\" is longer than the budget of 20 characters and was trimmed.",
+      "subject": "roster-a3"
+    }
+  ]
+}

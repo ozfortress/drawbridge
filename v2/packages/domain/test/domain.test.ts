@@ -165,7 +165,7 @@ describe('deriveLeague', () => {
 });
 
 describe('domain package boundary', () => {
-  it('keeps src free of imports', () => {
+  it('keeps src free of imports from outside the package', () => {
     const srcDir = new URL('../src/', import.meta.url);
     const files = readdirSync(srcDir).filter((name) => name.endsWith('.ts'));
 
@@ -174,10 +174,22 @@ describe('domain package boundary', () => {
     for (const file of files) {
       const source = readFileSync(new URL(file, srcDir), 'utf8');
 
-      expect(source, file).not.toMatch(/^\s*import\s/m);
+      // Every module specifier must point inside the package.
       for (const match of source.matchAll(/\bfrom\s+['"]([^'"]+)['"]/g)) {
         expect(match[1], file).toMatch(/^\.\//);
       }
+      for (const match of source.matchAll(/\bimport\(\s*['"]([^'"]+)['"]/g)) {
+        expect(match[1], file).toMatch(/^\.\//);
+      }
+      // No side effect import of an external module.
+      expect(source, file).not.toMatch(/^\s*import\s+['"]/m);
     }
+  });
+
+  it('keeps the hash implementation free of module specifiers', () => {
+    const source = readFileSync(new URL('sha256.ts', new URL('../src/', import.meta.url)), 'utf8');
+
+    expect(source).not.toMatch(/^\s*import\b/m);
+    expect(source).not.toMatch(/\bfrom\s+['"]/);
   });
 });

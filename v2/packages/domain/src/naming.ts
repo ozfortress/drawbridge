@@ -307,3 +307,28 @@ export function readableMatchLine(
 export function normalizeChannelName(value: string): string {
   return slugify(value);
 }
+
+/**
+ * The number of grapheme clusters in `value`: the characters a human reads.
+ *
+ * A flag or a zero-width-joiner sequence counts as one, never as the two or
+ * more code units it is written with.
+ */
+export function graphemeLength(value: string): number {
+  return clusters(value).length;
+}
+
+/**
+ * True when `name` trims to the same text as one of the sibling names.
+ *
+ * Two teams that trim alike get the roster id appended to their role and
+ * channel names so the two differ; this predicate is how a caller learns that
+ * the suffix was needed.
+ */
+export function teamNameCollides(
+  name: string,
+  siblingNames: readonly string[],
+  budget: number = DEFAULT_TEAM_NAME_BUDGET,
+): boolean {
+  return siblingNames.some((sibling) => trimsAlike(sibling, name, budget));
+}
