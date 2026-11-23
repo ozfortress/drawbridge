@@ -9,6 +9,7 @@ export default {
   resolve: {
     alias: {
       '@drawbridge/config': pkg('config'),
+      '@drawbridge/citadel': pkg('citadel'),
       '@drawbridge/logging': pkg('logging'),
       '@drawbridge/health': pkg('health'),
       '@drawbridge/crypto': pkg('crypto'),

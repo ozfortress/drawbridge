@@ -2,6 +2,7 @@
   "files": [],
   "references": [
     { "path": "packages/config/tsconfig.lib.json" },
+    { "path": "packages/citadel/tsconfig.lib.json" },
     { "path": "packages/logging/tsconfig.lib.json" },
     { "path": "packages/health/tsconfig.lib.json" },
     { "path": "packages/crypto/tsconfig.lib.json" },

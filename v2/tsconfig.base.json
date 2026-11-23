@@ -22,6 +22,7 @@
     "declarationMap": true,
     "paths": {
       "@drawbridge/config": ["./packages/config/src/index.ts"],
+      "@drawbridge/citadel": ["./packages/citadel/src/index.ts"],
       "@drawbridge/logging": ["./packages/logging/src/index.ts"],
       "@drawbridge/health": ["./packages/health/src/index.ts"],
       "@drawbridge/crypto": ["./packages/crypto/src/index.ts"],
