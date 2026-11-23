@@ -10,7 +10,8 @@
  * the real error taxonomy.
  *
  * No timers are involved: every failing call uses `maxRetries: 0`, so the
- * client never waits between attempts.
+ * client never waits between attempts. The one exception is the `slow`
+ * suite, where the client itself carries the timeout that ends the call.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -19,7 +20,7 @@ import { createFakeCitadel, type FakeCitadel } from '@drawbridge/testkit';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   type CitadelClient,
-  type CitadelError,
+  CitadelError,
   CitadelParseError,
   createCitadelClient,
 } from '../src/index.js';
@@ -56,6 +57,22 @@ async function settle<T>(promise: Promise<T>): Promise<Outcome> {
     (value) => ({ ok: true, value }) as Outcome,
     (error: unknown) => ({ ok: false, error }) as Outcome,
   );
+}
+
+/**
+ * Fails loudly instead of hanging when the promise never settles. The timer
+ * is always cleared, so it never keeps the process alive.
+ */
+function within<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const bound = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`the call did not settle within ${ms}ms`));
+    }, ms);
+  });
+  return Promise.race([promise, bound]).finally(() => {
+    if (timer !== undefined) clearTimeout(timer);
+  });
 }
 
 describe('Citadel client against the recorded fixtures', () => {
@@ -217,6 +234,37 @@ describe('Citadel client against a failing Citadel', () => {
     expect((outcome.error as CitadelError).code).toBe('transient');
     // A failure is never cached, so the next read fails the same way.
     await expect(client.getLeague('9100')).rejects.toMatchObject({ code: 'transient' });
+  });
+});
+
+describe('Citadel client against a slow Citadel', () => {
+  let citadel: FakeCitadel;
+
+  beforeAll(async () => {
+    citadel = await createFakeCitadel({ fixtures: FIXTURES, mode: 'slow' });
+  });
+
+  afterAll(async () => {
+    await citadel.close();
+  });
+
+  it('reports a hung response as transient and returns no object', async () => {
+    const client = createCitadelClient({
+      baseUrl: citadel.baseUrl,
+      apiKey: 'test-key',
+      // The fake sends the header but never the body, so the client's own
+      // timeout is the only thing that can end the call.
+      connectTimeoutMs: 50,
+      totalTimeoutMs: 50,
+      maxRetries: 0,
+    });
+
+    const outcome = await settle(within(client.getLeague('9100'), 5_000));
+
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) throw new Error('expected the league read to fail');
+    expect(outcome.error).toBeInstanceOf(CitadelError);
+    expect((outcome.error as CitadelError).code).toBe('transient');
   });
 });
 

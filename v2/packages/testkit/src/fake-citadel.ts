@@ -9,12 +9,12 @@
  * and a re-serialised fixture would round them.
  *
  * `setMode` switches the answer for every later request, which is how the
- * failure paths (401, 404, 5xx, malformed body) are reached.
+ * failure paths (401, 404, 5xx, malformed body, a hung response) are reached.
  */
-import { createServer } from 'node:http';
+import { createServer, type ServerResponse } from 'node:http';
 
 /** How the fake answers a request. */
-export type FakeCitadelMode = 'ok' | '401' | '404' | '500' | '503' | 'malformed';
+export type FakeCitadelMode = 'ok' | '401' | '404' | '500' | '503' | 'malformed' | 'slow';
 
 /** Options accepted by {@link createFakeCitadel}. */
 export interface FakeCitadelOptions {
@@ -67,6 +67,9 @@ export async function createFakeCitadel(options: FakeCitadelOptions): Promise<Fa
     fixtures.set(routePath(route), body);
   }
   let mode: FakeCitadelMode = options.mode ?? 'ok';
+  // Responses that were opened but never ended; `slow` holds them until the
+  // peer aborts or `close()` destroys them.
+  const held = new Set<ServerResponse>();
 
   const server = createServer((request, response) => {
     const headers = { 'content-type': 'application/json', connection: 'close' };
@@ -81,6 +84,21 @@ export async function createFakeCitadel(options: FakeCitadelOptions): Promise<Fa
     if (current === 'malformed') {
       response.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', connection: 'close' });
       response.end(MALFORMED_BODY);
+      return;
+    }
+    if (current === 'slow') {
+      // The header goes out, the body never does. The peer sees a 200 with a
+      // JSON content type and then waits forever for a body that never
+      // arrives, which is what the client's timeout guard is there for.
+      response.writeHead(200, headers);
+      response.flushHeaders();
+      held.add(response);
+      response.on('error', () => {
+        // The peer aborting the held response is its expected end.
+      });
+      response.on('close', () => {
+        held.delete(response);
+      });
       return;
     }
     if (current !== 'ok') {
@@ -114,6 +132,12 @@ export async function createFakeCitadel(options: FakeCitadelOptions): Promise<Fa
     close: () =>
       new Promise<void>((resolve) => {
         server.close(() => resolve());
+        // A held `slow` response never ends on its own, so it is destroyed
+        // here; the socket it sits on goes with it.
+        for (const response of held) {
+          response.destroy();
+        }
+        held.clear();
         // Undici keeps the connection alive; the port is only free once the
         // sockets are gone.
         server.closeAllConnections();

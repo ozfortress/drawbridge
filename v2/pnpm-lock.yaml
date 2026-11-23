@@ -296,6 +296,10 @@ importers:
       zod:
         specifier: 4.6.7
         version: 4.6.7
+    devDependencies:
+      '@drawbridge/testkit':
+        specifier: workspace:*
+        version: link:../testkit
 
   packages/config:
     dependencies:
@@ -326,6 +330,8 @@ importers:
       drizzle-kit:
         specifier: 0.31.11
         version: 0.31.11
+
+  packages/domain: {}
 
   packages/health: {}
 
