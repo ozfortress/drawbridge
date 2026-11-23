@@ -1,11 +1,46 @@
 /**
  * Domain model for the league structure Drawbridge renders.
  *
- * This package deliberately imports nothing. It describes a Citadel league
+ * This package deliberately imports nothing from outside itself: the modules
+ * below are pure and dependency free. It describes a Citadel league
  * snapshot structurally and derives the league structure (divisions, entries,
  * captains, byes) from it with pure functions, so any transport layer can
  * feed it without dragging dependencies along.
  */
+
+export {
+  ACCESS_LEVELS,
+  type AccessLevel,
+  type AccessOverwrite,
+  type AccessPlan,
+  type AccessPlanInput,
+  type AccessPurpose,
+  accessSetFor,
+  CATEGORY_ACCESS,
+  type ChannelKind,
+  levelAtLeast,
+  MATCH_ACCESS,
+  planAccess,
+  type StaffRole,
+  TEAM_ACCESS,
+  type TeamRole,
+} from './access.js';
+
+export {
+  type CapacityCategory,
+  type CapacityPlan,
+  type CapacityRefusal,
+  type CapacityRequest,
+  type CapacityScope,
+  type CapacitySplit,
+  type CapacitySplitPart,
+  type CapacityStatus,
+  MAX_CATEGORIES,
+  MAX_CHANNELS,
+  MAX_CHANNELS_PER_CATEGORY,
+  MAX_ROLES,
+  planCapacity,
+} from './capacity.js';
 
 /** A player as listed on a Citadel team. */
 export interface LeagueSnapshotPlayer {
