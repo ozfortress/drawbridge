@@ -161,3 +161,5 @@ export function deriveLeague(snapshot: LeagueSnapshot): LeagueStructure {
     byes,
   };
 }
+
+export * from './naming.js';

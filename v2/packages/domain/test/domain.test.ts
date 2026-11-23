@@ -166,9 +166,12 @@ describe('deriveLeague', () => {
 
 describe('domain package boundary', () => {
   it('keeps src free of imports', () => {
-    const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8');
+    for (const file of ['../src/index.ts', '../src/naming.ts']) {
+      const source = readFileSync(new URL(file, import.meta.url), 'utf8');
 
-    expect(source).not.toMatch(/^\s*import\s/m);
-    expect(source).not.toMatch(/\bfrom\s+['"]/);
+      expect(source).not.toMatch(/^\s*import\s/m);
+      // Only relative re-exports inside the package are allowed.
+      expect(source).not.toMatch(/from\s+['"](?!\.\/)/);
+    }
   });
 });
