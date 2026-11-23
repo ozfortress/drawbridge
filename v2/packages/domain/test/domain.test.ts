@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   deriveLeague,
@@ -166,9 +166,18 @@ describe('deriveLeague', () => {
 
 describe('domain package boundary', () => {
   it('keeps src free of imports', () => {
-    const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8');
+    const srcDir = new URL('../src/', import.meta.url);
+    const files = readdirSync(srcDir).filter((name) => name.endsWith('.ts'));
 
-    expect(source).not.toMatch(/^\s*import\s/m);
-    expect(source).not.toMatch(/\bfrom\s+['"]/);
+    expect(files.length).toBeGreaterThan(0);
+
+    for (const file of files) {
+      const source = readFileSync(new URL(file, srcDir), 'utf8');
+
+      expect(source, file).not.toMatch(/^\s*import\s/m);
+      for (const match of source.matchAll(/\bfrom\s+['"]([^'"]+)['"]/g)) {
+        expect(match[1], file).toMatch(/^\.\//);
+      }
+    }
   });
 });
