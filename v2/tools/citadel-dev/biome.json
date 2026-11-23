@@ -1,0 +1,10 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.6.8/schema.json",
+  "extends": "//",
+  "overrides": [
+    {
+      "includes": ["fixtures/**", "manifest.json"],
+      "formatter": { "enabled": false }
+    }
+  ]
+}
