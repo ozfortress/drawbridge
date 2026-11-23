@@ -27,5 +27,11 @@ export default {
     restoreMocks: true,
     // Integration files share one Postgres database and truncate between tests.
     fileParallelism: false,
+    coverage: {
+      provider: 'v8',
+      thresholds: {
+        'packages/citadel/src/**': { lines: 75 },
+      },
+    },
   },
 };
