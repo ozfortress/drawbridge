@@ -245,6 +245,9 @@ importers:
       '@drawbridge/authz':
         specifier: workspace:*
         version: link:../../packages/authz
+      '@drawbridge/citadel':
+        specifier: workspace:*
+        version: link:../../packages/citadel
       '@drawbridge/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -254,6 +257,9 @@ importers:
       '@drawbridge/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@drawbridge/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       '@drawbridge/health':
         specifier: workspace:*
         version: link:../../packages/health

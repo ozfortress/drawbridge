@@ -20,6 +20,7 @@ import { HttpError } from './http/errors.js';
 import { registerAuditRoutes } from './routes/audit.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerLeagueRoutes } from './routes/leagues.js';
+import { type CitadelClientFactory, registerPreviewRoutes } from './routes/preview.js';
 import { registerUserRoutes } from './routes/users.js';
 import { VERSION } from './version.js';
 
@@ -28,6 +29,8 @@ export interface BuildAppOptions {
   logger: Logger;
   db?: Db;
   oauth?: DiscordOAuth;
+  /** Builds the Citadel client of a league; injected so tests can use a fake. */
+  citadel?: CitadelClientFactory;
   readinessDependencies?: readonly Dependency[];
   /** Serve the built panel and SPA fallback. Off in API-only tests. */
   servePanel?: boolean;
@@ -153,6 +156,7 @@ export async function buildApp(options: BuildAppOptions): Promise<AppContext> {
     registerAuthRoutes(app, deps);
     registerUserRoutes(app, { config, db });
     registerLeagueRoutes(app, { config, db });
+    registerPreviewRoutes(app, { config, db, citadel: options.citadel });
     registerAuditRoutes(app, { config, db });
   } else {
     root.warn('no database configured; API routes are not registered');

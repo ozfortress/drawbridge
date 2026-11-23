@@ -14,9 +14,11 @@
   },
   "dependencies": {
     "@drawbridge/authz": "workspace:*",
+    "@drawbridge/citadel": "workspace:*",
     "@drawbridge/config": "workspace:*",
     "@drawbridge/crypto": "workspace:*",
     "@drawbridge/db": "workspace:*",
+    "@drawbridge/domain": "workspace:*",
     "@drawbridge/health": "workspace:*",
     "@drawbridge/logging": "workspace:*",
     "@fastify/cookie": "11.1.5",

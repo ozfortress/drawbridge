@@ -13,15 +13,21 @@ import {
   type LeagueMembershipRow,
   type LeagueRoleRow,
   type LeagueRow,
+  leagueCitadelKeys,
   leagueMemberships,
   leagueRoles,
   leagues,
+  type PreviewRow,
+  previews,
   sessions,
   settingsKv,
   type UserRow,
   userInvites,
   users,
 } from './schema.js';
+
+/** The sealed Citadel key of a league. */
+export type LeagueCitadelKeyRow = typeof leagueCitadelKeys.$inferSelect;
 
 export const SESSION_IDLE_MS = 12 * 60 * 60 * 1000;
 export const SESSION_ABSOLUTE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -527,6 +533,113 @@ export async function resolveLeagueAccess(
       capabilities: mergeCapabilities(actor.tier, role.capabilities as Capability[]),
     },
   };
+}
+
+// ── Previews ─────────────────────────────────────────────────
+
+export interface InsertPreviewInput {
+  leagueId: string;
+  createdByUserId: string | null;
+  plan: Record<string, unknown>;
+  planHash: string;
+  snapshot: Record<string, unknown>;
+  citadelSnapshotAt?: Date | null;
+  expiresAt?: Date | null;
+}
+
+/** Stores a preview with the snapshot its plan was built from. */
+export async function insertPreview(db: Db, input: InsertPreviewInput): Promise<PreviewRow> {
+  const rows = await db
+    .insert(previews)
+    .values({
+      leagueId: input.leagueId,
+      createdByUserId: input.createdByUserId,
+      plan: input.plan,
+      planHash: input.planHash,
+      snapshot: input.snapshot,
+      citadelSnapshotAt: input.citadelSnapshotAt ?? null,
+      expiresAt: input.expiresAt ?? null,
+    })
+    .returning();
+  const row = rows[0];
+  if (!row) throw new Error('preview insert returned no row');
+  return row;
+}
+
+export async function getPreview(db: Db, id: string): Promise<PreviewRow | undefined> {
+  const rows = await db.select().from(previews).where(eq(previews.id, id)).limit(1);
+  return rows[0];
+}
+
+/**
+ * Marks a preview as consumed. A consumed preview cannot be approved again,
+ * so the update only touches a preview that is still open.
+ */
+export async function consumePreview(db: Db, id: string): Promise<PreviewRow | undefined> {
+  const rows = await db
+    .update(previews)
+    .set({ consumedAt: new Date() })
+    .where(and(eq(previews.id, id), isNull(previews.consumedAt)))
+    .returning();
+  return rows[0];
+}
+
+// ── League Citadel keys ──────────────────────────────────────
+
+/** The sealed Citadel key of a league. */
+export async function getLeagueCitadelKey(
+  db: Db,
+  leagueId: string,
+): Promise<LeagueCitadelKeyRow | undefined> {
+  const rows = await db
+    .select()
+    .from(leagueCitadelKeys)
+    .where(eq(leagueCitadelKeys.leagueId, leagueId))
+    .limit(1);
+  return rows[0];
+}
+
+/** Stores or replaces the sealed Citadel key of a league. */
+export async function upsertLeagueCitadelKey(
+  db: Db,
+  input: {
+    leagueId: string;
+    keyEnvelope: string;
+    label: string;
+    verifiedAt: Date;
+  },
+): Promise<LeagueCitadelKeyRow> {
+  const rows = await db
+    .insert(leagueCitadelKeys)
+    .values({
+      leagueId: input.leagueId,
+      keyEnvelope: input.keyEnvelope,
+      label: input.label,
+      lastVerifiedAt: input.verifiedAt,
+    })
+    .onConflictDoUpdate({
+      target: leagueCitadelKeys.leagueId,
+      set: {
+        keyEnvelope: input.keyEnvelope,
+        label: input.label,
+        lastVerifiedAt: input.verifiedAt,
+        revokedAt: null,
+      },
+    })
+    .returning();
+  const row = rows[0];
+  if (!row) throw new Error('citadel key upsert returned no row');
+  return row;
+}
+
+/** Revokes the Citadel key of a league. Returns false when there was none. */
+export async function revokeLeagueCitadelKey(db: Db, leagueId: string): Promise<boolean> {
+  const rows = await db
+    .update(leagueCitadelKeys)
+    .set({ revokedAt: new Date() })
+    .where(and(eq(leagueCitadelKeys.leagueId, leagueId), isNull(leagueCitadelKeys.revokedAt)))
+    .returning();
+  return rows.length > 0;
 }
 
 // ── Settings ─────────────────────────────────────────────────
