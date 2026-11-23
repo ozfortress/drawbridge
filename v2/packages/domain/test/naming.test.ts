@@ -13,10 +13,10 @@ import {
 
 /** Discord only accepts these characters in a channel name. */
 const CHANNEL_PATTERN = /^[a-z0-9-]+$/;
-/** A high surrogate that is not followed by a low surrogate. */
-const LONE_HIGH_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])/u;
+/** A high surrogate that is not part of a surrogate pair. */
+const LONE_HIGH_SURROGATE = /(?<![\uD800-\uDBFF])[\uD800-\uDBFF](?![\uDC00-\uDFFF])/u;
 /** A low surrogate that is not preceded by a high surrogate. */
-const LONE_LOW_SURROGATE = /[\uDC00-\uDFFF](?![\uD800-\uDBFF])/u;
+const LONE_LOW_SURROGATE = /(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u;
 
 const SEGMENTER = new Intl.Segmenter('en', { granularity: 'grapheme' });
 
@@ -26,6 +26,17 @@ const expectNoSplit = (value: string): void => {
   expect(value).not.toMatch(LONE_HIGH_SURROGATE);
   expect(value).not.toMatch(LONE_LOW_SURROGATE);
 };
+
+describe('surrogate detection', () => {
+  it('flags an unpaired surrogate and accepts a pair', () => {
+    expect('\uD83D').toMatch(LONE_HIGH_SURROGATE);
+    expect('\uDD25').toMatch(LONE_LOW_SURROGATE);
+    expect('🔥').not.toMatch(LONE_HIGH_SURROGATE);
+    expect('🔥').not.toMatch(LONE_LOW_SURROGATE);
+    expect('👨‍👩‍👧‍👦').not.toMatch(LONE_HIGH_SURROGATE);
+    expect('👨‍👩‍👧‍👦').not.toMatch(LONE_LOW_SURROGATE);
+  });
+});
 
 describe('division names', () => {
   it('renders a division as "{division} - {shortcode}"', () => {
@@ -84,8 +95,31 @@ describe('team names', () => {
   });
 
   it('never splits a zero-width-joiner sequence', () => {
-    expect(teamRoleName('👨‍👩‍👧‍👦 Family Esports', 'OZL')).toBe('👨‍👩‍👧‍👦 Family E (OZL)');
-    expect(teamRoleName('👨‍👩‍👧‍👦 Family', 'OZL', { budget: 12 })).toBe('👨‍👩‍👧‍👦 (OZL)');
+    const role = teamRoleName('👨‍👩‍👧‍👦 Family Esports', 'OZL');
+
+    expect(role).toBe('👨‍👩‍👧‍👦 Family Esports (OZL)');
+    expectNoSplit(role);
+  });
+
+  it('keeps a zero-width-joiner family whole when the budget lands inside the cluster', () => {
+    // The family is one cluster: five clusters keep it whole, where a UTF-16
+    // slice of the same length would leave a broken surrogate pair behind.
+    const role = teamRoleName('👨‍👩‍👧‍👦 Family', 'OZL', { budget: 5 });
+
+    expect(role).toBe('👨‍👩‍👧‍👦 Fam (OZL)');
+    expectNoSplit(role);
+  });
+
+  it('drops a zero-width-joiner family whole when it does not fit at all', () => {
+    expect(teamRoleName('👨‍👩‍👧‍👦 Family', 'OZL', { budget: 0 })).toBe(' (OZL)');
+  });
+
+  it('counts the budget in grapheme clusters, not UTF-16 code units', () => {
+    const role = teamRoleName('🔥'.repeat(10), 'OZL', { budget: 5 });
+
+    expect(role).toBe('🔥🔥🔥🔥🔥 (OZL)');
+    expect(clusterCount(role)).toBe(11);
+    expectNoSplit(role);
   });
 
   it('never splits a surrogate pair of a long emoji name', () => {
@@ -93,7 +127,7 @@ describe('team names', () => {
     const namePart = role.slice(0, role.length - ' (OZL)'.length);
 
     expectNoSplit(role);
-    expect(clusterCount(namePart)).toBe(DEFAULT_TEAM_NAME_BUDGET / 2);
+    expect(clusterCount(namePart)).toBe(DEFAULT_TEAM_NAME_BUDGET);
     expect(role.length).toBeLessThanOrEqual(DISCORD_NAME_LIMIT);
   });
 
@@ -126,6 +160,59 @@ describe('team names', () => {
 
     expect(channel.length).toBe(DISCORD_NAME_LIMIT);
     expect(channel).toBe(`\u{1F6E1}\u{FE0F}${'X'.repeat(73)} (${shortcode})`);
+  });
+});
+
+describe('the Discord limit holds for any input', () => {
+  const LONG = 'C'.repeat(120);
+
+  it('keeps a role name inside the limit when the shortcode is longer than the limit', () => {
+    const role = teamRoleName('Sydney Azzurri', LONG);
+
+    expect(role).toBe(`Sydney Azzurri (${'C'.repeat(83)})`);
+    expect(role.length).toBe(DISCORD_NAME_LIMIT);
+    expect(clusterCount(role)).toBeLessThanOrEqual(DISCORD_NAME_LIMIT);
+    expect(role).not.toMatch(/-$/u);
+    expectNoSplit(role);
+  });
+
+  it('keeps a channel name inside the limit when the shortcode is longer than the limit', () => {
+    const channel = teamChannelName('Sydney Azzurri', LONG);
+
+    expect(channel.length).toBeLessThanOrEqual(DISCORD_NAME_LIMIT);
+    expect(clusterCount(channel)).toBeLessThanOrEqual(DISCORD_NAME_LIMIT);
+    expect(channel).not.toMatch(/-$/u);
+    expectNoSplit(channel);
+  });
+
+  it('keeps a division name inside the limit when the shortcode is longer than the limit', () => {
+    const name = divisionRoleName('Division 1', LONG);
+
+    expect(name).toBe(`Division 1 - ${'C'.repeat(87)}`);
+    expect(name.length).toBe(DISCORD_NAME_LIMIT);
+    expect(clusterCount(name)).toBeLessThanOrEqual(DISCORD_NAME_LIMIT);
+    expect(name).not.toMatch(/-$/u);
+  });
+
+  it('keeps a role name inside the limit when the roster id is longer than the limit', () => {
+    const role = teamRoleName('Sydney Azzurri', 'OZL', {
+      rosterId: 'R'.repeat(120),
+      siblingNames: ['Sydney Azzurri'],
+    });
+
+    expect(role.length).toBeLessThanOrEqual(DISCORD_NAME_LIMIT);
+    expect(clusterCount(role)).toBeLessThanOrEqual(DISCORD_NAME_LIMIT);
+    expect(role).not.toMatch(/-$/u);
+    expectNoSplit(role);
+  });
+
+  it('keeps a match channel inside the limit when the match id is longer than the limit', () => {
+    const channel = matchChannelName('Sydney Azzurri', 'Melbourne Tigers', 'M'.repeat(120));
+
+    expect(channel.length).toBeLessThanOrEqual(DISCORD_NAME_LIMIT);
+    expect(clusterCount(channel)).toBeLessThanOrEqual(DISCORD_NAME_LIMIT);
+    expect(channel).toMatch(CHANNEL_PATTERN);
+    expect(channel).not.toMatch(/-$/u);
   });
 });
 

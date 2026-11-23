@@ -14,6 +14,14 @@
  * a team channel is `🛡️{name[:budget]} ({shortcode})` and a match channel is
  * `{home}-vs-{away}-{matchId}` normalised for Discord. Every function here is
  * pure; the package imports nothing.
+ *
+ * Two counters are at work and they are not the same:
+ *
+ * - The **budget** of a team name counts grapheme clusters, the characters a
+ *   human reads: a budget of five keeps five emoji, never a broken pair.
+ * - The **limit** of a Discord name counts UTF-16 code units, the strictest
+ *   reading of Discord's 100 character cap. A name inside the limit is
+ *   therefore inside 100 code points and 100 grapheme clusters as well.
  */
 
 /** Discord's hard limit for role and channel names. */
@@ -31,8 +39,8 @@ export const MATCH_CHANNEL_SEPARATOR = 'vs';
 /** Options shared by the team role and team channel names. */
 export interface TeamNamingOptions {
   /**
-   * Budget for the team name, counted in UTF-16 code units but always cut on
-   * grapheme boundaries. Defaults to {@link DEFAULT_TEAM_NAME_BUDGET}.
+   * Budget for the team name, counted in grapheme clusters: a budget of five
+   * keeps five emoji. Defaults to {@link DEFAULT_TEAM_NAME_BUDGET}.
    */
   readonly budget?: number;
   /**
@@ -54,16 +62,37 @@ function clusters(value: string): string[] {
   return Array.from(SEGMENTER.segment(value), (part) => part.segment);
 }
 
+/** The length of `value` in UTF-16 code units. */
+function units(value: string): number {
+  return value.length;
+}
+
 /**
- * Cuts `value` to at most `maxLength` UTF-16 code units without splitting a
+ * Cuts `value` to at most `maxClusters` grapheme clusters, never splitting
+ * one.
+ */
+function cutClusters(value: string, maxClusters: number): string {
+  if (maxClusters <= 0) return '';
+  let out = '';
+  let count = 0;
+  for (const cluster of clusters(value)) {
+    if (count >= maxClusters) break;
+    out += cluster;
+    count += 1;
+  }
+  return out;
+}
+
+/**
+ * Cuts `value` to at most `maxUnits` UTF-16 code units without splitting a
  * grapheme cluster: a cluster that would straddle the limit is dropped whole.
  */
-function cut(value: string, maxLength: number): string {
-  if (maxLength <= 0) return '';
+function cutUnits(value: string, maxUnits: number): string {
+  if (maxUnits <= 0) return '';
   let out = '';
   let length = 0;
   for (const cluster of clusters(value)) {
-    if (length + cluster.length > maxLength) break;
+    if (length + cluster.length > maxUnits) break;
     out += cluster;
     length += cluster.length;
   }
@@ -77,7 +106,20 @@ function stripTrailing(value: string): string {
 
 /** The team name as it appears inside a role or channel name. */
 function trimName(name: string, budget: number): string {
-  return stripTrailing(cut(name, Math.max(0, budget)));
+  return stripTrailing(cutClusters(name, Math.max(0, budget)));
+}
+
+/** Cuts a name to the room left in a Discord name and drops a trailing hyphen. */
+function trimToUnits(value: string, maxUnits: number): string {
+  return stripTrailing(cutUnits(value, maxUnits));
+}
+
+/**
+ * The last line of defence: cuts a finished name to Discord's limit and
+ * drops a trailing hyphen, so no name is ever too long or ends in a hyphen.
+ */
+function clamp(value: string): string {
+  return stripTrailing(cutUnits(value, DISCORD_NAME_LIMIT));
 }
 
 /** True when two names trim to the same text. */
@@ -103,6 +145,46 @@ function slugify(value: string): string {
 }
 
 /**
+ * Assembles a Discord name from its parts so the result always fits inside
+ * Discord's limit.
+ *
+ * The parts give way in a fixed order when the name is too long: the team
+ * name first (legacy behaviour), then the roster id, then the shortcode. The
+ * final clamp guarantees the limit even when a part is pathologically long.
+ */
+function assemble(
+  prefix: string,
+  name: string,
+  suffix: string,
+  code: string,
+  open: string,
+  close: string,
+): string {
+  const fixed = units(prefix) + units(open) + units(close);
+  const wanted = stripTrailing(name);
+  let finalSuffix = suffix;
+  let finalCode = code;
+
+  // The name absorbs the pressure of a tail that fits beside it.
+  const nameRoom = DISCORD_NAME_LIMIT - fixed - units(finalSuffix) - units(finalCode);
+  let finalName = units(wanted) > nameRoom ? trimToUnits(wanted, nameRoom) : wanted;
+
+  // A tail that does not fit at all gives way: the roster id first, then the
+  // shortcode, so the name keeps the room it asked for.
+  if (fixed + units(finalName) + units(finalSuffix) + units(finalCode) > DISCORD_NAME_LIMIT) {
+    const tailRoom = DISCORD_NAME_LIMIT - fixed - units(wanted);
+    finalSuffix = cutUnits(finalSuffix, Math.max(0, tailRoom - units(finalCode)));
+    finalCode = cutUnits(finalCode, Math.max(0, tailRoom - units(finalSuffix)));
+    finalName = trimToUnits(
+      wanted,
+      DISCORD_NAME_LIMIT - fixed - units(finalSuffix) - units(finalCode),
+    );
+  }
+
+  return clamp(`${prefix}${finalName}${finalSuffix}${open}${finalCode}${close}`);
+}
+
+/**
  * Composes a team role or channel name.
  *
  * The name is trimmed to the budget, a roster id is appended when a sibling
@@ -122,10 +204,7 @@ function composeTeamName(
   const collides =
     rosterId !== '' && siblings.some((sibling) => trimsAlike(sibling, trimmed, budget));
   const suffix = collides ? `-${rosterId}` : '';
-  const tail = `${suffix} (${shortcode.trim()})`;
-  const room = DISCORD_NAME_LIMIT - prefix.length - tail.length;
-  const finalName = room >= trimmed.length ? trimmed : trimName(trimmed, room);
-  return `${prefix}${finalName}${tail}`;
+  return assemble(prefix, trimmed, suffix, shortcode.trim(), ' (', ')');
 }
 
 /**
@@ -143,10 +222,7 @@ export function divisionCategoryName(division: string, shortcode: string): strin
  * Discord shows the same name for the division category and its role.
  */
 export function divisionRoleName(division: string, shortcode: string): string {
-  const tail = ` - ${shortcode.trim()}`;
-  const room = DISCORD_NAME_LIMIT - tail.length;
-  const name = stripTrailing(cut(division.trim(), room));
-  return `${name}${tail}`;
+  return assemble('', division.trim(), '', shortcode.trim(), ' - ', '');
 }
 
 /**
@@ -199,13 +275,13 @@ export function matchChannelName(home: string, away: string, matchId: string): s
     (homeSlug.length > 0 || awaySlug.length > 0)
   ) {
     if (homeSlug.length >= awaySlug.length) {
-      homeSlug = stripTrailing(cut(homeSlug, homeSlug.length - 1));
+      homeSlug = stripTrailing(cutUnits(homeSlug, homeSlug.length - 1));
     } else {
-      awaySlug = stripTrailing(cut(awaySlug, awaySlug.length - 1));
+      awaySlug = stripTrailing(cutUnits(awaySlug, awaySlug.length - 1));
     }
   }
 
-  return compose(homeSlug, awaySlug);
+  return clamp(compose(homeSlug, awaySlug));
 }
 
 /**
