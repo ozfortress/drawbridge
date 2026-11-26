@@ -30,6 +30,7 @@
       "@drawbridge/authz": ["./packages/authz/src/index.ts"],
       "@drawbridge/db": ["./packages/db/src/index.ts"],
       "@drawbridge/jobs": ["./packages/jobs/src/index.ts"],
+      "@drawbridge/discord-ops": ["./packages/discord-ops/src/index.ts"],
       "@drawbridge/testkit": ["./packages/testkit/src/index.ts"],
       "@drawbridge/web": ["./apps/web/src/index.ts"],
       "@drawbridge/bot": ["./apps/bot/src/index.ts"],

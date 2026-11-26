@@ -17,6 +17,7 @@ export default {
       '@drawbridge/authz': pkg('authz'),
       '@drawbridge/db': pkg('db'),
       '@drawbridge/jobs': pkg('jobs'),
+      '@drawbridge/discord-ops': pkg('discord-ops'),
       '@drawbridge/testkit': pkg('testkit'),
       '@drawbridge/web': app('web'),
       '@drawbridge/bot': app('bot'),
