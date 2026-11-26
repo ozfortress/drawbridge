@@ -345,6 +345,9 @@ importers:
 
   packages/discord-ops:
     dependencies:
+      '@drawbridge/domain':
+        specifier: workspace:*
+        version: link:../domain
       '@drawbridge/jobs':
         specifier: workspace:*
         version: link:../jobs

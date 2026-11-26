@@ -13,6 +13,7 @@
     "build": "tsc -b tsconfig.lib.json"
   },
   "dependencies": {
+    "@drawbridge/domain": "workspace:*",
     "@drawbridge/jobs": "workspace:*"
   }
 }

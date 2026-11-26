@@ -101,6 +101,11 @@ describe('error taxonomy (02 §4.13)', () => {
       network: true,
       retryAfterSeconds: 2.5,
     });
+    expect(signalData({ status: 429, bucket: 'b1', rateLimitScope: 'shared' })).toEqual({
+      status: 429,
+      bucket: 'b1',
+      rateLimitScope: 'shared',
+    });
     expect(signalData({})).toEqual({});
   });
 });

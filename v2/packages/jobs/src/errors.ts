@@ -53,13 +53,20 @@ export const ERROR_CODE_CLASSES: Readonly<Record<number, JobErrorClass>> = {
  * What a Discord failure looks like to the engine. The adapter fills in
  * the fields it has: the HTTP `status`, the Discord `code` from the error
  * body, a `network` flag for transport-level failures (reset, timeout,
- * DNS) and the 429 body's `retry_after` seconds.
+ * DNS) and the 429 body's `retry_after` seconds. The two 429 header fields
+ * — the `X-RateLimit-Bucket` hash and the `X-RateLimit-Scope` value — ride
+ * along so the executor can record rate limits by bucket and exempt the
+ * shared-scope 429 from the invalid-request budget (02 §4.4-4.5).
  */
 export interface ApiErrorSignal {
   status?: number;
   code?: number;
   network?: boolean;
   retryAfterSeconds?: number;
+  /** The `X-RateLimit-Bucket` hash the 429 named, when the adapter read one. */
+  bucket?: string;
+  /** The `X-RateLimit-Scope` of a 429: `shared` (the per-IP bucket) never counts as invalid (02 §4.5). */
+  rateLimitScope?: 'user' | 'shared' | 'global';
   message?: string;
 }
 
@@ -113,6 +120,8 @@ export function signalData(signal: ApiErrorSignal): Record<string, unknown> {
     ...(signal.retryAfterSeconds !== undefined
       ? { retryAfterSeconds: signal.retryAfterSeconds }
       : {}),
+    ...(signal.bucket !== undefined ? { bucket: signal.bucket } : {}),
+    ...(signal.rateLimitScope !== undefined ? { rateLimitScope: signal.rateLimitScope } : {}),
     ...(signal.message !== undefined ? { message: signal.message } : {}),
   };
 }

@@ -6,5 +6,5 @@
     "outDir": "dist"
   },
   "include": ["src/**/*.ts"],
-  "references": [{ "path": "../jobs/tsconfig.lib.json" }]
+  "references": [{ "path": "../domain/tsconfig.lib.json" }, { "path": "../jobs/tsconfig.lib.json" }]
 }

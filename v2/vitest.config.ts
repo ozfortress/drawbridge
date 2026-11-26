@@ -35,6 +35,7 @@ export default {
       thresholds: {
         'packages/citadel/src/**': { lines: 75 },
         'packages/domain/src/**': { lines: 90 },
+        'packages/discord-ops/src/**': { lines: 90 },
         'packages/jobs/src/**': { lines: 90 },
       },
     },
