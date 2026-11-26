@@ -288,6 +288,12 @@ importers:
       '@drawbridge/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@drawbridge/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@drawbridge/jobs':
+        specifier: workspace:*
+        version: link:../../packages/jobs
       '@drawbridge/logging':
         specifier: workspace:*
         version: link:../../packages/logging

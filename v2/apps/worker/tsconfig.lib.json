@@ -8,6 +8,8 @@
   "include": ["src/**/*.ts"],
   "references": [
     { "path": "../../packages/config/tsconfig.lib.json" },
-    { "path": "../../packages/logging/tsconfig.lib.json" }
+    { "path": "../../packages/logging/tsconfig.lib.json" },
+    { "path": "../../packages/db/tsconfig.lib.json" },
+    { "path": "../../packages/jobs/tsconfig.lib.json" }
   ]
 }

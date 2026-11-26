@@ -14,6 +14,8 @@
   },
   "dependencies": {
     "@drawbridge/config": "workspace:*",
+    "@drawbridge/db": "workspace:*",
+    "@drawbridge/jobs": "workspace:*",
     "@drawbridge/logging": "workspace:*"
   }
 }

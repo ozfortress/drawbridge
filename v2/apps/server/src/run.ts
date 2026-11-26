@@ -79,13 +79,13 @@ export async function startRole(config: Config, logger: Logger): Promise<Running
       return [{ name: 'bot', stop: () => bot.stop() }];
     }
     case 'worker': {
-      const worker = await startWorker(logger);
+      const worker = await startWorker(config, logger);
       return [{ name: 'worker', stop: () => worker.stop() }];
     }
     case 'all': {
       const web = await startWebWithDatabase(config, logger, { migrate: true });
       const bot = await startBot(logger);
-      const worker = await startWorker(logger);
+      const worker = await startWorker(config, logger);
       return [
         web,
         { name: 'bot', stop: () => bot.stop() },
