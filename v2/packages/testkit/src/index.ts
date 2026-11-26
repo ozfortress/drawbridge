@@ -41,6 +41,10 @@ const TABLES = [
   'guild_role_mappings',
   'settings_kv',
   'previews',
+  'jobs',
+  'job_steps',
+  'job_events',
+  'discord_objects',
 ];
 
 function testUrl(): string {

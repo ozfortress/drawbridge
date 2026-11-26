@@ -365,6 +365,149 @@ export const previews = pgTable(
   (table) => [index('previews_league_created_idx').on(table.leagueId, table.createdAt.desc())],
 );
 
+/** Job states (plan 02 §5.3); concatenated only to keep lines within width. */
+const JOB_STATES_SQL =
+  "('queued','running','paused','awaiting_decision'," +
+  "'completed','completed_with_skips','failed','cancelled','reverting','reverted')";
+
+export const jobs = pgTable(
+  'jobs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    type: text('type').notNull(),
+    guildId: snowflake('guild_id').notNull(),
+    leagueId: uuid('league_id'),
+    lane: text('lane').notNull(),
+    state: text('state').notNull().default('queued'),
+    pauseReason: text('pause_reason'),
+    priority: integer('priority').notNull().default(0),
+    params: jsonb('params').$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
+    plan: jsonb('plan').$type<Record<string, unknown>>().notNull(),
+    planHash: text('plan_hash').notNull(),
+    requestedByUserId: uuid('requested_by_user_id'),
+    requestedByDiscordId: snowflake('requested_by_discord_id'),
+    leaseOwner: text('lease_owner'),
+    leaseExpiresAt: timestamp('lease_expires_at', { withTimezone: true }),
+    attempt: integer('attempt').notNull().default(0),
+    nextRunAt: timestamp('next_run_at', { withTimezone: true }).notNull().defaultNow(),
+    decision: jsonb('decision').$type<Record<string, unknown> | null>(),
+    error: jsonb('error').$type<Record<string, unknown> | null>(),
+    createdAt: createdAt(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+  },
+  (table) => [
+    // The claim scan polls (state, next_run_at): queued jobs (scheduled jobs
+    // included), paused jobs (ratelimit retry_after, external probes) and
+    // jobs mid-revert. Running jobs are lease-reclaimed on lease_expires_at
+    // and awaiting_decision is human-gated, so neither is polled (02 §5.5).
+    index('jobs_runnable_idx')
+      .on(table.state, table.nextRunAt)
+      .where(sql`${table.state} in ('queued','paused','reverting')`),
+    // Duplicate guard (02 §5.10): one active job per (league, plan_hash).
+    uniqueIndex('jobs_active_plan_key')
+      .on(table.leagueId, table.planHash)
+      .where(sql`${table.state} in ('queued','running','paused','awaiting_decision')`),
+    check(
+      'jobs_lane_check',
+      sql`${table.lane} in ('interactive','matches','setup','repair','maintenance')`,
+    ),
+    check('jobs_state_check', sql`${table.state} in ${sql.raw(JOB_STATES_SQL)}`),
+    check(
+      'jobs_pause_reason_check',
+      sql`${table.pauseReason} in ('external','ratelimit','guild_unavailable')`,
+    ),
+  ],
+);
+
+export const jobSteps = pgTable(
+  'job_steps',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    jobId: uuid('job_id')
+      .notNull()
+      .references(() => jobs.id, { onDelete: 'cascade' }),
+    seq: integer('seq').notNull(),
+    kind: text('kind').notNull(),
+    args: jsonb('args').$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
+    status: text('status').notNull().default('pending'),
+    attempts: integer('attempts').notNull().default(0),
+    skippable: boolean('skippable').notNull().default(false),
+    reversible: boolean('reversible').notNull().default(false),
+    compensation: jsonb('compensation').$type<Record<string, unknown> | null>(),
+    externalIds: jsonb('external_ids')
+      .$type<Array<Record<string, unknown>>>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    result: jsonb('result').$type<Record<string, unknown> | null>(),
+    error: jsonb('error').$type<Record<string, unknown> | null>(),
+    startedAt: timestamp('started_at', { withTimezone: true }),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex('job_steps_job_seq_key').on(table.jobId, table.seq),
+    check(
+      'job_steps_status_check',
+      sql`${table.status} in ('pending','running','done','skipped','failed','compensated')`,
+    ),
+  ],
+);
+
+export const jobEvents = pgTable(
+  'job_events',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    jobId: uuid('job_id')
+      .notNull()
+      .references(() => jobs.id, { onDelete: 'cascade' }),
+    at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
+    level: text('level').notNull().default('info'),
+    code: text('code').notNull(),
+    message: text('message').notNull(),
+    data: jsonb('data').$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
+  },
+  (table) => [
+    index('job_events_job_at_idx').on(table.jobId, table.at),
+    check('job_events_level_check', sql`${table.level} in ('info','warn','error')`),
+  ],
+);
+
+export const discordObjects = pgTable(
+  'discord_objects',
+  {
+    guildId: snowflake('guild_id').notNull(),
+    discordId: snowflake('discord_id').notNull(),
+    kind: text('kind').notNull(),
+    ownerType: text('owner_type').notNull(),
+    ownerId: text('owner_id').notNull(),
+    // Ledger rows outlive their job: deleting the job keeps the row and
+    // clears the provenance pointer (02 §5.9, A13).
+    createdByJobId: uuid('created_by_job_id').references(() => jobs.id, {
+      onDelete: 'set null',
+    }),
+    state: text('state').notNull().default('live'),
+    createdAt: createdAt(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
+    lastVerifiedAt: timestamp('last_verified_at', { withTimezone: true }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.guildId, table.discordId] }),
+    check(
+      'discord_objects_kind_check',
+      sql`${table.kind} in ('role','category','text_channel','message','webhook','other')`,
+    ),
+    check(
+      'discord_objects_owner_type_check',
+      sql`${table.ownerType} in ('guild','league','division','entry','match','job')`,
+    ),
+    check(
+      'discord_objects_state_check',
+      sql`${table.state} in ('live','missing','deleted','archived')`,
+    ),
+  ],
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type UserInviteRow = typeof userInvites.$inferSelect;
 export type SessionRow = typeof sessions.$inferSelect;
@@ -373,3 +516,7 @@ export type LeagueRoleRow = typeof leagueRoles.$inferSelect;
 export type LeagueMembershipRow = typeof leagueMemberships.$inferSelect;
 export type GuildRow = typeof guilds.$inferSelect;
 export type PreviewRow = typeof previews.$inferSelect;
+export type JobRow = typeof jobs.$inferSelect;
+export type JobStepRow = typeof jobSteps.$inferSelect;
+export type JobEventRow = typeof jobEvents.$inferSelect;
+export type DiscordObjectRow = typeof discordObjects.$inferSelect;
