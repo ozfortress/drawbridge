@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useParams } from '@tanstack/react-router';
+import { Link, useParams } from '@tanstack/react-router';
 import { useState } from 'react';
 import { api, getLeague, type LeagueDetail } from '../api.js';
 import { ErrorNote } from '../layout.js';
@@ -34,7 +34,14 @@ export function LeagueDetailPage() {
     <div className="stack">
       <div className="section-head">
         <h1>{league.name || '(unnamed league)'}</h1>
-        <span className={`pill ${league.status}`}>{league.status}</span>
+        <div className="actions">
+          {access.capabilities.includes('tournament.setup') ? (
+            <Link to="/leagues/$leagueId/setup" params={{ leagueId: league.id }} className="button">
+              Setup preview
+            </Link>
+          ) : null}
+          <span className={`pill ${league.status}`}>{league.status}</span>
+        </div>
       </div>
       <p className="muted">
         {league.shortcode} · Citadel #{league.citadelLeagueId} · {league.timezone}

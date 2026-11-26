@@ -3,6 +3,7 @@ import { AuthedLayout } from './layout.js';
 import { AuditPage } from './pages/audit.js';
 import { HomePage } from './pages/home.js';
 import { LeagueDetailPage } from './pages/league-detail.js';
+import { LeagueSetupPage } from './pages/league-setup.js';
 import { LeaguesPage } from './pages/leagues.js';
 import { SignInPage } from './pages/signin.js';
 import { UsersPage } from './pages/users.js';
@@ -43,6 +44,12 @@ const leagueDetailRoute = createRoute({
   component: LeagueDetailPage,
 });
 
+const leagueSetupRoute = createRoute({
+  getParentRoute: () => authedRoute,
+  path: '/leagues/$leagueId/setup',
+  component: LeagueSetupPage,
+});
+
 const usersRoute = createRoute({
   getParentRoute: () => authedRoute,
   path: '/users',
@@ -57,7 +64,14 @@ const auditRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   signInRoute,
-  authedRoute.addChildren([homeRoute, leaguesRoute, leagueDetailRoute, usersRoute, auditRoute]),
+  authedRoute.addChildren([
+    homeRoute,
+    leaguesRoute,
+    leagueDetailRoute,
+    leagueSetupRoute,
+    usersRoute,
+    auditRoute,
+  ]),
 ]);
 
 export const router = createRouter({ routeTree, defaultPreload: 'intent' });

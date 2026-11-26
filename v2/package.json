@@ -17,7 +17,8 @@
     "test:watch": "vitest",
     "start": "node apps/server/dist/main.js",
     "dev:web": "node --watch --env-file-if-exists=.env.local apps/server/dist/main.js",
-    "dev:panel": "pnpm -F @drawbridge/panel dev"
+    "dev:panel": "pnpm -F @drawbridge/panel dev",
+    "dev:seed": "tsc -b && node --env-file-if-exists=.env.local apps/server/dist/seed.js"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.8",
