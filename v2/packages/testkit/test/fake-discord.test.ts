@@ -613,6 +613,63 @@ describe('FakeDiscord (todo 21)', () => {
     });
   });
 
+  it('allows a same-category move at the per-category cap, refuses entering a full one', async () => {
+    const fake = new FakeDiscord();
+    fake.seedGuild(GUILD, { channels: [{ name: 'Full Division', kind: 'category' }] });
+    const parent = (await fake.fetchGuildChannels(GUILD)).find(
+      (found) => found.kind === 'category',
+    );
+    if (parent === undefined) throw new Error('parent missing');
+    fake.seedGuild(GUILD, {
+      channels: Array.from({ length: 49 }, (_, index) => ({
+        name: `Team ${index}`,
+        kind: 'text' as const,
+        categoryId: parent.channelId,
+      })),
+    });
+    // The 50th child puts the category at its cap.
+    const fiftieth = await fake.createTextChannel(
+      GUILD,
+      { name: 'Team 49', categoryId: parent.channelId },
+      'drb:j:1',
+    );
+    expect(
+      (await fake.fetchGuildChannels(GUILD)).filter(
+        (found) => found.categoryId === parent.channelId,
+      ),
+    ).toHaveLength(50);
+
+    // Repositioning inside the full category works (F2 regression): the
+    // moving channel is already one of the fifty children.
+    await fake.moveChannel(
+      GUILD,
+      fiftieth.channelId,
+      { categoryId: parent.channelId, position: 1 },
+      'drb:j:2',
+    );
+    const moved = (await fake.fetchGuildChannels(GUILD)).find(
+      (found) => found.channelId === fiftieth.channelId,
+    );
+    expect(moved).toMatchObject({ categoryId: parent.channelId, position: 1 });
+
+    // Entering the full category from outside is still refused with 30013,
+    // and the refused move changes nothing.
+    const outside = await fake.createTextChannel(GUILD, { name: 'Outside' }, 'drb:j:3');
+    const entering = await failureOf(
+      fake.moveChannel(GUILD, outside.channelId, { categoryId: parent.channelId }, 'drb:j:4'),
+    );
+    expect(entering.signal).toEqual({
+      status: 400,
+      code: 30013,
+      message: 'Maximum number of channels in a category reached (50)',
+    });
+    expect(classifyError(entering.signal)).toBe('capacity');
+    const stayed = (await fake.fetchGuildChannels(GUILD)).find(
+      (found) => found.channelId === outside.channelId,
+    );
+    expect(stayed?.categoryId).toBeNull();
+  });
+
   it('filters audit entries by exact reason, action and limit', async () => {
     const fake = seededFake();
     const one = await fake.createRole(GUILD, { name: 'One' }, 'drb:job-a:1');

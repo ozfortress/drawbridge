@@ -806,7 +806,15 @@ export class FakeDiscord implements DiscordPort {
       if (parent.kind !== 'category') {
         this.invalidRefused('the parent channel must be a category');
       }
-      if (this.childrenOf(guild, parent.channelId).length >= MAX_CHANNELS_PER_CATEGORY) {
+      // A move inside the channel's own category is a reposition: the moving
+      // channel is already one of the parent's children, so the per-category
+      // cap cannot bite. Only entering a different category can exceed it,
+      // and that count excludes the moving channel.
+      const entering = parent.channelId !== channel.categoryId;
+      if (
+        entering &&
+        this.childrenOf(guild, parent.channelId).length >= MAX_CHANNELS_PER_CATEGORY
+      ) {
         this.capacityRefused(
           30013,
           `Maximum number of channels in a category reached (${MAX_CHANNELS_PER_CATEGORY})`,
