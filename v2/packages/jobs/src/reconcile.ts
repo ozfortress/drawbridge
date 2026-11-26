@@ -79,7 +79,7 @@ export function normalizeDiscordName(kind: string, name: string): string {
 }
 
 /** The ledger owner a job's created objects belong to. */
-function ledgerOwner(job: JobRow): { ownerType: 'guild' | 'league'; ownerId: string } {
+export function ledgerOwner(job: JobRow): { ownerType: 'guild' | 'league'; ownerId: string } {
   return job.leagueId
     ? { ownerType: 'league', ownerId: job.leagueId }
     : { ownerType: 'guild', ownerId: job.guildId };

@@ -6,5 +6,5 @@
     "outDir": "dist"
   },
   "include": ["src/**/*.ts"],
-  "references": [{ "path": "../db/tsconfig.lib.json" }]
+  "references": [{ "path": "../authz/tsconfig.lib.json" }, { "path": "../db/tsconfig.lib.json" }]
 }

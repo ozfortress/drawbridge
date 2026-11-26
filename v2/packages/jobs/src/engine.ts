@@ -15,11 +15,13 @@ import {
   type CreateJobInput,
   createJob,
   type Db,
+  type DbOrTx,
   type DbTx,
   type JobLane,
   type JobRow,
   jobSteps,
   jobs,
+  NotFoundError,
   updateJobState,
 } from '@drawbridge/db';
 import { and, asc, desc, eq, gt, inArray, lt, lte, sql } from 'drizzle-orm';
@@ -62,6 +64,19 @@ function requireRow<T>(rows: readonly T[], what: string): T {
 }
 
 /**
+ * Locks one job row for update and returns it. The single-job engine
+ * moves (decisions, failure application, probes, revert finishing) all
+ * serialise on this lock; the claim and reclaim scans use `SKIP LOCKED`
+ * instead because they compete for many rows.
+ */
+export async function lockJobRow(tx: DbOrTx, jobId: string): Promise<JobRow> {
+  const rows = await tx.select().from(jobs).where(eq(jobs.id, jobId)).limit(1).for('update');
+  const job = rows[0];
+  if (!job) throw new NotFoundError('job not found');
+  return job;
+}
+
+/**
  * Enqueues a job with its immutable plan and step list.
  *
  * The duplicate guard is the `jobs_active_plan_key` partial unique index on
@@ -83,9 +98,13 @@ export async function enqueueJob(db: Db, input: CreateJobInput): Promise<JobRow>
  * claimers always receive different jobs. The claim applies the state
  * machine's `start` (from `queued`) or `resume` (from `paused`) move, sets
  * the lease 60 seconds ahead on the database clock and bumps the attempt
- * count. Jobs in `reverting` are not claimed: the machine has no edge out
- * of `reverting` into `running`, so a crashed revert is resumed by the
- * revert loop under its own state, not by this claim.
+ * count. A `paused(external)` job is deliberately not claimable: it
+ * resumes only through a successful probe (02 §5.7,
+ * `probePausedExternal`), so the claim scan hands it back untouched even
+ * when its probe time is due. Jobs in `reverting` are not claimed: the
+ * machine has no edge out of `reverting` into `running`, so a crashed
+ * revert is resumed by the revert loop under its own state
+ * (`claimRevertNext`), not by this claim.
  *
  * Returns undefined when no due job is claimable from the given lanes.
  */
@@ -95,17 +114,18 @@ export async function claimNext(
   owner: string,
 ): Promise<JobRow | undefined> {
   if (lanes.length === 0) return undefined;
+  // Paused jobs resume on a schedule, except external pauses, which need
+  // a successful probe first (02 §5.7).
+  const claimable = and(
+    inArray(jobs.state, ['queued', 'paused']),
+    lte(jobs.nextRunAt, sql`now()`),
+    sql`(${jobs.state} <> 'paused' or ${jobs.pauseReason} is distinct from 'external')`,
+  );
   return db.transaction(async (tx) => {
     const candidates = await tx
       .select({ id: jobs.id })
       .from(jobs)
-      .where(
-        and(
-          inArray(jobs.state, ['queued', 'paused']),
-          inArray(jobs.lane, [...lanes]),
-          lte(jobs.nextRunAt, sql`now()`),
-        ),
-      )
+      .where(and(claimable, inArray(jobs.lane, [...lanes])))
       .orderBy(desc(jobs.priority), asc(jobs.nextRunAt), asc(jobs.createdAt))
       .limit(CLAIM_SCAN_LIMIT);
 
@@ -116,13 +136,7 @@ export async function claimNext(
       const locked = await tx
         .select()
         .from(jobs)
-        .where(
-          and(
-            eq(jobs.id, candidate.id),
-            inArray(jobs.state, ['queued', 'paused']),
-            lte(jobs.nextRunAt, sql`now()`),
-          ),
-        )
+        .where(and(eq(jobs.id, candidate.id), claimable))
         .limit(1)
         .for('update', { skipLocked: true });
       const current = locked[0];

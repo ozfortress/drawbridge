@@ -343,6 +343,9 @@ importers:
 
   packages/jobs:
     dependencies:
+      '@drawbridge/authz':
+        specifier: workspace:*
+        version: link:../authz
       '@drawbridge/db':
         specifier: workspace:*
         version: link:../db
