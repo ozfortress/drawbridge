@@ -4,7 +4,7 @@
  * 02 §5.3). The engine (P3) drives the state machine; this file is only its
  * persistence surface.
  */
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import type { Db, DbOrTx } from './client.js';
 import { ConflictError, NotFoundError } from './repos.js';
 import {
@@ -86,9 +86,10 @@ export interface CreateJobInput {
 /**
  * Enqueues a job with its immutable step plan and the first journal row.
  * A second active job with the same (league, plan_hash) raises ConflictError
- * (the duplicate guard, plan 02 §5.10).
+ * (the duplicate guard, plan 02 §5.10). Accepts a transaction so an
+ * approval can create the job and consume its preview atomically.
  */
-export async function createJob(db: Db, input: CreateJobInput): Promise<JobRow> {
+export async function createJob(db: DbOrTx, input: CreateJobInput): Promise<JobRow> {
   try {
     return await db.transaction(async (tx) => {
       const inserted = await tx
@@ -151,6 +152,29 @@ export interface JobWithJournal {
   job: JobRow;
   steps: JobStepRow[];
   events: JobEventRow[];
+}
+
+export interface ListJobsOptions {
+  state?: JobState;
+  limit?: number;
+}
+
+/**
+ * One league's jobs, newest first, league-scoped only (02 §11). Guild-scoped
+ * jobs (no league) are never listed here. The limit is clamped to at most
+ * 200 so a caller cannot ask for the whole journal.
+ */
+export async function listJobsByLeague(
+  db: Db,
+  leagueId: string,
+  options: ListJobsOptions = {},
+): Promise<JobRow[]> {
+  const limit = Math.min(Math.max(options.limit ?? 50, 1), 200);
+  const where =
+    options.state === undefined
+      ? eq(jobs.leagueId, leagueId)
+      : and(eq(jobs.leagueId, leagueId), eq(jobs.state, options.state));
+  return db.select().from(jobs).where(where).orderBy(desc(jobs.createdAt)).limit(limit);
 }
 
 /** One job with its step journal (by seq) and event log (by time). */

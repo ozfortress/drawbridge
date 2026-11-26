@@ -14,6 +14,7 @@
     { "path": "../../packages/logging/tsconfig.lib.json" },
     { "path": "../../packages/crypto/tsconfig.lib.json" },
     { "path": "../../packages/authz/tsconfig.lib.json" },
-    { "path": "../../packages/db/tsconfig.lib.json" }
+    { "path": "../../packages/db/tsconfig.lib.json" },
+    { "path": "../../packages/jobs/tsconfig.lib.json" }
   ]
 }

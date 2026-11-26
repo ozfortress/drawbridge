@@ -24,6 +24,7 @@ import { sql } from 'drizzle-orm';
 import { Pool } from 'pg';
 
 export * from './fake-citadel.js';
+export * from './fake-citadel-fixtures.js';
 export * from './fake-discord.js';
 
 const DEFAULT_TEST_URL = 'postgres://drawbridge:drawbridge@127.0.0.1:5433/drawbridge_test';

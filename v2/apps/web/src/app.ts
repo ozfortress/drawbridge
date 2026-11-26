@@ -2,7 +2,8 @@ import './types.js';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { Config } from '@drawbridge/config';
-import { checkPostgres, type Db } from '@drawbridge/db';
+import { hashToken } from '@drawbridge/crypto';
+import { checkPostgres, type Db, type Pool } from '@drawbridge/db';
 import {
   type Dependency,
   evaluateReadiness,
@@ -12,28 +13,46 @@ import {
 } from '@drawbridge/health';
 import type { Logger } from '@drawbridge/logging';
 import cookie from '@fastify/cookie';
+import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { createDiscordOAuth, type DiscordOAuth } from './auth/oauth.js';
-import { requireCsrf } from './auth/session.js';
+import { requireCsrf, sessionCookieName, useSecureCookies } from './auth/session.js';
 import { HttpError } from './http/errors.js';
 import { registerAuditRoutes } from './routes/audit.js';
 import { registerAuthRoutes } from './routes/auth.js';
+import { registerJobRoutes } from './routes/jobs.js';
 import { registerLeagueRoutes } from './routes/leagues.js';
 import { type CitadelClientFactory, registerPreviewRoutes } from './routes/preview.js';
+import { registerStreamRoutes } from './routes/stream.js';
 import { registerUserRoutes } from './routes/users.js';
 import { VERSION } from './version.js';
+
+/** The API rate-limit bucket: `max` requests per `timeWindow` milliseconds. */
+export interface RateLimitSettings {
+  max: number;
+  timeWindow: number;
+}
+
+/** The default bucket: 300 requests per minute per session or IP. */
+const DEFAULT_RATE_LIMIT: RateLimitSettings = { max: 300, timeWindow: 60_000 };
 
 export interface BuildAppOptions {
   config: Config;
   logger: Logger;
   db?: Db;
+  /** The Postgres pool. SSE stream listeners hold connections out of it. */
+  pool?: Pool;
   oauth?: DiscordOAuth;
   /** Builds the Citadel client of a league; injected so tests can use a fake. */
   citadel?: CitadelClientFactory;
   readinessDependencies?: readonly Dependency[];
   /** Serve the built panel and SPA fallback. Off in API-only tests. */
   servePanel?: boolean;
+  /** Overrides the default rate-limit bucket for tests. */
+  rateLimit?: RateLimitSettings;
+  /** Overrides the 15-second SSE heartbeat interval for tests. */
+  heartbeatMs?: number;
 }
 
 export interface AppContext {
@@ -71,7 +90,29 @@ export async function buildApp(options: BuildAppOptions): Promise<AppContext> {
   });
 
   const root = logger.child({ scope: 'web' });
+  const secure = useSecureCookies(config.publicBaseUrl);
   await app.register(cookie);
+
+  // One bucket per signed-in session, one per IP for everyone else. The
+  // session token is hashed into the key, so the limiter's store never
+  // holds a secret value. Probes are exempt: supervision hits them every
+  // few seconds and must never trip a limit (02 §14).
+  const limits = options.rateLimit ?? DEFAULT_RATE_LIMIT;
+  await app.register(rateLimit, {
+    global: true,
+    max: limits.max,
+    timeWindow: limits.timeWindow,
+    allowList: (request) => isProbe(request.url),
+    keyGenerator: (request) => {
+      const token = request.cookies[sessionCookieName(secure)];
+      return token === undefined ? `ip:${request.ip}` : `session:${hashToken(token)}`;
+    },
+    errorResponseBuilder: (_request, context) =>
+      // The plugin throws whatever the builder returns, and the app's error
+      // handler answers it - so it must be a real HttpError to land as 429
+      // in the standard `{ error, requestId }` shape.
+      new HttpError(429, `Rate limit exceeded. Try again in ${context.after}.`),
+  });
 
   app.addHook('onSend', async (request, reply, payload) => {
     reply.header('x-request-id', String(request.id));
@@ -157,6 +198,14 @@ export async function buildApp(options: BuildAppOptions): Promise<AppContext> {
     registerUserRoutes(app, { config, db });
     registerLeagueRoutes(app, { config, db });
     registerPreviewRoutes(app, { config, db, citadel: options.citadel });
+    registerJobRoutes(app, { config, db, citadel: options.citadel });
+    registerStreamRoutes(app, {
+      config,
+      db,
+      logger: root,
+      ...(options.pool ? { pool: options.pool } : {}),
+      ...(options.heartbeatMs !== undefined ? { heartbeatMs: options.heartbeatMs } : {}),
+    });
     registerAuditRoutes(app, { config, db });
   } else {
     root.warn('no database configured; API routes are not registered');

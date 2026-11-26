@@ -6,7 +6,7 @@ import {
   tierRank,
 } from '@drawbridge/authz';
 import { and, desc, eq, gt, isNull } from 'drizzle-orm';
-import type { Db } from './client.js';
+import type { Db, DbOrTx } from './client.js';
 import {
   auditLog,
   guilds,
@@ -579,6 +579,27 @@ export async function consumePreview(db: Db, id: string): Promise<PreviewRow | u
   const rows = await db
     .update(previews)
     .set({ consumedAt: new Date() })
+    .where(and(eq(previews.id, id), isNull(previews.consumedAt)))
+    .returning();
+  return rows[0];
+}
+
+/**
+ * Marks a preview as consumed by the job created from it, recording the job
+ * id so a repeated approval can return the same job instead of creating a
+ * second one (idempotent approval, 02 §5.2). Accepts a transaction so the
+ * job and the consumption commit together. Returns undefined when another
+ * approval consumed the preview first; the caller re-reads it and either
+ * returns the winner's job or refuses.
+ */
+export async function consumePreviewForJob(
+  db: DbOrTx,
+  id: string,
+  jobId: string,
+): Promise<PreviewRow | undefined> {
+  const rows = await db
+    .update(previews)
+    .set({ consumedAt: new Date(), jobId })
     .where(and(eq(previews.id, id), isNull(previews.consumedAt)))
     .returning();
   return rows[0];

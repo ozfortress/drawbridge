@@ -360,6 +360,8 @@ export const previews = pgTable(
     citadelSnapshotAt: timestamp('citadel_snapshot_at', { withTimezone: true }),
     expiresAt: timestamp('expires_at', { withTimezone: true }),
     consumedAt: timestamp('consumed_at', { withTimezone: true }),
+    /** The job an approval created from this preview, for idempotent re-approval. */
+    jobId: uuid('job_id').references(() => jobs.id, { onDelete: 'set null' }),
     createdAt: createdAt(),
   },
   (table) => [index('previews_league_created_idx').on(table.leagueId, table.createdAt.desc())],
@@ -411,6 +413,8 @@ export const jobs = pgTable(
     uniqueIndex('jobs_active_plan_key')
       .on(table.leagueId, table.planHash)
       .where(sql`${table.state} in ('queued','running','paused','awaiting_decision')`),
+    // The league's job list (02 §11): newest first, league-scoped only.
+    index('jobs_league_created_idx').on(table.leagueId, table.createdAt.desc()),
     check(
       'jobs_lane_check',
       sql`${table.lane} in ('interactive','matches','setup','repair','maintenance')`,

@@ -1,9 +1,16 @@
-import { type Capability, can, type GlobalTier, isAtLeast } from '@drawbridge/authz';
+import {
+  type Capability,
+  can,
+  type EffectiveAccess,
+  type GlobalTier,
+  isAtLeast,
+} from '@drawbridge/authz';
 import {
   type Actor,
   appendAudit,
   ConflictError,
   type Db,
+  type LeagueRow,
   NotFoundError,
   resolveLeagueAccess,
 } from '@drawbridge/db';
@@ -60,6 +67,38 @@ export async function requireLeagueCapability(
   }
   request.leagueContext = { league: resolved.league, access: resolved.access };
   return { leagueId };
+}
+
+/**
+ * Resolves the actor's access to one league when the league is not in the
+ * path (a job or preview id names it instead). 404 when the league does not
+ * exist, 403 when the actor has no access to it at all - so a foreign id
+ * never reveals more than that.
+ */
+export async function requireLeagueAccess(
+  db: Db,
+  auth: AuthContext,
+  leagueId: string,
+): Promise<{ league: LeagueRow; access: EffectiveAccess }> {
+  const actor: Actor = { userId: auth.userId, discordId: auth.discordId, tier: auth.tier };
+  const resolved = await resolveLeagueAccess(db, actor, leagueId);
+  if (!resolved) throw notFound('League not found');
+  if (!resolved.access) throw forbidden('You do not have access to that league');
+  return { league: resolved.league, access: resolved.access };
+}
+
+/** {@link requireLeagueAccess} plus a capability check, naming the capability. */
+export async function requireLeagueCapabilityOn(
+  db: Db,
+  auth: AuthContext,
+  leagueId: string,
+  capability: Capability,
+): Promise<{ league: LeagueRow; access: EffectiveAccess }> {
+  const { league, access } = await requireLeagueAccess(db, auth, leagueId);
+  if (!can(access, capability)) {
+    throw forbidden(`You need the ${capability} capability on this league`);
+  }
+  return { league, access };
 }
 
 export async function audit(

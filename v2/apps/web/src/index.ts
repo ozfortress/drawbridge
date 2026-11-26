@@ -1,11 +1,13 @@
 import type { Config } from '@drawbridge/config';
-import type { Db } from '@drawbridge/db';
+import type { Db, Pool } from '@drawbridge/db';
 import type { Logger } from '@drawbridge/logging';
 import { type AppContext, buildApp, listen } from './app.js';
 import type { DiscordOAuth } from './auth/oauth.js';
 
 export interface StartWebOptions {
   db?: Db;
+  /** The Postgres pool. SSE stream listeners hold connections out of it. */
+  pool?: Pool;
   oauth?: DiscordOAuth;
 }
 

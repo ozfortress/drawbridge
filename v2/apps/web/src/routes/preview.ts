@@ -12,7 +12,6 @@
  * key under the AAD `league_citadel_keys|{leagueId}|key_envelope`, which binds
  * the ciphertext to the row it belongs to.
  */
-import { type Capability, can } from '@drawbridge/authz';
 import { type CitadelClient, CitadelError, createCitadelClient } from '@drawbridge/citadel';
 import { type Config, registerSecret } from '@drawbridge/config';
 import { buildAad, Cipher } from '@drawbridge/crypto';
@@ -22,16 +21,20 @@ import {
   getPreview,
   insertPreview,
   type LeagueRow,
-  resolveLeagueAccess,
   revokeLeagueCitadelKey,
   upsertLeagueCitadelKey,
 } from '@drawbridge/db';
 import { buildTournamentPlan, type LeagueSnapshot, type TournamentPlan } from '@drawbridge/domain';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { type AuthContext, requireAuth, useSecureCookies } from '../auth/session.js';
-import { badRequest, forbidden, HttpError, notFound } from '../http/errors.js';
-import { audit, parseBody, requireLeagueCapability } from '../http/helpers.js';
+import { requireAuth, useSecureCookies } from '../auth/session.js';
+import { badRequest, HttpError, notFound } from '../http/errors.js';
+import {
+  audit,
+  parseBody,
+  requireLeagueCapability,
+  requireLeagueCapabilityOn,
+} from '../http/helpers.js';
 
 /** How long a preview may be approved before it has to be built again. */
 const PREVIEW_TTL_MS = 24 * 60 * 60 * 1000;
@@ -66,7 +69,7 @@ export interface CitadelClientInput {
 
 export type CitadelClientFactory = (input: CitadelClientInput) => CitadelClient;
 
-function defaultCitadelFactory(input: CitadelClientInput): CitadelClient {
+export function defaultCitadelFactory(input: CitadelClientInput): CitadelClient {
   return createCitadelClient({ baseUrl: input.baseUrl, apiKey: input.apiKey });
 }
 
@@ -229,22 +232,6 @@ function changedPaths(before: ComparablePlan, after: ComparablePlan): string[] {
   return paths;
 }
 
-/** The league a capability is checked on, when the league is not in the path. */
-async function requireLeagueAccess(
-  db: Db,
-  auth: AuthContext,
-  leagueId: string,
-  capability: Capability,
-): Promise<LeagueRow> {
-  const actor = { userId: auth.userId, discordId: auth.discordId, tier: auth.tier };
-  const resolved = await resolveLeagueAccess(db, actor, leagueId);
-  if (!resolved) throw notFound('League not found');
-  if (!resolved.access || !can(resolved.access, capability)) {
-    throw forbidden(`You need the ${capability} capability on this league`);
-  }
-  return resolved.league;
-}
-
 /** The sealed key of a league, opened with the master key. */
 function openLeagueKey(config: Config, leagueId: string, envelope: string): string {
   return cipherFor(config).open(envelope, keyAad(leagueId));
@@ -253,6 +240,43 @@ function openLeagueKey(config: Config, leagueId: string, envelope: string): stri
 /** The status the panel shows for a stored key. */
 function keyStatus(row: { revokedAt: Date | null }): 'active' | 'revoked' {
   return row.revokedAt ? 'revoked' : 'active';
+}
+
+/** Everything a live plan build needs; shared by the preview and job routes. */
+export interface PlanSource {
+  db: Db;
+  config: Config;
+  /** Creates the Citadel client for a league key; injected so tests can use a fake. */
+  citadel: CitadelClientFactory;
+}
+
+/**
+ * Reads the league from Citadel and builds the plan from the live snapshot.
+ * Citadel failures are mapped to their HTTP statuses here, so every caller
+ * (preview, verify, an approval's drift check) answers them identically.
+ */
+export async function livePlanForLeague(
+  source: PlanSource,
+  league: LeagueRow,
+): Promise<{ plan: TournamentPlan; snapshot: LeagueSnapshot }> {
+  const stored = await getLeagueCitadelKey(source.db, league.id);
+  if (!stored || stored.revokedAt) {
+    throw new HttpError(409, 'citadel_key_missing: no Citadel key is stored for this league');
+  }
+  const apiKey = openLeagueKey(source.config, league.id, stored.keyEnvelope);
+  const client = source.citadel({
+    leagueId: league.id,
+    baseUrl: source.config.citadelApiBaseUrl,
+    apiKey,
+  });
+  let snapshot: LeagueSnapshot;
+  try {
+    snapshot = await loadSnapshot(client, String(league.citadelLeagueId));
+  } catch (error) {
+    throw citadelHttpError(error);
+  }
+  const plan = buildTournamentPlan(snapshot, { leagueShortcode: league.shortcode });
+  return { plan, snapshot };
 }
 
 export interface PreviewRouteDeps {
@@ -265,36 +289,15 @@ export interface PreviewRouteDeps {
 export function registerPreviewRoutes(app: FastifyInstance, deps: PreviewRouteDeps): void {
   const secure = useSecureCookies(deps.config.publicBaseUrl);
   const createCitadel = deps.citadel ?? defaultCitadelFactory;
-
-  /** A client for the stored key of a league, or the reason there is none. */
-  async function clientForLeague(league: LeagueRow): Promise<CitadelClient> {
-    const stored = await getLeagueCitadelKey(deps.db, league.id);
-    if (!stored || stored.revokedAt) {
-      throw new HttpError(409, 'citadel_key_missing: no Citadel key is stored for this league');
-    }
-    const apiKey = openLeagueKey(deps.config, league.id, stored.keyEnvelope);
-    return createCitadel({
-      leagueId: league.id,
-      baseUrl: deps.config.citadelApiBaseUrl,
-      apiKey,
-    });
-  }
+  const source: PlanSource = { db: deps.db, config: deps.config, citadel: createCitadel };
 
   /** Reads the league from Citadel and builds the plan from the snapshot. */
-  async function planForLeague(league: LeagueRow): Promise<{
+  const planForLeague = (
+    league: LeagueRow,
+  ): Promise<{
     plan: TournamentPlan;
     snapshot: LeagueSnapshot;
-  }> {
-    const client = await clientForLeague(league);
-    let snapshot: LeagueSnapshot;
-    try {
-      snapshot = await loadSnapshot(client, String(league.citadelLeagueId));
-    } catch (error) {
-      throw citadelHttpError(error);
-    }
-    const plan = buildTournamentPlan(snapshot, { leagueShortcode: league.shortcode });
-    return { plan, snapshot };
-  }
+  }> => livePlanForLeague(source, league);
 
   app.post('/api/v1/leagues/:leagueId/preview', async (request, reply) => {
     const auth = await requireAuth(deps.db, request, secure);
@@ -336,7 +339,7 @@ export function registerPreviewRoutes(app: FastifyInstance, deps: PreviewRouteDe
     const previewId = previewIdOf(request.params);
     const preview = await getPreview(deps.db, previewId);
     if (!preview) throw notFound('Preview not found');
-    await requireLeagueAccess(deps.db, auth, preview.leagueId, 'league.read');
+    await requireLeagueCapabilityOn(deps.db, auth, preview.leagueId, 'league.read');
     const consumedAt = preview.consumedAt?.toISOString() ?? null;
     if (preview.consumedAt) {
       throw new HttpError(409, 'This preview has already been consumed and cannot be reused');
@@ -362,7 +365,12 @@ export function registerPreviewRoutes(app: FastifyInstance, deps: PreviewRouteDe
     const previewId = previewIdOf(request.params);
     const preview = await getPreview(deps.db, previewId);
     if (!preview) throw notFound('Preview not found');
-    const league = await requireLeagueAccess(deps.db, auth, preview.leagueId, 'tournament.setup');
+    const { league } = await requireLeagueCapabilityOn(
+      deps.db,
+      auth,
+      preview.leagueId,
+      'tournament.setup',
+    );
 
     const stored = storedPlanSchema.safeParse(preview.plan);
     if (!stored.success) {

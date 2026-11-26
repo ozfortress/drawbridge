@@ -46,7 +46,7 @@ async function startWebWithDatabase(
       redirectUri: config.discordRedirectUri,
     });
 
-    const ctx = await startWeb(config, logger, { db: database.db, oauth });
+    const ctx = await startWeb(config, logger, { db: database.db, pool: database.pool, oauth });
     return {
       name: 'web',
       stop: async () => {

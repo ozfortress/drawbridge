@@ -20,8 +20,10 @@
     "@drawbridge/db": "workspace:*",
     "@drawbridge/domain": "workspace:*",
     "@drawbridge/health": "workspace:*",
+    "@drawbridge/jobs": "workspace:*",
     "@drawbridge/logging": "workspace:*",
     "@fastify/cookie": "11.1.5",
+    "@fastify/rate-limit": "11.3.0",
     "@fastify/static": "10.1.12",
     "fastify": "5.12.8",
     "zod": "4.6.7"
