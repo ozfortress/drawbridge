@@ -4,7 +4,7 @@
  * 02 §5.3). The engine (P3) drives the state machine; this file is only its
  * persistence surface.
  */
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import type { Db, DbOrTx } from './client.js';
 import { ConflictError, NotFoundError } from './repos.js';
 import {
@@ -380,4 +380,33 @@ export async function getDiscordObject(
     .where(and(eq(discordObjects.guildId, guildId), eq(discordObjects.discordId, discordId)))
     .limit(1);
   return rows[0];
+}
+
+/** Live ledger objects by kind, the guild-usage half of a capacity check. */
+export interface GuildDiscordObjectUsage {
+  readonly roles: number;
+  readonly channels: number;
+  readonly categories: number;
+}
+
+/**
+ * Counts the guild's live ledger objects by kind (02 §4.8): the usage a
+ * preview weighs its plan against. Only `live` rows count — archived and
+ * deleted objects freed their headroom.
+ */
+export async function guildDiscordObjectUsage(
+  db: DbOrTx,
+  guildId: string,
+): Promise<GuildDiscordObjectUsage> {
+  const rows = await db
+    .select({ kind: discordObjects.kind, count: sql<number>`count(*)::int` })
+    .from(discordObjects)
+    .where(and(eq(discordObjects.guildId, guildId), eq(discordObjects.state, 'live')))
+    .groupBy(discordObjects.kind);
+  const byKind = new Map(rows.map((row) => [row.kind, row.count]));
+  return {
+    roles: byKind.get('role') ?? 0,
+    channels: byKind.get('text_channel') ?? 0,
+    categories: byKind.get('category') ?? 0,
+  };
 }

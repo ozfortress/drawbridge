@@ -37,7 +37,9 @@
  *
  * There is no REST client and no network I/O: the class is plain state plus
  * the port's eighteen methods, plus the seed, fault, event and audit
- * helpers tests need.
+ * helpers tests need. `removeBot`/`rejoinGuild` model the bot being kicked
+ * from a guild: while it is gone every port call for that guild answers
+ * 404/10004 Unknown Guild and a `GUILD_DELETE` event is delivered.
  */
 
 import type {
@@ -165,6 +167,11 @@ export interface FakeGatewayMember {
   joined_at: string | null;
 }
 
+/** A GUILD_DELETE payload: the guild is gone for this bot. */
+export interface FakeGatewayGuildDelete {
+  id: string;
+}
+
 /** The gateway events the fake delivers, discriminated on `t`. */
 export type FakeGatewayEvent =
   | { t: 'MESSAGE_CREATE'; s: number; d: FakeGatewayMessage }
@@ -175,6 +182,7 @@ export type FakeGatewayEvent =
   | { t: 'GUILD_MEMBER_ADD'; s: number; d: FakeGatewayMember }
   | { t: 'GUILD_MEMBER_UPDATE'; s: number; d: FakeGatewayMember }
   | { t: 'GUILD_MEMBER_REMOVE'; s: number; d: { user: FakeGatewayUser; guild_id: string } }
+  | { t: 'GUILD_DELETE'; s: number; d: FakeGatewayGuildDelete }
   | { t: 'CHANNEL_CREATE'; s: number; d: FakeGatewayChannel }
   | { t: 'CHANNEL_UPDATE'; s: number; d: FakeGatewayChannel }
   | { t: 'CHANNEL_DELETE'; s: number; d: FakeGatewayChannel }
@@ -272,6 +280,10 @@ interface FakeMessageState {
 interface FakeGuildState {
   guildId: string;
   botMemberId: string;
+  /** False once the bot was removed: every port call answers 10004. */
+  botPresent: boolean;
+  /** The bot member as it was seeded, restored by `rejoinGuild`. */
+  removedBot: { name: string; roleIds: readonly string[] } | null;
   roles: Map<string, FakeRoleState>;
   channels: Map<string, FakeChannelState>;
   members: Map<string, FakeMemberState>;
@@ -527,6 +539,35 @@ export class FakeDiscord implements DiscordPort {
       s: this.nextEventSeq(),
       d: { user: { id: memberId, username: member.name, bot: false }, guild_id: guildId },
     });
+  }
+
+  /**
+   * Removes the bot from the guild: every later port call for the guild
+   * answers 404/10004 Unknown Guild, exactly as Discord does for a bot that
+   * is no longer a member. The guild's other state stays as it was, and a
+   * `GUILD_DELETE` event is delivered as the gateway would. `rejoinGuild`
+   * restores the member as it was seeded.
+   */
+  removeBot(guildId: string): void {
+    const guild = this.guildStateUnchecked(guildId);
+    const bot = guild.members.get(guild.botMemberId);
+    guild.removedBot = bot === undefined ? null : { name: bot.name, roleIds: [...bot.roleIds] };
+    guild.members.delete(guild.botMemberId);
+    guild.botPresent = false;
+    this.deliver({ t: 'GUILD_DELETE', s: this.nextEventSeq(), d: { id: guildId } });
+  }
+
+  /** Puts the bot back in the guild with the member record it had before. */
+  rejoinGuild(guildId: string): void {
+    const guild = this.guildStateUnchecked(guildId);
+    const bot = guild.removedBot;
+    guild.members.set(guild.botMemberId, {
+      memberId: guild.botMemberId,
+      name: bot?.name ?? 'drawbridge',
+      roleIds: [...(bot?.roleIds ?? [])],
+    });
+    guild.removedBot = null;
+    guild.botPresent = true;
   }
 
   // ---------------------------------------------------------------------
@@ -940,11 +981,23 @@ export class FakeDiscord implements DiscordPort {
 
   /** The guild's state, created on first touch with @everyone in place. */
   private guildState(guildId: string): FakeGuildState {
+    const guild = this.guildStateUnchecked(guildId);
+    if (!guild.botPresent) {
+      // A bot that was removed hears what Discord answers: 404/10004.
+      throw new DiscordOperationError({ status: 404, code: 10004, message: 'Unknown Guild' });
+    }
+    return guild;
+  }
+
+  /** The guild's state without the bot-membership check. */
+  private guildStateUnchecked(guildId: string): FakeGuildState {
     let guild = this.guilds.get(guildId);
     if (guild === undefined) {
       guild = {
         guildId,
         botMemberId: this.botUserId,
+        botPresent: true,
+        removedBot: null,
         roles: new Map(),
         channels: new Map(),
         members: new Map(),

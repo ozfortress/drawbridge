@@ -30,6 +30,7 @@ export {
 export { type CanonicalValue, canonicalJson } from './canonical.js';
 export {
   type CapacityCategory,
+  type CapacityHeadroomFlag,
   type CapacityPlan,
   type CapacityRefusal,
   type CapacityRequest,
@@ -37,6 +38,8 @@ export {
   type CapacitySplit,
   type CapacitySplitPart,
   type CapacityStatus,
+  type CapacityUsage,
+  flagCapacityHeadroom,
   MAX_CATEGORIES,
   MAX_CHANNELS,
   MAX_CHANNELS_PER_CATEGORY,

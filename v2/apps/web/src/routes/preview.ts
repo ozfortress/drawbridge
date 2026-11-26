@@ -19,12 +19,18 @@ import {
   type Db,
   getLeagueCitadelKey,
   getPreview,
+  guildDiscordObjectUsage,
   insertPreview,
   type LeagueRow,
   revokeLeagueCitadelKey,
   upsertLeagueCitadelKey,
 } from '@drawbridge/db';
-import { buildTournamentPlan, type LeagueSnapshot, type TournamentPlan } from '@drawbridge/domain';
+import {
+  buildTournamentPlan,
+  flagCapacityHeadroom,
+  type LeagueSnapshot,
+  type TournamentPlan,
+} from '@drawbridge/domain';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireAuth, useSecureCookies } from '../auth/session.js';
@@ -306,6 +312,23 @@ export function registerPreviewRoutes(app: FastifyInstance, deps: PreviewRouteDe
 
     const { plan, snapshot } = await planForLeague(league);
 
+    // Capacity flagging (02 §4.8): the plan's own refusal says what the setup
+    // cannot fit on its own; the headroom flags say what no longer fits
+    // because the guild already holds recorded objects near a cap. Warnings,
+    // not refusals — the ledger cannot see foreign objects, and the
+    // executor's live preflight remains the authority that refuses a create.
+    const usage = await guildDiscordObjectUsage(deps.db, league.guildId);
+    const capacityHeadroom = flagCapacityHeadroom(
+      {
+        roleCount: plan.counts.roles,
+        categories: plan.divisions.map((division) => ({
+          name: division.categoryName,
+          channelCount: division.entries.length,
+        })),
+      },
+      usage,
+    );
+
     const preview = await insertPreview(deps.db, {
       leagueId,
       createdByUserId: auth.userId,
@@ -330,6 +353,8 @@ export function registerPreviewRoutes(app: FastifyInstance, deps: PreviewRouteDe
       plan,
       warnings: plan.warnings,
       capacity: plan.capacity,
+      capacityHeadroom,
+      guildUsage: usage,
       captains: plan.captainReport.captains,
     });
   });

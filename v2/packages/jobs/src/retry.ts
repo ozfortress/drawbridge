@@ -24,6 +24,12 @@ export const TRANSIENT_MAX_ATTEMPTS = 6;
 export const EXTERNAL_PROBE_INTERVAL_MS = 30_000;
 /** A failing external pause escalates to awaiting_decision after 24 hours (02 §5.7). */
 export const EXTERNAL_PAUSE_ESCALATION_MS = 24 * 60 * 60_000;
+/**
+ * A `paused(guild_unavailable)` job retries on this cadence (02 §5.3): the
+ * claim scan re-runs the failed step once the bot is back in the guild, so
+ * the pause is a retry schedule with an operator escape hatch, not a probe.
+ */
+export const GUILD_UNAVAILABLE_RETRY_MS = 30_000;
 
 /** Injected clock: epoch milliseconds. */
 export type Clock = () => number;
@@ -61,6 +67,11 @@ export function rateLimitRetryAt(retryAfterSeconds: number, clock: Clock): Date 
 /** When the next `paused(external)` probe is due (02 §5.7). */
 export function nextProbeAt(clock: Clock): Date {
   return new Date(clock() + EXTERNAL_PROBE_INTERVAL_MS);
+}
+
+/** When a `paused(guild_unavailable)` job next retries (02 §5.3). */
+export function guildUnavailableRetryAt(clock: Clock): Date {
+  return new Date(clock() + GUILD_UNAVAILABLE_RETRY_MS);
 }
 
 /** The state a `paused(external)` probe decision is made over. */

@@ -70,6 +70,82 @@ export interface CapacityPlan {
   readonly categories: readonly CapacityCategory[];
 }
 
+/** What a guild already holds, as the bot's own ledger records it. */
+export interface CapacityUsage {
+  /** Live roles the bot created, @everyone and foreign roles excluded. */
+  readonly roles: number;
+  /** Live channels, categories included as Discord counts them. */
+  readonly channels: number;
+  readonly categories: number;
+}
+
+/** One headroom flag: the plan plus the guild's recorded usage crosses a cap. */
+export interface CapacityHeadroomFlag {
+  readonly scope: CapacityScope;
+  readonly limit: number;
+  /** What the guild already holds, per the ledger. */
+  readonly existing: number;
+  /** What the plan would add. */
+  readonly planned: number;
+  readonly message: string;
+}
+
+/**
+ * Flags every guild-wide cap the planned setup plus the guild's recorded
+ * usage would cross (02 §4.8).
+ *
+ * `planCapacity` says what the plan alone cannot fit; this says what no
+ * longer fits because the guild is already close to a cap — a full season
+ * of match channels can push a setup over the limit even when the setup
+ * itself is small. The flags are warnings, not refusals: the ledger is the
+ * bot's own record and cannot see foreign objects, so the executor's live
+ * preflight stays the authority that refuses a create. Per-category
+ * headroom is not derivable from the ledger (it does not record parents)
+ * and stays the preflight's to check.
+ */
+export function flagCapacityHeadroom(
+  request: CapacityRequest,
+  usage: CapacityUsage,
+): CapacityHeadroomFlag[] {
+  const plannedChannels = request.categories.reduce(
+    (sum, category) => sum + Math.max(0, category.channelCount),
+    0,
+  );
+  const plannedCategories = request.categories.length;
+  // Discord counts categories as channels, so the channel cap sees both.
+  const plannedChannelObjects = plannedChannels + plannedCategories;
+  const flags: CapacityHeadroomFlag[] = [];
+
+  if (usage.roles + Math.max(0, request.roleCount) > MAX_ROLES) {
+    flags.push({
+      scope: 'roles',
+      limit: MAX_ROLES,
+      existing: usage.roles,
+      planned: request.roleCount,
+      message: `The guild already holds ${usage.roles} roles; this plan adds ${request.roleCount} and would cross the limit of ${MAX_ROLES}.`,
+    });
+  }
+  if (usage.channels + plannedChannelObjects > MAX_CHANNELS) {
+    flags.push({
+      scope: 'channels',
+      limit: MAX_CHANNELS,
+      existing: usage.channels,
+      planned: plannedChannelObjects,
+      message: `The guild already holds ${usage.channels} channels; this plan adds ${plannedChannelObjects} and would cross the limit of ${MAX_CHANNELS}.`,
+    });
+  }
+  if (usage.categories + plannedCategories > MAX_CATEGORIES) {
+    flags.push({
+      scope: 'categories',
+      limit: MAX_CATEGORIES,
+      existing: usage.categories,
+      planned: plannedCategories,
+      message: `The guild already holds ${usage.categories} categories; this plan adds ${plannedCategories} and would cross the limit of ${MAX_CATEGORIES}.`,
+    });
+  }
+  return flags;
+}
+
 function splitCategory(category: CapacityCategory): CapacitySplitPart[] {
   const parts: CapacitySplitPart[] = [];
   const partCount = Math.ceil(category.channelCount / MAX_CHANNELS_PER_CATEGORY);

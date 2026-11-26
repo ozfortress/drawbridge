@@ -40,6 +40,7 @@ import {
   type Clock,
   type ExternalPauseAction,
   evaluateExternalPause,
+  guildUnavailableRetryAt,
   isTransientExhausted,
   nextProbeAt,
   nextRetryAt,
@@ -76,6 +77,7 @@ const DEFAULT_RETRY_AFTER_SECONDS = 1;
 export type StepFailureAction =
   | 'retry_scheduled'
   | 'ratelimit_paused'
+  | 'guild_unavailable_paused'
   | 'failed'
   | 'awaiting_decision';
 
@@ -129,15 +131,17 @@ async function findStep(tx: DbTx, jobId: string, stepSeq: number): Promise<JobSt
 /**
  * Applies a step failure to the journal and the job (plan 02 §4.13, §5.7).
  *
- * The classified signal decides the move: `rate_limited` pauses the job
- * until `retry_after` without consuming a step attempt; `transient` keeps
- * the job `running` under its lease with `next_run_at` pushed to the next
- * backoff slot, and fails the job once 6 attempts are spent; every
- * permanent class parks the job in `awaiting_decision` at once, naming its
- * cause — and `fatal_config` additionally opens an alert. One
- * `job.step.failure` row records the signal; the state machine emits its
- * own row whenever the job's state actually moves. The job must be
- * `running`; anything else is an illegal move the machine rejects.
+ * The classified signal decides the move: a 10004 Unknown Guild pauses the
+ * job with reason `guild_unavailable` on a 30-second retry schedule and
+ * asks for a decision; `rate_limited` pauses the job until `retry_after`
+ * without consuming a step attempt; `transient` keeps the job `running`
+ * under its lease with `next_run_at` pushed to the next backoff slot, and
+ * fails the job once 6 attempts are spent; every permanent class parks the
+ * job in `awaiting_decision` at once, naming its cause — and
+ * `fatal_config` additionally opens an alert. One `job.step.failure` row
+ * records the signal; the state machine emits its own row whenever the
+ * job's state actually moves. The job must be `running`; anything else is
+ * an illegal move the machine rejects.
  */
 export async function applyStepFailure(
   db: Db,
@@ -159,8 +163,52 @@ export async function applyStepFailure(
       );
     }
     const step = await findStep(tx, jobId, failure.stepSeq);
-    const cls = classifyError(failure.signal);
     const signal = signalData(failure.signal);
+
+    // The guild itself is unavailable (02 §5.3's third pause reason): a
+    // 10004 Unknown Guild on a guild-scoped write means the bot was removed
+    // mid-job. That is neither a taxonomy class to park on nor an object
+    // that went missing — it is `paused(guild_unavailable)`, with a
+    // 30-second claim-retry schedule that resumes the job on its own once
+    // the bot is back, and an explicit ask for a decision because an
+    // operator may prefer to abort or revert instead of waiting.
+    if (failure.signal.code === 10004) {
+      await tx
+        .update(jobSteps)
+        .set({ status: 'failed', error: { guildUnavailable: true, ...signal } })
+        .where(eq(jobSteps.id, step.id));
+      await appendJobEvent(tx, jobId, {
+        level: 'warn',
+        code: 'job.step.failure',
+        message: `Step ${failure.stepSeq} failed: the guild is unavailable${
+          failure.signal.message === undefined ? '' : ` (${failure.signal.message})`
+        }`,
+        data: { stepSeq: failure.stepSeq, guildUnavailable: true, ...signal },
+      });
+      const paused = await applyMove(
+        tx,
+        job,
+        { type: 'pause', reason: 'guild_unavailable' },
+        { detail: `the bot is no longer in guild ${job.guildId}` },
+      );
+      const updated = await updateJobState(tx, jobId, {
+        state: paused.state,
+        pauseReason: paused.pauseReason,
+        leaseOwner: null,
+        leaseExpiresAt: null,
+        nextRunAt: guildUnavailableRetryAt(clock),
+      });
+      await appendJobEvent(tx, jobId, {
+        level: 'warn',
+        code: 'job.guild_unavailable',
+        message:
+          'Decision needed: re-invite the bot to resume this job on its own, or abort/revert it',
+        data: { guildId: job.guildId, stepSeq: failure.stepSeq },
+      });
+      return { job: updated, action: 'guild_unavailable_paused' };
+    }
+
+    const cls = classifyError(failure.signal);
 
     // The step records the classified signal whatever the engine does next.
     await tx
