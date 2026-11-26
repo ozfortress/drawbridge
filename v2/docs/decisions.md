@@ -2,6 +2,11 @@
 
 Implementation decisions and deviations from the plan. Newest first.
 
+## P2 exit (2026-11-26)
+
+- **Snowflakes have two independent guards.** The P2 exit failure probe (temporarily parsing Citadel bodies with `JSON.parse`) showed the zod schemas' `z.number().int()` safe-integer bound rejects float64-unsafe values at the parse boundary, so a lossy parser cannot store a corrupted snowflake: the preview fails closed (502 `citadel_invalid_response`) instead of writing a rounded id. The lossless parser keeps the exact string; the schema guard is the second defense. Both are now covered by the recorded exit evidence.
+- **The P2-era decisions below held unchanged through the exit checks:** the `previews` table and `leagues.citadel_league_id` staying `integer` both ran green in the five recorded checks (golden equality, hidden league, injected 503, 18-digit round-trip, live manual run).
+
 ## P2 (2026-11-22)
 
 - **`previews` table added to the schema.** Plan `03` §2.4 did not name it; the preview-and-approve flow needs the plan and its Citadel snapshot stored against a hash. Columns per todo 10: `id uuid pk`, `league_id` (fk, cascade), `created_by_user_id` (fk, set null, nullable like the other creator columns), `plan`/`snapshot` jsonb not null, `plan_hash` text not null, `citadel_snapshot_at`/`expires_at`/`consumed_at` nullable timestamptz (lifecycle set by the API, not defaulted), `created_at`; index `(league_id, created_at desc)`. Previews are deliberately not unique: re-previewing stores a new row and the API layer treats consumed or expired rows as unusable.

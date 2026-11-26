@@ -15,7 +15,7 @@
 
 - [x] P0 Foundations
 - [x] P1 Data, crypto, identity, RBAC, panel shell
-- [ ] P2 Citadel client, league import, preview
+- [x] P2 Citadel client, league import, preview (exit checks recorded 2026-11-26)
 - [ ] P3 Job engine and Discord executor
 - [ ] P4 Tournament setup parity
 - [ ] P5 Match lifecycle parity
@@ -29,14 +29,14 @@
 
 ## State
 
-- 85 tests pass: unit (config, logging, health, crypto, authz) and integration (repositories, HTTP API) against Postgres 16.
+- 262 tests pass across 23 files: unit (config, logging, health, crypto, authz, citadel client/schemas/contract, testkit) and integration (repositories, seed, HTTP API, preview) against Postgres 16.
 - `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build` are green.
+- P2 exit checks recorded 2026-11-26 (five checks, none skipped): golden plan equality (byte + value), hidden league `citadel_not_visible`, injected Citadel 503 with no partial preview, 18-digit snowflake round-trip through Citadel/Postgres/API/panel with a failure probe, and a manual run against the live Citadel dev stack. Evidence: `.omo/evidence/drawbridge-v2-redesign-implementation/task-13-p2-exit.md` (outside the repo).
 - Runtime smoke: migrations applied, root admin seeded, panel served at `/signin`, `/api/v1/me` returns 401 without a session.
 - Local Postgres: `docker compose -f deploy/compose.dev.yaml up -d postgres` (host port 5433). Integration tests create `drawbridge_test` and truncate between tests.
 
 ## Open blockers
 
-- GPG signing is pending the owner's key unlock. Commits are unsigned; owner can sign later.
 - TF2Esports questions (`06` §6): Q-T1, Q-T3 to Q-T7 open. Q-T2 answered: no pre-cutover schedule data.
 - B8 (optional): error tracking choice.
 - Production server `sterling` presumed, to be confirmed.
@@ -55,6 +55,6 @@
 
 ## Last session
 
-- Date: 2026-11-22
-- Done: P1. Postgres/Drizzle schema and migration for identity, guilds, leagues, roles, memberships, managed channels, audit, alerts, settings. AES-256-GCM crypto with key ids and AAD, token hashing. Discord OAuth (injectable fetch), server-side sessions, CSRF, capability guards, user/invite/tier management, league create/read/update, audit. React panel shell (sign-in, home, leagues, league detail, users, audit). CI now has a Postgres service and runs integration tests.
-- Next: P2. Citadel client, dev seed, domain naming/plan builder, preview.
+- Date: 2026-11-26
+- Done: P2. Citadel client with contract tests, FakeCitadel, dev seed, domain naming/access/capacity/plan with a golden file, preview API with stored snapshot and drift check, live preview panel screen and dev seed. P2 exit checks recorded (golden equality, hidden league, injected 503, 18-digit snowflake round-trip with failure probe, live manual run against the Citadel dev instance); P2 marked done. Commits are signed with key 60BB6FE8E7073C6B.
+- Next: P3. Job engine and Discord executor.
