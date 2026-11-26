@@ -383,6 +383,15 @@ importers:
       '@drawbridge/db':
         specifier: workspace:*
         version: link:../db
+      '@drawbridge/discord-ops':
+        specifier: workspace:*
+        version: link:../discord-ops
+      '@drawbridge/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@drawbridge/jobs':
+        specifier: workspace:*
+        version: link:../jobs
       drizzle-orm:
         specifier: 0.45.4
         version: 0.45.4(@types/pg@8.23.1)(pg@8.23.1)

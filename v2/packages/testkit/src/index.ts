@@ -7,7 +7,10 @@
  * tests.
  *
  * `createFakeCitadel` serves recorded Citadel responses over real HTTP so
- * clients can be exercised without a live Citadel instance.
+ * clients can be exercised without a live Citadel instance. `FakeDiscord` is
+ * the in-memory `DiscordPort`: deterministic snowflakes, the audit log with
+ * reason tags, capacity limits, fault injection and a gateway event emitter,
+ * with no network I/O and no timers.
  */
 
 import {
@@ -21,6 +24,7 @@ import { sql } from 'drizzle-orm';
 import { Pool } from 'pg';
 
 export * from './fake-citadel.js';
+export * from './fake-discord.js';
 
 const DEFAULT_TEST_URL = 'postgres://drawbridge:drawbridge@127.0.0.1:5433/drawbridge_test';
 
