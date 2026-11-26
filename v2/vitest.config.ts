@@ -16,6 +16,7 @@ export default {
       '@drawbridge/crypto': pkg('crypto'),
       '@drawbridge/authz': pkg('authz'),
       '@drawbridge/db': pkg('db'),
+      '@drawbridge/jobs': pkg('jobs'),
       '@drawbridge/testkit': pkg('testkit'),
       '@drawbridge/web': app('web'),
       '@drawbridge/bot': app('bot'),
@@ -33,6 +34,7 @@ export default {
       thresholds: {
         'packages/citadel/src/**': { lines: 75 },
         'packages/domain/src/**': { lines: 90 },
+        'packages/jobs/src/**': { lines: 90 },
       },
     },
   },

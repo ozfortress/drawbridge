@@ -9,6 +9,7 @@
     { "path": "packages/crypto/tsconfig.lib.json" },
     { "path": "packages/authz/tsconfig.lib.json" },
     { "path": "packages/db/tsconfig.lib.json" },
+    { "path": "packages/jobs/tsconfig.lib.json" },
     { "path": "packages/testkit/tsconfig.lib.json" },
     { "path": "apps/web/tsconfig.lib.json" },
     { "path": "apps/bot/tsconfig.lib.json" },
