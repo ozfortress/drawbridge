@@ -404,6 +404,9 @@ export const jobs = pgTable(
     index('jobs_runnable_idx')
       .on(table.state, table.nextRunAt)
       .where(sql`${table.state} in ('queued','paused','reverting')`),
+    // Expired-lease reclaim (02 §5.5): any worker may take a running job
+    // whose lease lapsed, so the scan is (lease_expires_at) over running.
+    index('jobs_lease_idx').on(table.leaseExpiresAt).where(sql`${table.state} = 'running'`),
     // Duplicate guard (02 §5.10): one active job per (league, plan_hash).
     uniqueIndex('jobs_active_plan_key')
       .on(table.leagueId, table.planHash)

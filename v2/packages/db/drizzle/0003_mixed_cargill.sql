@@ -1,0 +1,1 @@
+CREATE INDEX "jobs_lease_idx" ON "jobs" USING btree ("lease_expires_at") WHERE "jobs"."state" = 'running';

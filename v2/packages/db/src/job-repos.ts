@@ -5,7 +5,7 @@
  * persistence surface.
  */
 import { and, eq } from 'drizzle-orm';
-import type { Db } from './client.js';
+import type { Db, DbOrTx } from './client.js';
 import { ConflictError, NotFoundError } from './repos.js';
 import {
   type DiscordObjectRow,
@@ -187,7 +187,7 @@ export interface UpdateJobStatePatch {
 
 /** Updates a job's scheduling and lifecycle fields, bumping updated_at. */
 export async function updateJobState(
-  db: Db,
+  db: DbOrTx,
   jobId: string,
   patch: UpdateJobStatePatch,
 ): Promise<JobRow> {
@@ -265,7 +265,7 @@ export interface AppendJobEventInput {
 
 /** Appends one human-readable journal line (plan 02 §5.13). */
 export async function appendJobEvent(
-  db: Db,
+  db: DbOrTx,
   jobId: string,
   input: AppendJobEventInput,
 ): Promise<JobEventRow> {
@@ -308,7 +308,7 @@ export interface UpsertDiscordObjectInput {
  * the original provenance survives re-creation by a later job.
  */
 export async function upsertDiscordObject(
-  db: Db,
+  db: DbOrTx,
   input: UpsertDiscordObjectInput,
 ): Promise<DiscordObjectRow> {
   try {
@@ -346,7 +346,7 @@ export async function upsertDiscordObject(
 
 /** Reads one ledger row by its key. */
 export async function getDiscordObject(
-  db: Db,
+  db: DbOrTx,
   guildId: string,
   discordId: string,
 ): Promise<DiscordObjectRow | undefined> {

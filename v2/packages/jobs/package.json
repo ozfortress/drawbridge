@@ -11,5 +11,12 @@
   },
   "scripts": {
     "build": "tsc -b tsconfig.lib.json"
+  },
+  "dependencies": {
+    "@drawbridge/db": "workspace:*",
+    "drizzle-orm": "0.45.4"
+  },
+  "devDependencies": {
+    "@drawbridge/testkit": "workspace:*"
   }
 }
