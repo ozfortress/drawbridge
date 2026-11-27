@@ -232,8 +232,40 @@ h2 {
   color: var(--danger);
 }
 
+.pill.completed,
+.pill.reverted,
+.pill.done {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 40%, transparent);
+}
+
+.pill.running,
+.pill.info {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.pill.paused,
+.pill.awaiting_decision,
+.pill.reverting,
+.pill.completed_with_skips,
+.pill.skipped,
+.pill.warn,
+.pill.warning {
+  color: var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 40%, transparent);
+}
+
+.pill.failed,
+.pill.error {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+}
+
 .pill.archived,
-.pill.ended {
+.pill.ended,
+.pill.cancelled,
+.pill.compensated {
   color: var(--muted);
 }
 
@@ -300,7 +332,8 @@ button:disabled {
   cursor: not-allowed;
 }
 
-button.ghost {
+button.ghost,
+.button.ghost {
   background: transparent;
   border: 1px solid var(--line);
   color: var(--text);
@@ -310,6 +343,7 @@ button.ghost {
 .actions {
   white-space: nowrap;
   display: flex;
+  flex-wrap: wrap;
   gap: 0.4rem;
 }
 
@@ -357,6 +391,7 @@ button.ghost {
 .summary-list dd,
 .key-meta dd {
   margin: 0.25rem 0 0;
+  overflow-wrap: anywhere;
 }
 
 .summary-list dd {

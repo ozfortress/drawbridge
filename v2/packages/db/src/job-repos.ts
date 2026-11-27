@@ -4,10 +4,11 @@
  * 02 §5.3). The engine (P3) drives the state machine; this file is only its
  * persistence surface.
  */
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import type { Db, DbOrTx } from './client.js';
 import { ConflictError, NotFoundError } from './repos.js';
 import {
+  alerts,
   type DiscordObjectRow,
   discordObjects,
   type JobEventRow,
@@ -175,6 +176,22 @@ export async function listJobsByLeague(
       ? eq(jobs.leagueId, leagueId)
       : and(eq(jobs.leagueId, leagueId), eq(jobs.state, options.state));
   return db.select().from(jobs).where(where).orderBy(desc(jobs.createdAt)).limit(limit);
+}
+
+export type AlertRow = typeof alerts.$inferSelect;
+
+/** Unresolved operational alerts visible within one league's access boundary. */
+export async function listOpenAlertsByLeague(
+  db: Db,
+  leagueId: string,
+  limit = 50,
+): Promise<AlertRow[]> {
+  return db
+    .select()
+    .from(alerts)
+    .where(and(eq(alerts.leagueId, leagueId), isNull(alerts.resolvedAt)))
+    .orderBy(desc(alerts.openedAt))
+    .limit(Math.min(Math.max(limit, 1), 200));
 }
 
 /** One job with its step journal (by seq) and event log (by time). */

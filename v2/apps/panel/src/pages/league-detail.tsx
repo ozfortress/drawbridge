@@ -35,6 +35,13 @@ export function LeagueDetailPage() {
       <div className="section-head">
         <h1>{league.name || '(unnamed league)'}</h1>
         <div className="actions">
+          <Link
+            to="/leagues/$leagueId/jobs"
+            params={{ leagueId: league.id }}
+            className="button ghost"
+          >
+            Jobs
+          </Link>
           {access.capabilities.includes('tournament.setup') ? (
             <Link to="/leagues/$leagueId/setup" params={{ leagueId: league.id }} className="button">
               Setup preview

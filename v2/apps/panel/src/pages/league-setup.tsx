@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useParams } from '@tanstack/react-router';
+import { Link, useNavigate, useParams } from '@tanstack/react-router';
 import { useState } from 'react';
 import {
   ApiError,
+  approveLeaguePreview,
   createLeaguePreview,
   getCitadelKey,
   getLeague,
@@ -251,6 +252,7 @@ export function LeagueSetupPage() {
   const { leagueId } = useParams({ from: '/authed/leagues/$leagueId/setup' });
   const detail = useQuery({ queryKey: ['league', leagueId], queryFn: () => getLeague(leagueId) });
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const canManageKeys = detail.data?.access.capabilities.includes('citadel.keys.manage') ?? false;
   const canPreview = detail.data?.access.capabilities.includes('tournament.setup') ?? false;
   const keyStatus = useQuery({
@@ -268,6 +270,16 @@ export function LeagueSetupPage() {
     mutationFn: () => createLeaguePreview(leagueId),
     onMutate: () => {
       verify.reset();
+    },
+  });
+  const approve = useMutation({
+    mutationFn: (previewId: string) => approveLeaguePreview(previewId),
+    onSuccess: async ({ job }) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['jobs', leagueId] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
+      ]);
+      await navigate({ to: '/jobs/$jobId', params: { jobId: job.id } });
     },
   });
   const saveKey = useMutation({
@@ -314,15 +326,33 @@ export function LeagueSetupPage() {
             <h2>Tournament preview</h2>
             <p className="muted">Inspect a fresh, read-only plan before any approval.</p>
           </div>
-          <button
-            type="button"
-            disabled={!canPreview || preview.isPending}
-            onClick={() => preview.mutate()}
-            data-testid="preview-button"
-          >
-            {preview.isPending ? 'Building…' : preview.error ? 'Retry preview' : 'Preview'}
-          </button>
+          <div className="actions">
+            <button
+              type="button"
+              className="ghost"
+              disabled={!canPreview || preview.isPending || approve.isPending}
+              onClick={() => preview.mutate()}
+              data-testid="preview-button"
+            >
+              {preview.isPending ? 'Building…' : preview.error ? 'Retry preview' : 'Preview'}
+            </button>
+            {visiblePreview && canPreview ? (
+              <button
+                type="button"
+                disabled={approve.isPending || verify.data?.changed === true}
+                onClick={() => approve.mutate(visiblePreview.previewId)}
+                data-testid="approve-preview"
+              >
+                {approve.isPending ? 'Approving…' : 'Approve and run'}
+              </button>
+            ) : null}
+          </div>
         </div>
+        {approve.error ? (
+          <div data-testid="approve-error">
+            <ErrorNote error={approve.error} />
+          </div>
+        ) : null}
         {!canPreview ? (
           <p className="muted">You need the tournament.setup capability to build a preview.</p>
         ) : null}

@@ -92,6 +92,105 @@ export interface AuditEntry {
   leagueId: string | null;
 }
 
+export type JobState =
+  | 'queued'
+  | 'running'
+  | 'paused'
+  | 'awaiting_decision'
+  | 'completed'
+  | 'completed_with_skips'
+  | 'failed'
+  | 'cancelled'
+  | 'reverting'
+  | 'reverted';
+
+export interface Job {
+  id: string;
+  type: string;
+  guildId: string;
+  leagueId: string;
+  lane: string;
+  state: JobState;
+  pauseReason: 'external' | 'ratelimit' | 'guild_unavailable' | null;
+  priority: number;
+  planHash: string;
+  requestedByUserId: string | null;
+  requestedByDiscordId: string | null;
+  error: Record<string, unknown> | null;
+  attempt: number;
+  createdAt: string;
+  updatedAt: string;
+  nextRunAt: string;
+  finishedAt: string | null;
+}
+
+export interface JobStep {
+  seq: number;
+  kind: string;
+  status: 'pending' | 'running' | 'done' | 'skipped' | 'failed' | 'compensated';
+  attempts: number;
+  skippable: boolean;
+  reversible: boolean;
+  externalIds: Array<Record<string, unknown>>;
+  result: Record<string, unknown> | null;
+  error: Record<string, unknown> | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
+export interface JobEvent {
+  id: number;
+  at: string;
+  level: 'info' | 'warn' | 'error';
+  code: string;
+  message: string;
+  data: Record<string, unknown>;
+}
+
+export type JobDecision =
+  | { type: 'retry' }
+  | { type: 'skip'; stepSeq: number }
+  | {
+      type: 'adopt';
+      stepSeq: number;
+      object?: {
+        discordId: string;
+        kind: 'role' | 'category' | 'text_channel' | 'message' | 'webhook' | 'other';
+        name: string;
+      };
+    }
+  | { type: 'revert' }
+  | { type: 'abort' };
+
+export interface JobDetail {
+  job: Job;
+  steps: JobStep[];
+  events: JobEvent[];
+  access: { capabilities: string[] };
+  allowedDecisions: JobDecision[];
+}
+
+export interface OpenAlert {
+  id: string;
+  kind: string;
+  severity: string;
+  leagueId: string;
+  jobId: string | null;
+  details: Record<string, unknown>;
+  openedAt: string;
+}
+
+export interface LeagueActivity {
+  league: League;
+  jobs: Job[];
+  alerts: OpenAlert[];
+}
+
+export interface DashboardData {
+  leagues: League[];
+  activity: LeagueActivity[];
+}
+
 export interface PreviewEntry {
   citadelRosterId: string;
   citadelTeamId: string;
@@ -177,6 +276,36 @@ export const getLeagues = () => api<{ leagues: League[] }>('/api/v1/leagues');
 export const getLeague = (id: string) => api<LeagueDetail>(`/api/v1/leagues/${id}`);
 export const getUsers = () => api<{ users: UserRow[] }>('/api/v1/users');
 export const getAudit = () => api<{ entries: AuditEntry[] }>('/api/v1/audit?limit=100');
+export const getLeagueJobs = (leagueId: string, state?: JobState) =>
+  api<{ jobs: Job[] }>(
+    `/api/v1/leagues/${leagueId}/jobs${state ? `?state=${encodeURIComponent(state)}` : ''}`,
+  );
+export const getJob = (jobId: string) => api<JobDetail>(`/api/v1/jobs/${jobId}`);
+export const getOpenAlerts = (leagueId: string) =>
+  api<{ alerts: OpenAlert[] }>(`/api/v1/leagues/${leagueId}/alerts`);
+export const getDashboard = async (): Promise<DashboardData> => {
+  const { leagues } = await getLeagues();
+  const activity = await Promise.all(
+    leagues.map(async (league) => {
+      const [{ jobs }, { alerts }] = await Promise.all([
+        getLeagueJobs(league.id),
+        getOpenAlerts(league.id),
+      ]);
+      return { league, jobs, alerts };
+    }),
+  );
+  return { leagues, activity };
+};
+export const decideJob = (jobId: string, decision: JobDecision) =>
+  api<{ job: Job }>(`/api/v1/jobs/${jobId}/decision`, {
+    method: 'POST',
+    body: JSON.stringify(decision),
+  });
+export const approveLeaguePreview = (previewId: string) =>
+  api<{ job: Job }>('/api/v1/jobs', {
+    method: 'POST',
+    body: JSON.stringify({ previewId }),
+  });
 export const createLeaguePreview = (leagueId: string) =>
   api<LeaguePreview>(`/api/v1/leagues/${leagueId}/preview`, { method: 'POST' });
 export const verifyLeaguePreview = (previewId: string) =>

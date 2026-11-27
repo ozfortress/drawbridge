@@ -24,7 +24,7 @@ import { registerAuthRoutes } from './routes/auth.js';
 import { registerJobRoutes } from './routes/jobs.js';
 import { registerLeagueRoutes } from './routes/leagues.js';
 import { type CitadelClientFactory, registerPreviewRoutes } from './routes/preview.js';
-import { registerStreamRoutes } from './routes/stream.js';
+import { registerStreamRoutes, type StreamListenerFactory } from './routes/stream.js';
 import { registerUserRoutes } from './routes/users.js';
 import { VERSION } from './version.js';
 
@@ -53,6 +53,8 @@ export interface BuildAppOptions {
   rateLimit?: RateLimitSettings;
   /** Overrides the 15-second SSE heartbeat interval for tests. */
   heartbeatMs?: number;
+  /** Controls listener acquisition in the disconnect-race integration test. */
+  streamListen?: StreamListenerFactory;
 }
 
 export interface AppContext {
@@ -205,6 +207,7 @@ export async function buildApp(options: BuildAppOptions): Promise<AppContext> {
       logger: root,
       ...(options.pool ? { pool: options.pool } : {}),
       ...(options.heartbeatMs !== undefined ? { heartbeatMs: options.heartbeatMs } : {}),
+      ...(options.streamListen ? { listen: options.streamListen } : {}),
     });
     registerAuditRoutes(app, { config, db });
   } else {

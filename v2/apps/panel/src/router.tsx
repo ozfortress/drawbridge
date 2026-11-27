@@ -2,6 +2,8 @@ import { createRootRoute, createRoute, createRouter, Outlet } from '@tanstack/re
 import { AuthedLayout } from './layout.js';
 import { AuditPage } from './pages/audit.js';
 import { HomePage } from './pages/home.js';
+import { JobDetailPage } from './pages/job-detail.js';
+import { JobQueuePage } from './pages/jobs.js';
 import { LeagueDetailPage } from './pages/league-detail.js';
 import { LeagueSetupPage } from './pages/league-setup.js';
 import { LeaguesPage } from './pages/leagues.js';
@@ -44,6 +46,18 @@ const leagueDetailRoute = createRoute({
   component: LeagueDetailPage,
 });
 
+const leagueJobsRoute = createRoute({
+  getParentRoute: () => authedRoute,
+  path: '/leagues/$leagueId/jobs',
+  component: JobQueuePage,
+});
+
+const jobDetailRoute = createRoute({
+  getParentRoute: () => authedRoute,
+  path: '/jobs/$jobId',
+  component: JobDetailPage,
+});
+
 const leagueSetupRoute = createRoute({
   getParentRoute: () => authedRoute,
   path: '/leagues/$leagueId/setup',
@@ -68,6 +82,8 @@ const routeTree = rootRoute.addChildren([
     homeRoute,
     leaguesRoute,
     leagueDetailRoute,
+    leagueJobsRoute,
+    jobDetailRoute,
     leagueSetupRoute,
     usersRoute,
     auditRoute,

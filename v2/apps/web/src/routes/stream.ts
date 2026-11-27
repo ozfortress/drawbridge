@@ -44,6 +44,8 @@ const notificationSchema = z.object({
   from: z.string().min(1).nullable(),
 });
 
+export type StreamListenerFactory = typeof listenJobState;
+
 export interface StreamRouteDeps {
   config: Config;
   db: Db;
@@ -52,11 +54,14 @@ export interface StreamRouteDeps {
   pool?: Pool | undefined;
   /** Overrides the 15-second heartbeat for tests. */
   heartbeatMs?: number | undefined;
+  /** Test seam for deterministic disconnect-during-acquisition coverage. */
+  listen?: StreamListenerFactory | undefined;
 }
 
 export function registerStreamRoutes(app: FastifyInstance, deps: StreamRouteDeps): void {
   const secure = useSecureCookies(deps.config.publicBaseUrl);
   const heartbeatMs = deps.heartbeatMs ?? STREAM_HEARTBEAT_MS;
+  const listen = deps.listen ?? listenJobState;
 
   app.get('/api/v1/stream', async (request, reply) => {
     const auth = await requireAuth(deps.db, request, secure);
@@ -76,10 +81,10 @@ export function registerStreamRoutes(app: FastifyInstance, deps: StreamRouteDeps
       throw new HttpError(503, 'streaming is unavailable: no database pool is configured');
     }
 
+    const raw = reply.raw;
     let closed = false;
     let listener: JobStateListener | undefined;
     let heartbeat: ReturnType<typeof setInterval> | undefined;
-    const raw = reply.raw;
     const send = (event: string, data: string): void => {
       if (closed) return;
       raw.write(`event: ${event}\ndata: ${data}\n\n`);
@@ -87,6 +92,9 @@ export function registerStreamRoutes(app: FastifyInstance, deps: StreamRouteDeps
     const close = (): void => {
       if (closed) return;
       closed = true;
+      // The disconnect may arrive before the listener has been acquired.
+      // Hijack now so the route never tries to answer a departed client.
+      reply.hijack();
       if (heartbeat !== undefined) clearInterval(heartbeat);
       if (listener !== undefined) void listener.close();
       try {
@@ -96,12 +104,19 @@ export function registerStreamRoutes(app: FastifyInstance, deps: StreamRouteDeps
       }
     };
 
+    // Subscribe before the first await: an EventSource unmounted during
+    // connection setup still closes the eventual listener. Response close
+    // covers proxies, which may close the downstream request independently.
+    raw.on('error', close);
+    raw.on('close', close);
+    request.raw.on('close', close);
+
     // The listener is acquired before the reply is hijacked, so a failure to
     // listen still answers as an ordinary HTTP error. Notifications are
     // delivered on I/O events, never inside the synchronous block below, so
     // `send` cannot run before the headers are on the wire.
     try {
-      listener = await listenJobState(deps.pool, leagueId, {
+      listener = await listen(deps.pool, leagueId, {
         onPayload: (payload) => {
           let json: unknown;
           try {
@@ -123,8 +138,18 @@ export function registerStreamRoutes(app: FastifyInstance, deps: StreamRouteDeps
         },
       });
     } catch (error) {
+      if (closed) return;
       deps.logger.warn('stream listener failed', { leagueId, error });
       throw new HttpError(503, 'streaming is unavailable: the listener connection failed');
+    }
+
+    // A disconnect while LISTEN was being acquired has already ended the
+    // response; release the listener that arrived too late instead of
+    // leaking its dedicated pool connection.
+    if (closed || raw.destroyed || request.raw.destroyed) {
+      await listener.close();
+      reply.hijack();
+      return;
     }
 
     // The reply is ours from here: the socket stays open until the client
@@ -145,11 +170,6 @@ export function registerStreamRoutes(app: FastifyInstance, deps: StreamRouteDeps
     }, heartbeatMs);
     // The server outlives any one stream; the timer must not hold it open.
     heartbeat.unref();
-
-    // A write to a socket that died between events must not crash the
-    // process: the error only ends this stream.
-    raw.on('error', close);
-    request.raw.on('close', close);
 
     send('open', JSON.stringify({ leagueId, at: new Date().toISOString() }));
   });

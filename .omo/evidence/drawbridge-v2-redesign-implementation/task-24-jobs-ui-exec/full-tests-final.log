@@ -1,0 +1,12 @@
+$ vitest run
+
+ RUN  v5.1.1 E:/drawbridge-wt/drawbridge-v2-redesign-implementation-w20/v2
+
+
+ Test Files  42 passed (42)
+      Tests  486 passed (486)
+   Start at  17:50:28
+   Duration  58.06s (tests 72%, import 27%)
+
+    Isolate  42 workers spawned · ~115ms startup each (spawn + environment, per file)
+             at least ~4.73s faster with isolate: false — reuses workers across files instead of one per file

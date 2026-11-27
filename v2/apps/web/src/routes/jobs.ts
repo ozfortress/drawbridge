@@ -18,8 +18,10 @@
  * `tournament.destructive` - before touching the job. Every decision is
  * audited.
  */
+import type { Capability } from '@drawbridge/authz';
 import type { Config } from '@drawbridge/config';
 import {
+  type AlertRow,
   ConflictError,
   type CreateJobStepInput,
   consumePreviewForJob,
@@ -31,16 +33,20 @@ import {
   type JobRow,
   type JobStepRow,
   listJobsByLeague,
+  listOpenAlertsByLeague,
   NotFoundError,
 } from '@drawbridge/db';
 import type { TournamentPlan } from '@drawbridge/domain';
 import {
   applyDecision,
+  DECISION_CAPABILITY,
+  DESTRUCTIVE_CAPABILITY,
   type DecisionActor,
   InvalidDecision,
   InvalidTransition,
   JOB_STATES,
   type JobDecision,
+  revertRequiresDestructive,
   UnauthorizedDecision,
 } from '@drawbridge/jobs';
 import type { FastifyInstance } from 'fastify';
@@ -166,12 +172,67 @@ function serialiseJob(job: JobRow): Record<string, unknown> {
     pauseReason: job.pauseReason,
     priority: job.priority,
     planHash: job.planHash,
+    requestedByUserId: job.requestedByUserId,
+    requestedByDiscordId: job.requestedByDiscordId,
+    error: job.error,
     attempt: job.attempt,
     createdAt: job.createdAt.toISOString(),
     updatedAt: job.updatedAt.toISOString(),
     nextRunAt: job.nextRunAt.toISOString(),
     finishedAt: job.finishedAt?.toISOString() ?? null,
   };
+}
+
+function serialiseAlert(alert: AlertRow): Record<string, unknown> {
+  return {
+    id: alert.id,
+    kind: alert.kind,
+    severity: alert.severity,
+    leagueId: alert.leagueId,
+    jobId: alert.jobId,
+    details: alert.details,
+    openedAt: alert.openedAt.toISOString(),
+  };
+}
+
+const DECISION_STEP_FINAL_STATUSES: ReadonlySet<string> = new Set([
+  'done',
+  'skipped',
+  'compensated',
+]);
+
+/** Read-only presentation of the decision guards; mutations re-check them in the engine. */
+function availableJobDecisions(
+  job: Pick<JobRow, 'state'>,
+  steps: readonly JobStepRow[],
+  capabilities: ReadonlySet<Capability>,
+): Array<Record<string, unknown>> {
+  if (!capabilities.has(DECISION_CAPABILITY)) return [];
+
+  const prompting = job.state === 'awaiting_decision';
+  const active = job.state === 'queued' || job.state === 'running' || job.state === 'paused';
+  if (!prompting && !active) return [];
+
+  const decisions: Array<Record<string, unknown>> = [];
+  if (prompting) {
+    decisions.push({ type: 'retry' });
+    for (const step of steps) {
+      if (step.skippable && !DECISION_STEP_FINAL_STATUSES.has(step.status)) {
+        decisions.push({ type: 'skip', stepSeq: step.seq });
+      }
+    }
+    for (const step of steps) decisions.push({ type: 'adopt', stepSeq: step.seq });
+  }
+  // Queued jobs have only cancel; revert is running|paused|awaiting_decision.
+  const revertable = prompting || job.state === 'running' || job.state === 'paused';
+  if (
+    revertable &&
+    (!revertRequiresDestructive(steps) || capabilities.has(DESTRUCTIVE_CAPABILITY))
+  ) {
+    decisions.push({ type: 'revert' });
+  }
+  decisions.push({ type: 'abort' });
+  return decisions;
 }
 
 function serialiseStep(step: JobStepRow): Record<string, unknown> {
@@ -282,6 +343,13 @@ export function registerJobRoutes(app: FastifyInstance, deps: JobRouteDeps): voi
     return reply.send({ jobs: jobs.map(serialiseJob) });
   });
 
+  app.get('/api/v1/leagues/:leagueId/alerts', async (request, reply) => {
+    const auth = await requireAuth(deps.db, request, secure);
+    const { leagueId } = await requireLeagueCapability(deps.db, request, auth, 'league.read');
+    const openAlerts = await listOpenAlertsByLeague(deps.db, leagueId);
+    return reply.send({ alerts: openAlerts.map(serialiseAlert) });
+  });
+
   app.get('/api/v1/jobs/:jobId', async (request, reply) => {
     const auth = await requireAuth(deps.db, request, secure);
     const jobId = jobIdOf(request.params);
@@ -289,11 +357,18 @@ export function registerJobRoutes(app: FastifyInstance, deps: JobRouteDeps): voi
     // League-scoped only: an unknown job and a guild-scoped job are the same
     // answer to a caller of the league API.
     if (!journal || journal.job.leagueId === null) throw notFound('Job not found');
-    await requireLeagueCapabilityOn(deps.db, auth, journal.job.leagueId, 'league.read');
+    const { access } = await requireLeagueCapabilityOn(
+      deps.db,
+      auth,
+      journal.job.leagueId,
+      'league.read',
+    );
     return reply.send({
       job: serialiseJob(journal.job),
       steps: journal.steps.map(serialiseStep),
       events: journal.events.map(serialiseEvent),
+      access: { capabilities: Array.from(access.capabilities) },
+      allowedDecisions: availableJobDecisions(journal.job, journal.steps, access.capabilities),
     });
   });
 

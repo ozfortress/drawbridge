@@ -1,0 +1,17 @@
+{"time":"2026-11-27T06:48:33.456Z","level":"warn","message":"panel build not found; run pnpm -F @drawbridge/panel build","scope":"web"}
+QA_READY api=8080 panel=5173 citadel=http://127.0.0.1:59378
+{"time":"2026-11-27T06:48:49.345Z","level":"info","message":"request","scope":"web","requestId":"req-2","method":"GET","path":"/api/v1/auth/discord","statusCode":302,"durationMs":1}
+{"time":"2026-11-27T06:48:49.370Z","level":"info","message":"signed in","scope":"auth","userId":"a3decaeb-04f2-49e0-81b3-23ae1a42b9ea","tier":"root"}
+{"time":"2026-11-27T06:48:49.370Z","level":"info","message":"request","scope":"web","requestId":"req-3","method":"GET","path":"/api/v1/auth/discord/callback?code=qa&state=tQyUOvZKSAc3sD-wnasjmlqnBim7wCjO","statusCode":302,"durationMs":23}
+{"time":"2026-11-27T06:48:49.396Z","level":"info","message":"request","scope":"web","requestId":"req-4","method":"GET","path":"/api/v1/me","statusCode":200,"durationMs":5}
+{"time":"2026-11-27T06:48:49.407Z","level":"info","message":"request","scope":"web","requestId":"req-5","method":"GET","path":"/api/v1/leagues","statusCode":200,"durationMs":5}
+{"time":"2026-11-27T06:48:49.437Z","level":"info","message":"request","scope":"web","requestId":"req-6","method":"POST","path":"/api/v1/leagues","statusCode":201,"durationMs":26}
+{"time":"2026-11-27T06:48:49.446Z","level":"info","message":"request","scope":"web","requestId":"req-7","method":"GET","path":"/__qa/listeners","statusCode":200,"durationMs":6}
+{"time":"2026-11-27T06:48:49.470Z","level":"info","message":"request","scope":"web","requestId":"req-8","method":"GET","path":"/api/v1/me","statusCode":200,"durationMs":4}
+{"time":"2026-11-27T06:48:49.483Z","level":"info","message":"request","scope":"web","requestId":"req-9","method":"GET","path":"/api/v1/leagues/9cf14fa7-f7f5-450f-9091-81e7113cc1ec","statusCode":200,"durationMs":7}
+{"time":"2026-11-27T06:48:49.498Z","level":"info","message":"request","scope":"web","requestId":"req-a","method":"GET","path":"/api/v1/leagues/9cf14fa7-f7f5-450f-9091-81e7113cc1ec/jobs","statusCode":200,"durationMs":22}
+{"time":"2026-11-27T06:48:49.505Z","level":"info","message":"request","scope":"web","requestId":"req-c","method":"GET","path":"/__qa/listeners","statusCode":200,"durationMs":4}
+{"time":"2026-11-27T06:48:54.074Z","level":"info","message":"request","scope":"web","requestId":"req-d","method":"GET","path":"/api/v1/leagues","statusCode":200,"durationMs":4}
+{"time":"2026-11-27T06:48:54.081Z","level":"info","message":"request","scope":"web","requestId":"req-e","method":"GET","path":"/api/v1/leagues/9cf14fa7-f7f5-450f-9091-81e7113cc1ec/alerts","statusCode":200,"durationMs":4}
+{"time":"2026-11-27T06:48:54.083Z","level":"info","message":"request","scope":"web","requestId":"req-f","method":"GET","path":"/api/v1/leagues/9cf14fa7-f7f5-450f-9091-81e7113cc1ec/jobs","statusCode":200,"durationMs":5}
+{"time":"2026-11-27T06:48:54.086Z","level":"info","message":"request","scope":"web","requestId":"req-g","method":"GET","path":"/__qa/listeners","statusCode":200,"durationMs":2}

@@ -1,0 +1,200 @@
+{
+  "task": 24,
+  "date": "2026-11-27",
+  "panel": "production Vite build served by vite preview on 127.0.0.1:5173",
+  "browser": "Chrome 158 via native DevTools Protocol",
+  "api": "real buildApp on 127.0.0.1:8080 with fake OAuth and FakeCitadel",
+  "database": "real Postgres 16 on 127.0.0.1:5433; isolated task-24 databases only",
+  "results": [
+    {
+      "case": "empty states",
+      "home": {
+        "awaiting": "No jobs are waiting for a decision.",
+        "alerts": "No open alerts.",
+        "jobs": "No jobs have been created in your leagues yet."
+      },
+      "queue": "No jobs have been created for this league yet.",
+      "league": {
+        "leagueId": "41624fd7-b2b0-4d5a-bbad-f8d410f5d84d",
+        "keyStatus": "active"
+      },
+      "signin": {
+        "selector": "[data-testid=\"needs-attention\"]",
+        "text": "Needs attention0 openJobs awaiting decisionNo jobs are waiting for a decision.Open alertsNo open alerts.",
+        "state": null
+      }
+    },
+    {
+      "case": "approve preview",
+      "preview": {
+        "counts": "DIVISIONS\n2\nENTRIES\n4\nCAPTAINS\n4\nLINKED CAPTAINS\n3\nROLES\n6\nCHANNELS\n4",
+        "entries": 4,
+        "approveDisabled": false
+      },
+      "approved": {
+        "jobId": "8946ba65-1ac5-4ddf-8d64-eb43e7648c03",
+        "url": "http://127.0.0.1:5173/jobs/8946ba65-1ac5-4ddf-8d64-eb43e7648c03",
+        "state": "queued",
+        "steps": 32,
+        "decisions": [
+          "decision-abort"
+        ]
+      }
+    },
+    {
+      "case": "live running to completed",
+      "running": {
+        "elapsedMs": 24,
+        "state": "running",
+        "marker": "task24-live-detail"
+      },
+      "completed": {
+        "elapsedMs": 47,
+        "state": "completed",
+        "marker": "task24-live-detail",
+        "noDecisions": null,
+        "completedEvents": 0
+      },
+      "settledDetail": {
+        "noDecisions": "No decisions are available for this job state or your access.",
+        "completedEvents": 1
+      }
+    },
+    {
+      "case": "queue desktop and mobile",
+      "queueFacts": {
+        "headers": [
+          "State",
+          "Type",
+          "League",
+          "Requested by",
+          "Updated"
+        ],
+        "rows": 1,
+        "state": "completed",
+        "stream": "Live updates connected"
+      },
+      "queueMobileFacts": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "tableScrollWidth": 606,
+        "tableClientWidth": 358
+      },
+      "settledDetail": {
+        "noDecisions": "No decisions are available for this job state or your access.",
+        "completedEvents": 1
+      }
+    },
+    {
+      "case": "reopened completed detail",
+      "detailFacts": {
+        "state": "completed",
+        "firstStep": "done",
+        "doneSteps": 32,
+        "events": 3,
+        "noDecisions": "No decisions are available for this job state or your access."
+      },
+      "detailMobileFacts": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "metadataWidth": 358
+      }
+    },
+    {
+      "case": "failed job taxonomy and allowed decisions",
+      "failureFacts": {
+        "jobId": "c7dcb41f-1d97-45f2-9aca-d63af402f119",
+        "action": "awaiting_decision",
+        "state": "awaiting_decision",
+        "taxonomy": "fatal_config",
+        "title": "Fatal Discord configuration",
+        "message": "Fatal Discord configuration\n\nDiscord authentication failed. All writes stay stopped until the bot token or configuration is fixed.\n\nTaxonomy: fatal_config · Step 1\n\nQA bot token refused",
+        "decisions": [
+          {
+            "id": "decision-retry",
+            "disabled": false
+          },
+          {
+            "id": "decision-skip-1",
+            "disabled": false
+          },
+          {
+            "id": "decision-adopt-1",
+            "disabled": false
+          },
+          {
+            "id": "decision-revert",
+            "disabled": false
+          },
+          {
+            "id": "decision-abort",
+            "disabled": false
+          }
+        ],
+        "stepStatus": "failed"
+      },
+      "failureMobileFacts": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "decisionCount": 5
+      }
+    },
+    {
+      "case": "home needs attention",
+      "attentionFacts": {
+        "awaiting": 1,
+        "alerts": 1,
+        "recentJobs": 2,
+        "leagues": 1,
+        "alertText": "job.fatal_config\n\nTask 24 QA League · critical · 27/11/2026, 17:45:58\n\nOpen job"
+      },
+      "attentionMobile": {
+        "viewport": 390,
+        "documentWidth": 390
+      }
+    },
+    {
+      "case": "decision retry and active-state gating",
+      "decisionFacts": {
+        "state": "running",
+        "marker": "task24-decision-no-refresh",
+        "activeDecisions": [
+          {
+            "id": "decision-revert",
+            "disabled": false
+          },
+          {
+            "id": "decision-abort",
+            "disabled": false
+          }
+        ]
+      }
+    },
+    {
+      "case": "EventSource cleanup on SPA unmount",
+      "cleanupFacts": {
+        "listenersBefore": 3,
+        "listenersAfter": 2
+      }
+    },
+    {
+      "case": "revoked session redirects to sign-in",
+      "revokedFacts": {
+        "revoked": 1,
+        "url": "http://127.0.0.1:5173/signin",
+        "signinVisible": true,
+        "apiStatus": 401
+      },
+      "revokedMobileFacts": {
+        "viewport": 390,
+        "documentWidth": 390
+      }
+    },
+    {
+      "case": "fixed EventSource cleanup regression",
+      "listenersAtHome": 0,
+      "listenersMounted": 1,
+      "listenersAfterUnmount": 0
+    }
+  ]
+}

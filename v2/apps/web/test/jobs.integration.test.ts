@@ -10,6 +10,7 @@ import { randomUUID } from 'node:crypto';
 import { createCitadelClient } from '@drawbridge/citadel';
 import { parseConfig } from '@drawbridge/config';
 import {
+  alerts,
   consumePreview,
   createJob,
   type Database,
@@ -165,7 +166,12 @@ async function seededJob(
   leagueId: string,
   options: {
     state?: string;
-    step?: { kind: string; compensation: Record<string, unknown> | null; status?: string };
+    step?: {
+      kind: string;
+      compensation: Record<string, unknown> | null;
+      status?: string;
+      skippable: boolean;
+    };
   } = {},
 ): Promise<string> {
   const job = await createJob(database.db, {
@@ -181,6 +187,7 @@ async function seededJob(
             seq: 1,
             kind: options.step.kind,
             reversible: true,
+            skippable: options.step.skippable,
             compensation: options.step.compensation,
           },
         ]
@@ -405,6 +412,9 @@ describe.skipIf(!available)('job api (integration)', () => {
     expect(job['lane']).toBe('setup');
     expect(job['leagueId']).toBe(leagueId);
     expect(job['planHash']).toBe(body['planHash']);
+    expect(job['requestedByDiscordId']).toBe(ROOT_ID);
+    expect(job['requestedByUserId']).toBeTypeOf('string');
+    expect(job['error']).toBeNull();
     expect(job['id']).toBeTruthy();
 
     // The preview is consumed by the approval.
@@ -443,6 +453,9 @@ describe.skipIf(!available)('job api (integration)', () => {
     }
     const events = detail.json().events as Array<Record<string, unknown>>;
     expect(events.some((event) => event['code'] === 'job.queued')).toBe(true);
+    expect(detail.json().access.capabilities).toContain('jobs.decide');
+    // Queued jobs have only the machine's cancel edge, not revert.
+    expect(detail.json().allowedDecisions).toEqual([{ type: 'abort' }]);
 
     expect(await auditActions()).toContain('job.create');
   });
@@ -550,7 +563,38 @@ describe.skipIf(!available)('job api (integration)', () => {
     const casterRole = await roleId(leagueId, 'Caster');
     const asCaster = await invited(MEMBER_ID, 'user', [{ leagueId, leagueRoleId: casterRole }]);
 
-    const jobId = await seededJob(database, leagueId, { state: 'awaiting_decision' });
+    const jobId = await seededJob(database, leagueId, {
+      state: 'awaiting_decision',
+      step: { kind: 'create_channel', compensation: null, skippable: true },
+    });
+
+    const casterDetail = await ctx.app.inject({
+      method: 'GET',
+      url: `/api/v1/jobs/${jobId}`,
+      headers: { cookie: asCaster.cookie },
+    });
+    expect(casterDetail.statusCode).toBe(200);
+    expect(casterDetail.json().allowedDecisions).toEqual([]);
+    expect(casterDetail.json().access.capabilities).not.toContain('jobs.decide');
+
+    const rootDetail = await ctx.app.inject({
+      method: 'GET',
+      url: `/api/v1/jobs/${jobId}`,
+      headers: { cookie: asRoot.cookie },
+    });
+    const allowed = rootDetail.json().allowedDecisions as Array<{
+      type: string;
+      stepSeq?: number;
+    }>;
+    expect(allowed.some((decision) => decision.type === 'retry')).toBe(true);
+    expect(allowed.some((decision) => decision.type === 'skip' && decision.stepSeq === 1)).toBe(
+      true,
+    );
+    expect(allowed.some((decision) => decision.type === 'adopt' && decision.stepSeq === 1)).toBe(
+      true,
+    );
+    expect(allowed.some((decision) => decision.type === 'revert')).toBe(true);
+    expect(allowed.some((decision) => decision.type === 'abort')).toBe(true);
 
     // A caster can read the league but cannot decide on its jobs.
     const refused = await ctx.app.inject({
@@ -612,10 +656,21 @@ describe.skipIf(!available)('job api (integration)', () => {
         kind: 'create_role',
         compensation: { kind: 'delete_role', roleId: '9001' },
         status: 'done',
+        skippable: false,
       },
     });
 
     // A helper holds jobs.decide but never tournament.destructive.
+    const helperDetail = await ctx.app.inject({
+      method: 'GET',
+      url: `/api/v1/jobs/${jobId}`,
+      headers: { cookie: asHelper.cookie },
+    });
+    expect(helperDetail.statusCode).toBe(200);
+    const helperAllowed = helperDetail.json().allowedDecisions as Array<{ type: string }>;
+    expect(helperAllowed.some((decision) => decision.type === 'retry')).toBe(true);
+    expect(helperAllowed.some((decision) => decision.type === 'revert')).toBe(false);
+
     const refused = await ctx.app.inject({
       method: 'POST',
       url: `/api/v1/jobs/${jobId}/decision`,
@@ -656,6 +711,7 @@ describe.skipIf(!available)('job api (integration)', () => {
     });
     const codes = (detail.json().events as Array<{ code: string }>).map((event) => event.code);
     expect(codes).toContain('job.cancelled');
+    expect(detail.json().allowedDecisions).toEqual([]);
     expect(await auditActions()).toContain('job.cancel');
 
     // Terminal states accept nothing: a second cancel is a conflict.
@@ -675,6 +731,66 @@ describe.skipIf(!available)('job api (integration)', () => {
       headers: authHeaders(asGuest),
     });
     expect(forbidden.statusCode).toBe(403);
+  });
+
+  it("lists only unresolved alerts inside the caller's league access", async () => {
+    const asRoot = await login(user(ROOT_ID, 'Root'));
+    const leagueA = await leagueWithKey(asRoot);
+    const leagueB = await leagueWithKey(asRoot, 9101);
+    const casterRole = await roleId(leagueA, 'Caster');
+    const asCaster = await invited(MEMBER_ID, 'user', [
+      { leagueId: leagueA, leagueRoleId: casterRole },
+    ]);
+    const jobId = await seededJob(database, leagueA);
+    await database.db.insert(alerts).values([
+      {
+        kind: 'job.fatal_config',
+        severity: 'critical',
+        guildId: GUILD_ID,
+        leagueId: leagueA,
+        jobId,
+        details: { message: 'token refused' },
+      },
+      {
+        kind: 'job.fatal_config',
+        severity: 'critical',
+        guildId: GUILD_ID,
+        leagueId: leagueA,
+        jobId,
+        details: { message: 'already resolved' },
+        resolvedAt: new Date(),
+      },
+      {
+        kind: 'job.fatal_config',
+        severity: 'critical',
+        guildId: GUILD_ID,
+        leagueId: leagueB,
+        jobId: null,
+        details: { message: 'another league' },
+      },
+    ]);
+
+    const own = await ctx.app.inject({
+      method: 'GET',
+      url: `/api/v1/leagues/${leagueA}/alerts`,
+      headers: { cookie: asCaster.cookie },
+    });
+    expect(own.statusCode).toBe(200);
+    expect(own.json().alerts).toHaveLength(1);
+    const alert = own.json().alerts[0] as Record<string, unknown>;
+    expect(alert['kind']).toBe('job.fatal_config');
+    expect(alert['severity']).toBe('critical');
+    expect(alert['leagueId']).toBe(leagueA);
+    expect(alert['jobId']).toBe(jobId);
+    expect(alert['details']).toEqual({ message: 'token refused' });
+    expect(alert['openedAt']).toBeTypeOf('string');
+
+    const foreign = await ctx.app.inject({
+      method: 'GET',
+      url: `/api/v1/leagues/${leagueB}/alerts`,
+      headers: { cookie: asCaster.cookie },
+    });
+    expect(foreign.statusCode).toBe(403);
   });
 
   it('never shows another league: 403 for foreign jobs, 404 for unknown ones', async () => {
@@ -812,6 +928,73 @@ describe.skipIf(!available)('job api (integration)', () => {
     });
     expect(opened.status).toBe(403);
     expect(opened.body).toContain('league.read');
+  });
+
+  it('releases a listener acquired after the client disconnects', async () => {
+    let acquisitionStarted: (() => void) | undefined;
+    const started = new Promise<void>((resolve) => {
+      acquisitionStarted = resolve;
+    });
+    let completeAcquisition: ((listener: { close: () => Promise<void> }) => void) | undefined;
+    const listenerReady = new Promise<{ close: () => Promise<void> }>((resolve) => {
+      completeAcquisition = resolve;
+    });
+    let listenerClosed: (() => void) | undefined;
+    const closed = new Promise<void>((resolve) => {
+      listenerClosed = resolve;
+    });
+
+    const disconnectApp = await buildApp({
+      config,
+      logger: createLogger({ level: 'error', sink: () => undefined }),
+      db: database.db,
+      pool: database.pool,
+      oauth,
+      servePanel: false,
+      streamListen: () => {
+        acquisitionStarted?.();
+        return listenerReady;
+      },
+    });
+    await disconnectApp.app.listen({ host: '127.0.0.1', port: 0 });
+    const address = disconnectApp.app.server.address();
+    const disconnectPort = typeof address === 'object' && address !== null ? address.port : 0;
+    try {
+      const asRoot = await login(user(ROOT_ID, 'Root'));
+      const leagueId = await leagueWithKey(asRoot);
+      const controller = new AbortController();
+      const aborted = fetch(
+        `http://127.0.0.1:${disconnectPort}/api/v1/stream?leagueId=${leagueId}`,
+        { headers: { cookie: asRoot.cookie }, signal: controller.signal },
+      ).then(
+        () => {
+          throw new Error('the stream answered after its client aborted');
+        },
+        (error: unknown) => error,
+      );
+
+      // Hold LISTEN acquisition until the request is definitely aborted.
+      await started;
+      controller.abort();
+      completeAcquisition?.({
+        close: async () => {
+          listenerClosed?.();
+        },
+      });
+      expect(await aborted).toBeInstanceOf(Error);
+
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const deadline = new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error('late listener was not closed')), 2000);
+      });
+      try {
+        await Promise.race([closed, deadline]);
+      } finally {
+        if (timer !== undefined) clearTimeout(timer);
+      }
+    } finally {
+      await disconnectApp.app.close();
+    }
   });
 
   it('heartbeats while the stream is open', async () => {
