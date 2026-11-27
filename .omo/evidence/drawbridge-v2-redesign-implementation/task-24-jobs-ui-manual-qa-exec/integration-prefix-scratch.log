@@ -1,0 +1,10 @@
+
+ RUN  v5.1.1 E:/drawbridge-wt/scratch-task24-mq/v2
+
+
+ Test Files  1 passed (1)
+      Tests  17 passed (17)
+   Start at  18:32:30
+   Duration  7.04s (tests 70%, import 19%, transform 12%)
+
+prefix_exit=0

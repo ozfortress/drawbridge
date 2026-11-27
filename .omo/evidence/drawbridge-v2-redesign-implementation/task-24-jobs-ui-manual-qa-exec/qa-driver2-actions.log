@@ -1,0 +1,17 @@
+[2026-11-27T07:31:58.443Z] === driver 2: clean-window SSE listener cycle + mobile scroll (corrected selector) ===
+[2026-11-27T07:31:58.508Z] SC-A invocation: Page.navigate http://127.0.0.1:5173/api/v1/auth/discord (fresh tab, real session/CSRF flow)
+[2026-11-27T07:31:58.615Z]   navigated -> http://127.0.0.1:5173/api/v1/auth/discord
+[2026-11-27T07:31:58.670Z]   observed: home mounted
+[2026-11-27T07:31:58.692Z] PASS S2-league-available :: created=false
+[2026-11-27T07:31:58.748Z] PASS S6-queue-row-job :: state=awaiting_decision
+[2026-11-27T07:31:58.756Z] PASS S4-clean-listeners-home-0 :: listeners=0
+[2026-11-27T07:31:58.776Z]   observed: leagues list
+[2026-11-27T07:31:58.793Z]   observed: league detail
+[2026-11-27T07:31:58.835Z]   observed: queue stream live (SPA)
+[2026-11-27T07:31:58.839Z] PASS S4-clean-listeners-mounted-1 :: listeners=1 waited=4ms
+[2026-11-27T07:31:58.843Z] PASS S1-mobile-table-scrolls-in-wrapper :: {"pageWidth":390,"wrapScroll":594,"wrapClient":358}
+[2026-11-27T07:31:58.872Z]   screenshot -> qa-18-queue-mobile-fixed.png
+[2026-11-27T07:31:58.883Z]   observed: home mounted (SPA)
+[2026-11-27T07:31:58.889Z] PASS S4-clean-listeners-unmounted-0 :: listeners=0 waited=6ms
+[2026-11-27T07:31:58.959Z]   screenshot -> qa-19-home-after-unmount.png
+[2026-11-27T07:31:58.959Z] result: listeners 0 -> 1 -> 0

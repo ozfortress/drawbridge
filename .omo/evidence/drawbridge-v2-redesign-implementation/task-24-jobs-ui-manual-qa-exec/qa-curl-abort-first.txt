@@ -1,0 +1,15 @@
+HTTP/1.1 200 OK
+x-ratelimit-limit: 300
+x-ratelimit-remaining: 230
+x-ratelimit-reset: 40
+content-type: application/json; charset=utf-8
+x-request-id: req-51
+x-content-type-options: nosniff
+x-frame-options: DENY
+referrer-policy: no-referrer
+content-length: 629
+Date: Fri, 27 Nov 2026 07:13:30 GMT
+Connection: keep-alive
+Keep-Alive: timeout=72
+
+{"job":{"id":"0c1080a3-3790-47d9-9e1d-fdb959ccf30e","type":"tournament.setup","guildId":"1573554616371777546","leagueId":"c1769151-38aa-456d-8591-8c8ec740667a","lane":"setup","state":"cancelled","pauseReason":null,"priority":0,"planHash":"qa-failure-1795763609808","requestedByUserId":"2eee15b4-f3b8-4785-a0e3-0320cc2d72a6","requestedByDiscordId":"136264506933248001","error":{"class":"fatal_config","status":401,"message":"QA bot token refused","stepSeq":1},"attempt":0,"createdAt":"2026-11-27T07:13:29.809Z","updatedAt":"2026-11-27T07:13:30.378Z","nextRunAt":"2026-11-27T07:13:29.809Z","finishedAt":"2026-11-27T07:13:30.378Z"}}

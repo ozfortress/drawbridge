@@ -1,0 +1,10 @@
+
+ RUN  v5.1.1 E:/drawbridge-wt/drawbridge-v2-redesign-implementation-w20/v2
+
+
+ Test Files  1 skipped (1)
+      Tests  17 skipped (17)
+   Start at  18:20:22
+   Duration  970ms (import 91%, transform 8%, worker 1%)
+
+its_exit=0

@@ -1,0 +1,15 @@
+HTTP/1.1 401 Unauthorized
+x-ratelimit-limit: 300
+x-ratelimit-remaining: 189
+x-ratelimit-reset: 32
+content-type: application/json; charset=utf-8
+x-request-id: req-4o
+x-content-type-options: nosniff
+x-frame-options: DENY
+referrer-policy: no-referrer
+content-length: 49
+Date: Fri, 27 Nov 2026 07:13:30 GMT
+Connection: keep-alive
+Keep-Alive: timeout=72
+
+{"error":"Sign in required","requestId":"req-4o"}

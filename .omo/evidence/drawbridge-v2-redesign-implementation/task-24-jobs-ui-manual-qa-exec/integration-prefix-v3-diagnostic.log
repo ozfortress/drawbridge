@@ -1,0 +1,67 @@
+
+ RUN  v5.1.1 E:/drawbridge-wt/scratch-task24-mq/v2
+
+ ❯ apps/web/test/jobs.integration.test.ts (17 tests | 1 failed | 16 skipped) 15340ms
+   ❯ job api (integration) (16)
+     × releases a listener acquired after the client disconnects 5200ms
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/web/test/jobs.integration.test.ts > job api (integration)
+HookTimeoutError: Hook timed out in 10000ms.
+If this is a long-running hook, pass a timeout value as the last argument or configure it globally with "hookTimeout".
+ ❯ apps/web/test/jobs.integration.test.ts:258:3
+    256|   });
+    257|
+    258|   afterAll(async () => {
+       |   ^
+    259|     if (ctx) await ctx.app.close();
+    260|     if (citadel) await citadel.close();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/web/test/jobs.integration.test.ts > job api (integration) > releases a listener acquired after the client disconnects
+TestTimeoutError: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ apps/web/test/jobs.integration.test.ts:933:3
+    931|   });
+    932|
+    933|   it('releases a listener acquired after the client disconnects', asyn…
+       |   ^
+    934|     let acquisitionStarted: (() => void) | undefined;
+    935|     const started = new Promise<void>((resolve) => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯
+
+Vitest caught 1 unhandled error during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.
+
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+Error: the stream answered after its client aborted
+ ❯ apps/web/test/jobs.integration.test.ts:971:17
+    969|       ).then(
+    970|         () => {
+    971|           throw new Error('the stream answered after its client aborte…
+       |                 ^
+    972|         },
+    973|         (error: unknown) => error,
+ ❯ process.processTicksAndRejections node:internal/process/task_queues:104:5
+
+This error originated in "apps/web/test/jobs.integration.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The last test to run before this error was "releases a listener acquired after the client disconnects". This means either:
+- the error was thrown while Vitest was running this test, or
+- the error was thrown after the test completed, and this was the most recent test at that point.
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 16 skipped (17)
+     Errors  1 error
+   Start at  18:38:13
+   Duration  16.36s (tests 95%, import 5%, transform 1%)
+

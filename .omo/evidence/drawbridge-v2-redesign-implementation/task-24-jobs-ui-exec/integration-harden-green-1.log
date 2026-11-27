@@ -1,0 +1,35 @@
+Scope: all 17 workspace projects
+[WARN] There are cyclic workspace dependencies: E:\drawbridge-wt\drawbridge-v2-redesign-implementation-w20\v2\packages\db, E:\drawbridge-wt\drawbridge-v2-redesign-implementation-w20\v2\packages\testkit, E:\drawbridge-wt\drawbridge-v2-redesign-implementation-w20\v2\packages\jobs
+✓ Lockfile passes supply-chain policies (verified 15h ago)
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 142, reused 142, downloaded 0, added 127
+Progress: resolved 176, reused 176, downloaded 0, added 168
+Packages: +178
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 178, reused 178, downloaded 0, added 178, done
+.../esbuild@0.25.12/node_modules/esbuild postinstall$ node install.js
+.../esbuild@0.18.20/node_modules/esbuild postinstall$ node install.js
+.../esbuild@0.28.2/node_modules/esbuild postinstall$ node install.js
+.../esbuild@0.25.12/node_modules/esbuild postinstall: Done
+.../esbuild@0.18.20/node_modules/esbuild postinstall: Done
+.../esbuild@0.28.2/node_modules/esbuild postinstall: Done
+Agent skills awaiting approval: @tanstack/react-router.
+Run "pnpm approve" to review them.
+
+devDependencies:
++ @biomejs/biome 2.6.8
++ @types/node 24.19.2
++ @vitest/coverage-v8 5.1.1
++ typescript 7.0.2
++ vitest 5.1.1
+
+Done in 6.1s using pnpm v12.16.1
+
+ RUN  v5.1.1 E:/drawbridge-wt/drawbridge-v2-redesign-implementation-w20/v2
+
+
+ Test Files  1 passed (1)
+      Tests  17 passed (17)
+   Start at  18:56:13
+   Duration  5.24s (tests 84%, import 14%, transform 1%)
+

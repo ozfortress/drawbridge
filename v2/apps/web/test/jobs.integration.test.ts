@@ -7,6 +7,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import type { Socket } from 'node:net';
 import { createCitadelClient } from '@drawbridge/citadel';
 import { parseConfig } from '@drawbridge/config';
 import {
@@ -959,6 +960,16 @@ describe.skipIf(!available)('job api (integration)', () => {
     await disconnectApp.app.listen({ host: '127.0.0.1', port: 0 });
     const address = disconnectApp.app.server.address();
     const disconnectPort = typeof address === 'object' && address !== null ? address.port : 0;
+
+    // The server's own sockets. The stream request is the only connection
+    // this app receives, so the close of its socket is the server-side
+    // observation of the disconnect - proof the route has seen it, not just
+    // that the client called abort().
+    const serverSockets = new Set<Socket>();
+    const sawConnection = (socket: Socket): void => {
+      serverSockets.add(socket);
+    };
+    disconnectApp.app.server.on('connection', sawConnection);
     try {
       const asRoot = await login(user(ROOT_ID, 'Root'));
       const leagueId = await leagueWithKey(asRoot);
@@ -973,9 +984,29 @@ describe.skipIf(!available)('job api (integration)', () => {
         (error: unknown) => error,
       );
 
-      // Hold LISTEN acquisition until the request is definitely aborted.
+      // Hold LISTEN acquisition until the server has observed the
+      // disconnect. Awaiting the request socket's server-side close puts
+      // the seam's resolution after the socket teardown events, so the
+      // route's disconnect handling has already run - or been missed - by
+      // the time the listener arrives.
       await started;
+      const socket: Socket | undefined = [...serverSockets][0];
+      if (socket === undefined) {
+        throw new Error('the stream request never opened a server-side connection');
+      }
+      let closeTimer: ReturnType<typeof setTimeout> | undefined;
+      const serverSawClose = new Promise<void>((resolve, reject) => {
+        closeTimer = setTimeout(
+          () => reject(new Error('the server never observed the disconnect')),
+          5000,
+        );
+        socket.once('close', () => {
+          if (closeTimer !== undefined) clearTimeout(closeTimer);
+          resolve();
+        });
+      });
       controller.abort();
+      await serverSawClose;
       completeAcquisition?.({
         close: async () => {
           listenerClosed?.();
@@ -993,6 +1024,7 @@ describe.skipIf(!available)('job api (integration)', () => {
         if (timer !== undefined) clearTimeout(timer);
       }
     } finally {
+      disconnectApp.app.server.off('connection', sawConnection);
       await disconnectApp.app.close();
     }
   });

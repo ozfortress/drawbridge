@@ -1,0 +1,27 @@
+
+ RUN  v5.1.1 E:/scratch-w20-red/v2
+
+ ❯ apps/web/test/jobs.integration.test.ts (17 tests | 1 failed) 6663ms
+   ❯ job api (integration) (16)
+     × releases a listener acquired after the client disconnects 2183ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/web/test/jobs.integration.test.ts > job api (integration) > releases a listener acquired after the client disconnects
+Error: late listener was not closed
+ ❯ Timeout.<anonymous> apps/web/test/jobs.integration.test.ts:1019:41
+    1017|       let timer: ReturnType<typeof setTimeout> | undefined;
+    1018|       const deadline = new Promise<never>((_resolve, reject) => {
+    1019|         timer = setTimeout(() => reject(new Error('late listener was n…
+       |                                         ^
+    1020|       });
+    1021|       try {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 16 passed (17)
+   Start at  18:55:46
+   Duration  7.58s (tests 89%, import 10%, transform 1%)
+

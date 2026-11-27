@@ -1,0 +1,15 @@
+HTTP/1.1 200 OK
+x-ratelimit-limit: 300
+x-ratelimit-remaining: 243
+x-ratelimit-reset: 41
+content-type: application/json; charset=utf-8
+x-request-id: req-4n
+x-content-type-options: nosniff
+x-frame-options: DENY
+referrer-policy: no-referrer
+content-length: 2038
+Date: Fri, 27 Nov 2026 07:13:30 GMT
+Connection: keep-alive
+Keep-Alive: timeout=72
+
+{"job":{"id":"0c1080a3-3790-47d9-9e1d-fdb959ccf30e","type":"tournament.setup","guildId":"1573554616371777546","leagueId":"c1769151-38aa-456d-8591-8c8ec740667a","lane":"setup","state":"awaiting_decision","pauseReason":null,"priority":0,"planHash":"qa-failure-1795763609808","requestedByUserId":"2eee15b4-f3b8-4785-a0e3-0320cc2d72a6","requestedByDiscordId":"136264506933248001","error":{"class":"fatal_config","status":401,"message":"QA bot token refused","stepSeq":1},"attempt":0,"createdAt":"2026-11-27T07:13:29.809Z","updatedAt":"2026-11-27T07:13:29.821Z","nextRunAt":"2026-11-27T07:13:29.809Z","finishedAt":null},"steps":[{"seq":1,"kind":"create_role","status":"failed","attempts":0,"skippable":true,"reversible":true,"externalIds":[],"result":null,"error":{"class":"fatal_config","status":401,"message":"QA bot token refused"},"startedAt":null,"finishedAt":null}],"events":[{"id":4,"at":"2026-11-27T07:13:29.809Z","level":"info","code":"job.queued","message":"Job queued (1 steps)","data":{"lane":"setup","type":"tournament.setup"}},{"id":5,"at":"2026-11-27T07:13:29.816Z","level":"error","code":"job.step.failure","message":"Step 1 failed: fatal_config (QA bot token refused)","data":{"class":"fatal_config","status":401,"message":"QA bot token refused","stepSeq":1}},{"id":6,"at":"2026-11-27T07:13:29.816Z","level":"warn","code":"job.awaiting_decision","message":"Job awaiting decision: fatal_config: authentication failed; all Discord writes must stop until the token is fixed: QA bot token refused","data":{"to":"awaiting_decision","from":"running"}}],"access":{"capabilities":["league.read","league.settings.write","league.staff.manage","league.roles.manage","tournament.setup","tournament.destructive","match.manage","schedule.manage","awards.manage","logs.read","logs.redact","logstf.manage","faq.edit","templates.edit","citadel.keys.manage","discord.settings.manage","sync.manage","jobs.decide"]},"allowedDecisions":[{"type":"retry"},{"type":"skip","stepSeq":1},{"type":"adopt","stepSeq":1},{"type":"revert"},{"type":"abort"}]}

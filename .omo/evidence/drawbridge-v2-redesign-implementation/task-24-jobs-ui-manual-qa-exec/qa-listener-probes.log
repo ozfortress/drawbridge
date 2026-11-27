@@ -1,0 +1,16 @@
+[2026-11-27T07:31:10.012Z] === direct-socket SSE disconnect probes (buildApp :8080, no proxy) ===
+[2026-11-27T07:31:10.061Z] set-cookie names: drawbridge_oauth_state, drawbridge_session, drawbridge_csrf
+[2026-11-27T07:31:10.061Z] signed in through real session flow (fake OAuth)
+[2026-11-27T07:31:10.068Z] league under test: b14d46ae-fa35-4196-91d6-1f67c5066e48
+[2026-11-27T07:31:10.073Z] PASS probe-baseline-0 :: listeners=0
+[2026-11-27T07:31:10.107Z] PASS probe-two-streams-2 :: waited=11ms
+[2026-11-27T07:31:10.110Z] PASS probe-destroy-releases :: back to 0 in 3ms
+[2026-11-27T07:31:10.123Z] PASS probe-post-acquire-destroy-1 :: released in 4ms
+[2026-11-27T07:31:10.133Z] PASS probe-post-acquire-destroy-2 :: released in 3ms
+[2026-11-27T07:31:10.141Z] PASS probe-post-acquire-destroy-3 :: released in 2ms
+[2026-11-27T07:31:10.145Z] PASS probe-acquire-race-destroy-1 :: released in 2ms
+[2026-11-27T07:31:10.149Z] PASS probe-acquire-race-destroy-2 :: released in 2ms
+[2026-11-27T07:31:10.153Z] PASS probe-acquire-race-destroy-3 :: released in 2ms
+[2026-11-27T07:31:10.157Z] PASS probe-acquire-race-destroy-4 :: released in 2ms
+[2026-11-27T07:31:10.162Z] PASS probe-acquire-race-destroy-5 :: released in 2ms
+[2026-11-27T07:31:10.162Z] === probes complete ===

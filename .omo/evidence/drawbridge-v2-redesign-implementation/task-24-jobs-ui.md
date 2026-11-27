@@ -24,7 +24,7 @@
 3. Completed the alert integration fixture: the inherited test expected an alert but inserted none. It now covers open, resolved and foreign-league rows.
 4. Added assertions that a helper with `jobs.decide` but without `tournament.destructive` is not offered a deleting revert, and that a terminal job has no allowed decisions.
 5. Preserved the inherited plain `Record<string, unknown>` job/decision serializers; TypeScript completes without the earlier decision-union inference crash.
-6. Browser QA exposed an SSE early-disconnect race not present in the inherited diff: disconnect handlers were attached only after awaiting Postgres `LISTEN`. Handlers now attach before that await, response close is covered, and a listener acquired after its client leaves is released immediately. `BuildAppOptions.streamListen` is a test-only injection seam; a deterministic regression holds acquisition until after abort and proves closure without sleeps or polling.
+6. Browser QA exposed an SSE early-disconnect race not present in the inherited diff: disconnect handlers were attached only after awaiting Postgres `LISTEN`. Handlers now attach before that await, response close is covered, and a listener acquired after its client leaves is released immediately. `BuildAppOptions.streamListen` is a test-only injection seam; a deterministic regression holds acquisition until after abort and proves closure without sleeps or polling. The independent gate later falsified that regression's discriminating power (pre-fix code also passed it); the hardened test is recorded under "Independent gate follow-up" below.
 
 ## Automated gates
 
@@ -37,6 +37,31 @@ All commands ran from `v2/` against real Postgres on `127.0.0.1:5433`; no integr
 | `pnpm build` | PASS, exit 0; `tsc -b` and Vite production panel build | `task-24-jobs-ui-exec/gates-build.log` |
 | `TEST_DATABASE_URL=...drawbridge_task24_abort_test pnpm exec vitest run apps/web/test/jobs.integration.test.ts` | PASS, **17/17** | session output |
 | `TEST_DATABASE_URL=...drawbridge_task24_final pnpm test` | PASS, **42 files / 486 tests**, exit 0 | `task-24-jobs-ui-exec/full-tests-final.log` |
+
+## Independent gate follow-up: disconnect regression hardening
+
+**Date:** 2026-11-27. **Gate:** `task-24-jobs-ui-manual-qa.md` (independent QA executor) — verdict **needs-fix**, failure_class **harness**.
+
+The gate reverted exactly the stream fix — disconnect handlers moved back after the `LISTEN` await, response-close coverage and the late-acquisition release removed — while keeping the test-only `streamListen` seam, and the shipped suite stayed green: 17/17 and 3/3 on a single-test repeat (`task-24-jobs-ui-manual-qa-exec/integration-prefix-scratch.log`, `integration-prefix-v1-repeat.log`). The regression held acquisition only until after `abort()` was *called* and completed the seam in the same turn, before the socket teardown could reach the server, so the pre-fix handler placement still caught the close: the test passed both code shapes and pinned nothing. The fix itself is load-bearing — under a timing where the abort's close reaches the server before acquisition completes, the pre-fix code leaks its dedicated listener (`integration-prefix-v3-diagnostic.log`; direct-socket probes release every destroy mode in 2–4 ms on fixed code, `qa-listener-probes.log`).
+
+### What changed in the test (test file only; no product change)
+
+`releases a listener acquired after the client disconnects` now completes the held acquisition only after the disconnect is **observable server-side**: the test tracks the disconnect app's own sockets (`server.on('connection')`) and, after `abort()`, awaits the request socket's server-side `'close'` before resolving the `streamListen` seam. On Node 24 the response/request `'close'` events are emitted in the same teardown turn as the socket close, so once the listener arrives the route's disconnect handling has already run (fixed code: `closed` is set and the late-acquisition release fires) or has been irrevocably missed (pre-fix code: those events were emitted before its handlers existed and never re-fire; its writes to the dead response buffer silently). No new seam in `stream.ts` was needed — the Node server's own connection events provide the observable. Deterministic: no sleeps, no polling; the happy path resolves on events, and deadlines only bound failure.
+
+### Red/green transcript
+
+| Run | Code under test | Result | Evidence |
+|---|---|---|---|
+| Red | scratch copy at `88a6a2a` with `apps/web/src/routes/stream.ts` reverted to its `19f729f` version plus only the four test-seam edits | **1 failed / 16 passed**, exit 1 — `releases a listener acquired after the client disconnects` fails with `Error: late listener was not closed` at 2183 ms | `task-24-jobs-ui-exec/integration-harden-red.log` |
+| Green ×3 | fixed worktree (`88a6a2a`) | **17/17**, exit 0, three consecutive runs (5.2 s, 5.1 s, 5.0 s) | `task-24-jobs-ui-exec/integration-harden-green-1.log` … `-3.log` |
+| `pnpm typecheck` | fixed worktree | exit 0 | `task-24-jobs-ui-exec/gates-harden.log` |
+| `pnpm lint` | fixed worktree | exit 0; the pre-existing 93 infos + 1 warning baseline, unchanged | `task-24-jobs-ui-exec/gates-harden.log` |
+| `pnpm test` | fixed worktree | **42 files / 486 tests passed**, exit 0, 52.5 s (real Postgres 5433) | `task-24-jobs-ui-exec/full-tests-harden.log` |
+
+### Out-of-scope findings (recorded, not fixed here)
+
+- `vite preview`'s `/api` proxy holds the upstream socket — and its Postgres listener — of an EventSource whose document is destroyed, until a transport timeout (observed 1–4 minutes). The product route releases in 2–4 ms whenever the transport close is delivered; this is the proxy not forwarding aborts promptly. Relevant to QA harnesses and the production reverse-proxy contract (plan 02 §14: abort forwarding, read timeout above the 15 s heartbeat).
+- `POST /api/v1/leagues` with an existing `(guildId, citadelLeagueId)` pair answers 500 from the `leagues_guild_citadel_key` unique violation instead of a 4xx — pre-existing on the todo-11 league surface, untouched by this branch; follow-up only.
 
 ## Browser QA
 

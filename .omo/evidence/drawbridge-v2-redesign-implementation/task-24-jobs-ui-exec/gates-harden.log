@@ -1,0 +1,11 @@
+=== pnpm typecheck ===
+$ tsc -p tsconfig.check.json && tsc -p apps/panel/tsconfig.json
+TYPECHECK_EXIT=0
+=== pnpm lint ===
+LINT_EXIT=0
+
+The number of diagnostics exceeds the limit allowed. Use --max-diagnostics to increase it.
+Diagnostics not shown: 74.
+Checked 204 files in 93ms. No fixes applied.
+Found 1 warning.
+Found 93 infos.

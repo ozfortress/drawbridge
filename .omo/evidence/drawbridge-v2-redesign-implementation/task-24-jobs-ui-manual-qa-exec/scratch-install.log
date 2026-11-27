@@ -1,0 +1,30 @@
+Scope: all 17 workspace projects
+[WARN] There are cyclic workspace dependencies: E:\drawbridge-wt\scratch-task24-mq\v2\packages\db, E:\drawbridge-wt\scratch-task24-mq\v2\packages\testkit, E:\drawbridge-wt\scratch-task24-mq\v2\packages\jobs
+✓ Lockfile passes supply-chain policies (verified 15h ago)
+Lockfile is up to date, resolution step is skipped
+Packages are hard linked from the content-addressable store to the virtual store.
+  Content-addressable store is at: E:\.pnpm-store\v11
+  Virtual store is at:             node_modules/.pnpm
+Progress: resolved 129, reused 129, downloaded 0, added 114
+Progress: resolved 175, reused 174, downloaded 0, added 164
+Progress: resolved 178, reused 178, downloaded 0, added 173
+Packages: +178
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 178, reused 178, downloaded 0, added 178, done
+.../esbuild@0.28.2/node_modules/esbuild postinstall$ node install.js
+.../esbuild@0.25.12/node_modules/esbuild postinstall$ node install.js
+.../esbuild@0.18.20/node_modules/esbuild postinstall$ node install.js
+.../esbuild@0.28.2/node_modules/esbuild postinstall: Done
+.../esbuild@0.25.12/node_modules/esbuild postinstall: Done
+.../esbuild@0.18.20/node_modules/esbuild postinstall: Done
+Agent skills awaiting approval: @tanstack/react-router.
+Run "pnpm approve" to review them.
+
+devDependencies:
++ @biomejs/biome 2.6.8
++ @types/node 24.19.2
++ @vitest/coverage-v8 5.1.1
++ typescript 7.0.2
++ vitest 5.1.1
+
+Done in 5.1s using pnpm v12.16.1

@@ -1,0 +1,148 @@
+[2026-11-27T07:13:10.199Z] === Task 24 manual QA driver ===
+[2026-11-27T07:13:10.201Z] surface: production Vite panel on http://127.0.0.1:5173 (vite preview) -> real buildApp on http://127.0.0.1:8080; Chrome headless via native DevTools Protocol on 127.0.0.1:9333; real Postgres 5433; fake OAuth + FakeCitadel
+[2026-11-27T07:13:10.264Z] SC1 invocation: Page.navigate http://127.0.0.1:5173/api/v1/auth/discord (real session/CSRF flow, fake OAuth)
+[2026-11-27T07:13:10.350Z]   navigated -> http://127.0.0.1:5173/api/v1/auth/discord
+[2026-11-27T07:13:10.391Z]   observed: home dashboard mounted
+[2026-11-27T07:13:10.401Z] PASS S5-home-empty-awaiting :: Needs attention
+0 open
+Jobs awaiting decision
+
+No jobs are waiting for a decisio
+[2026-11-27T07:13:10.401Z] PASS S5-home-empty-alerts
+[2026-11-27T07:13:10.401Z] PASS S5-home-empty-jobs
+[2026-11-27T07:13:10.402Z] PASS S5-home-empty-leagues
+[2026-11-27T07:13:10.451Z]   screenshot -> qa-01-home-empty.png
+[2026-11-27T07:13:10.452Z] PASS S1-session-cookies :: session + csrf cookies set
+[2026-11-27T07:13:10.452Z] SC2 invocation: in-page fetch POST /api/v1/leagues + PUT /api/v1/leagues/:id/citadel-key (real API, session+CSRF)
+[2026-11-27T07:13:10.518Z] PASS S2-league-and-key :: leagueId=c1769151-38aa-456d-8591-8c8ec740667a key=active
+[2026-11-27T07:13:10.518Z] SC2 invocation: Page.navigate http://127.0.0.1:5173/leagues/c1769151-38aa-456d-8591-8c8ec740667a/jobs
+[2026-11-27T07:13:10.541Z]   navigated -> http://127.0.0.1:5173/leagues/c1769151-38aa-456d-8591-8c8ec740667a/jobs
+[2026-11-27T07:13:10.583Z]   observed: queue empty state
+[2026-11-27T07:13:10.584Z] PASS S5-queue-empty :: No jobs have been created for this league yet.
+[2026-11-27T07:13:10.584Z] PASS S4-stream-status :: Live updates connected
+[2026-11-27T07:13:10.635Z]   screenshot -> qa-02-queue-empty.png
+[2026-11-27T07:13:10.635Z] SC3 invocation: POST __qa/slow {ms:1500}; Page.navigate queue; observe [data-testid="job-queue-loading"]
+[2026-11-27T07:13:10.668Z]   navigated -> http://127.0.0.1:5173/leagues/c1769151-38aa-456d-8591-8c8ec740667a/jobs
+[2026-11-27T07:13:12.189Z]   observed: queue loading state
+[2026-11-27T07:13:12.251Z]   screenshot -> qa-03-queue-loading.png
+[2026-11-27T07:13:13.709Z]   observed: queue settled
+[2026-11-27T07:13:13.709Z] SC4 invocation: POST __qa/api-fail {match:"jobs"}; Page.navigate queue; observe [data-testid="job-queue-error"]
+[2026-11-27T07:13:13.731Z]   navigated -> http://127.0.0.1:5173/leagues/c1769151-38aa-456d-8591-8c8ec740667a/jobs
+[2026-11-27T07:13:13.748Z]   observed: queue error state
+[2026-11-27T07:13:13.749Z] PASS S5-queue-error :: qa injected api failure
+[2026-11-27T07:13:13.816Z]   screenshot -> qa-04-queue-error.png
+[2026-11-27T07:13:13.818Z] SC5 invocation: Page.navigate http://127.0.0.1:5173/leagues/c1769151-38aa-456d-8591-8c8ec740667a/setup; click [data-testid="preview-button"]; click [data-testid="approve-preview"]
+[2026-11-27T07:13:13.837Z]   navigated -> http://127.0.0.1:5173/leagues/c1769151-38aa-456d-8591-8c8ec740667a/setup
+[2026-11-27T07:13:13.855Z]   observed: setup page
+[2026-11-27T07:13:13.916Z]   observed: preview built
+[2026-11-27T07:13:13.944Z]   preview counts: DIVISIONS | 2 | ENTRIES | 4 | CAPTAINS | 4 | LINKED CAPTAINS | 3 | ROLES | 6 | CHANNELS | 4
+[2026-11-27T07:13:14.007Z]   observed: approve navigated to job detail
+[2026-11-27T07:13:14.019Z] PASS S2-detail-state-queued :: queued
+[2026-11-27T07:13:14.019Z] PASS S2-detail-steps-32 :: steps=32
+[2026-11-27T07:13:14.019Z] PASS S3-queued-decisions-abort-only :: [{"id":"decision-abort","disabled":false}]
+[2026-11-27T07:13:14.019Z] PASS S8-testid-job-detail-page
+[2026-11-27T07:13:14.019Z] PASS S8-testid-job-metadata
+[2026-11-27T07:13:14.019Z] PASS S8-testid-job-decisions
+[2026-11-27T07:13:14.019Z] PASS S8-testid-job-steps
+[2026-11-27T07:13:14.019Z] PASS S8-testid-job-events
+[2026-11-27T07:13:14.019Z] PASS S8-testid-job-stream-status
+[2026-11-27T07:13:14.019Z] PASS S8-testid-detail-queue-link
+[2026-11-27T07:13:14.086Z]   screenshot -> qa-05-job-queued.png
+[2026-11-27T07:13:14.086Z] SC6 invocation: set window marker; POST __qa/job-state running then completed (real DB trigger -> LISTEN/NOTIFY -> SSE -> React Query); observe [data-testid="job-state"]
+[2026-11-27T07:13:14.100Z]   observed: running painted live
+[2026-11-27T07:13:14.113Z]   observed: completed painted live
+[2026-11-27T07:13:14.114Z] PASS S4-no-refresh-marker-survived :: marker=mq-live-1
+[2026-11-27T07:13:14.133Z]   observed: terminal decisions settle
+[2026-11-27T07:13:14.136Z] PASS S2-completed-32-done :: state=completed done=32
+[2026-11-27T07:13:14.137Z] PASS S3-terminal-no-decisions :: No decisions are available for this job state or your access.
+[2026-11-27T07:13:14.137Z]   live timings: running=13ms completed=13ms
+[2026-11-27T07:13:14.187Z]   screenshot -> qa-06-job-completed.png
+[2026-11-27T07:13:14.187Z] SC7 invocation: click [data-testid="detail-queue-link"] (SPA); assert queue table headers and row
+[2026-11-27T07:13:14.206Z]   observed: queue rendered
+[2026-11-27T07:13:14.208Z] PASS S1-queue-columns :: ["State","Type","League","Requested by","Updated"]
+[2026-11-27T07:13:14.208Z] PASS S1-queue-row-state :: completed
+[2026-11-27T07:13:14.209Z] PASS S1-queue-stream-status :: Live updates connected
+[2026-11-27T07:13:14.268Z]   screenshot -> qa-07-queue-desktop.png
+[2026-11-27T07:13:14.272Z] PASS S1-queue-mobile-width :: scrollWidth=390
+[2026-11-27T07:13:14.272Z] FAIL S1-queue-mobile-table-scrolls :: {"sw":609,"cw":609}
+[2026-11-27T07:13:14.300Z]   screenshot -> qa-08-queue-mobile.png
+[2026-11-27T07:13:14.303Z] SC8 invocation: click [data-testid="job-open"] (SPA) -> reopened detail
+[2026-11-27T07:13:14.311Z]   observed: detail reopened
+[2026-11-27T07:13:14.313Z] PASS S2-reopened-detail :: state=completed done=32 events=3
+[2026-11-27T07:13:14.371Z]   screenshot -> qa-09-detail-reopened.png
+[2026-11-27T07:13:14.371Z] SC9 invocation: SPA nav Home -> GET /__qa/listeners; SPA nav queue -> listeners; SPA nav Home -> listeners
+[2026-11-27T07:13:14.393Z]   observed: home mounted
+[2026-11-27T07:13:19.507Z] FAIL S4-listeners-home-0 :: listeners=1
+[2026-11-27T07:13:19.526Z]   observed: detail stream live
+[2026-11-27T07:13:24.652Z] FAIL S4-listeners-mounted-1 :: listeners=2
+[2026-11-27T07:13:24.662Z]   observed: queue mounted
+[2026-11-27T07:13:24.665Z] PASS S4-listeners-queue-1 :: listeners=1
+[2026-11-27T07:13:24.670Z]   observed: home mounted again
+[2026-11-27T07:13:29.806Z] FAIL S4-listeners-unmounted-0 :: listeners=1
+[2026-11-27T07:13:29.806Z] SC10 invocation: GET __qa/failed-job?leagueId=... (real applyStepFailure, 401 signal); Page.navigate /jobs/:id
+[2026-11-27T07:13:29.823Z] PASS S6-failure-action :: {"jobId":"0c1080a3-3790-47d9-9e1d-fdb959ccf30e","state":"awaiting_decision","action":"awaiting_decision"}
+[2026-11-27T07:13:29.843Z]   navigated -> http://127.0.0.1:5173/jobs/0c1080a3-3790-47d9-9e1d-fdb959ccf30e
+[2026-11-27T07:13:29.859Z]   observed: failure error notice
+[2026-11-27T07:13:29.863Z] PASS S6-taxonomy-class :: fatal_config
+[2026-11-27T07:13:29.864Z] PASS S6-taxonomy-message :: Fatal Discord configuration |  | Discord authentication failed. All writes stay stopped until the bot token or configuration is fixed. |  | Taxonomy: fatal_config · Step 1 |  | QA bot token refused
+[2026-11-27T07:13:29.864Z] PASS S3-failure-five-decisions :: [{"id":"decision-retry","disabled":false},{"id":"decision-skip-1","disabled":false},{"id":"decision-adopt-1","disabled":false},{"id":"decision-revert","disabled":false},{"id":"decision-abort","disabled":false}]
+[2026-11-27T07:13:29.866Z] PASS S6-step-failed :: failed
+[2026-11-27T07:13:29.919Z]   screenshot -> qa-10-failure-desktop.png
+[2026-11-27T07:13:29.923Z] PASS S6-failure-mobile-decisions :: count=5
+[2026-11-27T07:13:29.924Z] PASS S6-failure-mobile-width :: scrollWidth=390
+[2026-11-27T07:13:29.966Z]   screenshot -> qa-11-failure-mobile.png
+[2026-11-27T07:13:29.968Z] SC13A invocation: curl -i probes (see qa-curl-*.txt for full transcripts)
+[2026-11-27T07:13:29.969Z]   invocation: curl -i -s http://127.0.0.1:8080/api/v1/leagues/c1769151-38aa-456d-8591-8c8ec740667a/jobs -H Cookie: drawbridge_session=[redacted]; drawbridge_csrf=[redacted]
+[2026-11-27T07:13:29.999Z]   curl queue-list -> HTTP/1.1 200 OK
+[2026-11-27T07:13:30.000Z] PASS S1-api-queue-200
+[2026-11-27T07:13:30.000Z]   invocation: curl -i -s http://127.0.0.1:8080/api/v1/jobs/0c1080a3-3790-47d9-9e1d-fdb959ccf30e -H Cookie: drawbridge_session=[redacted]; drawbridge_csrf=[redacted]
+[2026-11-27T07:13:30.028Z]   curl failed-detail-5decisions -> HTTP/1.1 200 OK
+[2026-11-27T07:13:30.028Z] PASS S6-api-detail-200
+[2026-11-27T07:13:30.028Z] PASS S3-api-allowed-decisions :: ["retry","skip-1","adopt-1","revert","abort"]
+[2026-11-27T07:13:30.028Z]   invocation: curl -i -s http://127.0.0.1:8080/api/v1/jobs/0c1080a3-3790-47d9-9e1d-fdb959ccf30e
+[2026-11-27T07:13:30.051Z]   curl no-session -> HTTP/1.1 401 Unauthorized
+[2026-11-27T07:13:30.051Z] PASS A1-no-session-401
+[2026-11-27T07:13:30.051Z]   invocation: curl -i -s -X POST -H content-type: application/json -H x-csrf-token: [redacted] -d {"type":"retry"} http://127.0.0.1:8080/api/v1/jobs/86ee49fa-d736-4795-b1e4-c73e91bb906d/decision -H Cookie: drawbridge_session=[redacted]; drawbridge_csrf=[redacted]
+[2026-11-27T07:13:30.089Z]   curl decision-on-terminal -> HTTP/1.1 409 Conflict
+[2026-11-27T07:13:30.089Z] PASS A3-terminal-decision-409 :: 409
+[2026-11-27T07:13:30.089Z]   invocation: curl -i -s http://127.0.0.1:8080/api/v1/jobs/86ee49fa-d736-4795-b1e4-c73e91bb906d -H Cookie: drawbridge_session=[redacted]; drawbridge_csrf=[redacted]
+[2026-11-27T07:13:30.117Z]   curl terminal-unchanged -> HTTP/1.1 200 OK
+[2026-11-27T07:13:30.117Z] PASS A3-terminal-unchanged :: completed
+[2026-11-27T07:13:30.117Z] SC11 invocation: SPA nav Home; assert needs-attention block contents
+[2026-11-27T07:13:30.137Z]   observed: home mounted
+[2026-11-27T07:13:30.137Z]   observed: attention populated
+[2026-11-27T07:13:30.140Z] PASS S7-open-alert :: job.fatal_config |  | Manual QA League · critical · 27/11/2026, 18:13:29 |  | Open job
+[2026-11-27T07:13:30.140Z] PASS S7-recent-jobs-2 :: rows=2
+[2026-11-27T07:13:30.141Z] PASS S7-leagues-1 :: cards=1
+[2026-11-27T07:13:30.202Z]   screenshot -> qa-12-home-attention-desktop.png
+[2026-11-27T07:13:30.206Z] PASS S7-home-mobile-width :: scrollWidth=390
+[2026-11-27T07:13:30.249Z]   screenshot -> qa-13-home-attention-mobile.png
+[2026-11-27T07:13:30.252Z] SC12 invocation: click awaiting job link (SPA); click [data-testid="decision-retry"]; observe state + decision set
+[2026-11-27T07:13:30.258Z]   observed: failed job detail
+[2026-11-27T07:13:30.280Z]   observed: retry moved job to running
+[2026-11-27T07:13:30.302Z]   observed: settled decisions = revert + abort
+[2026-11-27T07:13:30.303Z] PASS S3-retry-no-refresh :: marker=mq-dec-1
+[2026-11-27T07:13:30.350Z]   screenshot -> qa-14-after-retry.png
+[2026-11-27T07:13:30.350Z] SC13B invocation: curl -i double-abort state guard
+[2026-11-27T07:13:30.350Z]   invocation: curl -i -s -X POST -H content-type: application/json -H x-csrf-token: [redacted] -d {"type":"abort"} http://127.0.0.1:8080/api/v1/jobs/0c1080a3-3790-47d9-9e1d-fdb959ccf30e/decision -H Cookie: drawbridge_session=[redacted]; drawbridge_csrf=[redacted]
+[2026-11-27T07:13:30.386Z]   curl abort-first -> HTTP/1.1 200 OK
+[2026-11-27T07:13:30.386Z] PASS A3-abort-first-200
+[2026-11-27T07:13:30.386Z]   invocation: curl -i -s -X POST -H content-type: application/json -H x-csrf-token: [redacted] -d {"type":"abort"} http://127.0.0.1:8080/api/v1/jobs/0c1080a3-3790-47d9-9e1d-fdb959ccf30e/decision -H Cookie: drawbridge_session=[redacted]; drawbridge_csrf=[redacted]
+[2026-11-27T07:13:30.413Z]   curl abort-second -> HTTP/1.1 409 Conflict
+[2026-11-27T07:13:30.413Z] PASS A3-abort-second-409 :: 409
+[2026-11-27T07:13:30.413Z] SC15 invocation: GET __qa/failed-job?message=<img src=x onerror="window.__xss=1">XSSQA; Page.navigate detail
+[2026-11-27T07:13:30.453Z]   navigated -> http://127.0.0.1:5173/jobs/a814e825-2ed0-40d6-9b9b-10c063850b6c
+[2026-11-27T07:13:30.471Z]   observed: xss job error notice
+[2026-11-27T07:13:30.474Z] PASS A7-message-injection-escaped :: {"img":false,"text":true}
+[2026-11-27T07:13:30.534Z]   screenshot -> qa-17-xss-text.png
+[2026-11-27T07:13:30.534Z] SC14 invocation: POST __qa/revoke-root-sessions; curl -i job API with old cookie; Page.navigate /jobs/:id
+[2026-11-27T07:13:30.538Z] PASS S7-sessions-revoked :: {"revoked":1}
+[2026-11-27T07:13:30.538Z]   invocation: curl -i -s http://127.0.0.1:8080/api/v1/jobs/0c1080a3-3790-47d9-9e1d-fdb959ccf30e -H Cookie: drawbridge_session=[redacted]; drawbridge_csrf=[redacted]
+[2026-11-27T07:13:30.556Z]   curl revoked-session-401 -> HTTP/1.1 401 Unauthorized
+[2026-11-27T07:13:30.556Z] PASS S7-revoked-api-401 :: 401
+[2026-11-27T07:13:30.576Z]   navigated -> http://127.0.0.1:5173/jobs/0c1080a3-3790-47d9-9e1d-fdb959ccf30e
+[2026-11-27T07:13:30.582Z]   observed: redirected to /signin
+[2026-11-27T07:13:30.583Z] PASS S7-redirect-signin :: http://127.0.0.1:5173/signin
+[2026-11-27T07:13:30.631Z]   screenshot -> qa-15-signin-redirect-desktop.png
+[2026-11-27T07:13:30.637Z] PASS S7-browser-api-401 :: status=401
+[2026-11-27T07:13:30.680Z]   screenshot -> qa-16-signin-redirect-mobile.png

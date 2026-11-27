@@ -1,0 +1,24 @@
+{
+  "leagueId": "c1769151-38aa-456d-8591-8c8ec740667a",
+  "previewCounts": "DIVISIONS | 2 | ENTRIES | 4 | CAPTAINS | 4 | LINKED CAPTAINS | 3 | ROLES | 6 | CHANNELS | 4",
+  "approvedJobId": "86ee49fa-d736-4795-b1e4-c73e91bb906d",
+  "liveUpdateMs": {
+    "running": 13,
+    "completed": 13
+  },
+  "listeners": {
+    "home": 1,
+    "mounted": 2,
+    "queue": 1,
+    "afterUnmount": 1
+  },
+  "failedJobId": "0c1080a3-3790-47d9-9e1d-fdb959ccf30e",
+  "apiAllowedDecisions": [
+    "retry",
+    "skip-1",
+    "adopt-1",
+    "revert",
+    "abort"
+  ],
+  "completed": true
+}

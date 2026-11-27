@@ -1,0 +1,479 @@
+=== git state ===
+88a6a2ae63892953cd90e2b88aefdb4419181a79 G feat(panel): add jobs queue and decision views
+## ws/w20-jobs-ui
+?? ../.omo/evidence/drawbridge-v2-redesign-implementation/task-24-jobs-ui-manual-qa-exec/
+=== typecheck ===
+$ tsc -p tsconfig.check.json && tsc -p apps/panel/tsconfig.json
+typecheck_exit=0
+=== lint ===
+$ biome check .
+apps\web\src\routes\auth.ts:113:34 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+  
+    111 │     const auth = await requireAuth(deps.db, request, secure);
+    112 │     // The panel needs a CSRF token for its mutating requests.
+  > 113 │     const csrf = request.cookies['drawbridge_csrf'] ?? issueCsrfToken();
+        │                                  ^^^^^^^^^^^^^^^^^
+    114 │     setCsrfCookie(reply, csrf, secure);
+    115 │     const user = await findUserById(deps.db, auth.userId);
+  
+  i A literal key is easier to read, and tools such as type checkers and minifiers can understand the property name.
+  
+  i Unsafe fix: Use a literal key instead.
+  
+    111 111 │       const auth = await requireAuth(deps.db, request, secure);
+    112 112 │       // The panel needs a CSRF token for its mutating requests.
+    113     │ - ····const·csrf·=·request.cookies['drawbridge_csrf']·??·issueCsrfToken();
+        113 │ + ····const·csrf·=·request.cookies.drawbridge_csrf·??·issueCsrfToken();
+    114 114 │       setCsrfCookie(reply, csrf, secure);
+    115 115 │       const user = await findUserById(deps.db, auth.userId);
+  
+
+apps\web\src\routes\jobs.ts:152:17 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+  
+    150 │   return plan.steps.map((step) => {
+    151 │     const args = { ...step } as Record<string, unknown>;
+  > 152 │     delete args['kind'];
+        │                 ^^^^^^
+    153 │     return {
+    154 │       seq: step.order,
+  
+  i A literal key is easier to read, and tools such as type checkers and minifiers can understand the property name.
+  
+  i Unsafe fix: Use a literal key instead.
+  
+    150 150 │     return plan.steps.map((step) => {
+    151 151 │       const args = { ...step } as Record<string, unknown>;
+    152     │ - ····delete·args['kind'];
+        152 │ + ····delete·args.kind;
+    153 153 │       return {
+    154 154 │         seq: step.order,
+  
+
+apps\web\src\routes\preview.ts:378:22 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+  
+    376 │       planHash: preview.planHash,
+    377 │       plan,
+  > 378 │       warnings: plan['warnings'] ?? [],
+        │                      ^^^^^^^^^^
+    379 │       capacity: plan['capacity'] ?? null,
+    380 │       captains: (plan['captainReport'] as { captains?: unknown } | undefined)?.captains ?? [],
+  
+  i A literal key is easier to read, and tools such as type checkers and minifiers can understand the property name.
+  
+  i Unsafe fix: Use a literal key instead.
+  
+    376 376 │         planHash: preview.planHash,
+    377 377 │         plan,
+    378     │ - ······warnings:·plan['warnings']·??·[],
+        378 │ + ······warnings:·plan.warnings·??·[],
+    379 379 │         capacity: plan['capacity'] ?? null,
+    380 380 │         captains: (plan['captainReport'] as { captains?: unknown } | undefined)?.captains ?? [],
+  
+
+apps\web\src\routes\preview.ts:379:22 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+  
+    377 │       plan,
+    378 │       warnings: plan['warnings'] ?? [],
+  > 379 │       capacity: plan['capacity'] ?? null,
+        │                      ^^^^^^^^^^
+    380 │       captains: (plan['captainReport'] as { captains?: unknown } | undefined)?.captains ?? [],
+    381 │       citadelSnapshotAt: preview.citadelSnapshotAt?.toISOString() ?? null,
+  
+  i A literal key is easier to read, and tools such as type checkers and minifiers can understand the property name.
+  
+  i Unsafe fix: Use a literal key instead.
+  
+    377 377 │         plan,
+    378 378 │         warnings: plan['warnings'] ?? [],
+    379     │ - ······capacity:·plan['capacity']·??·null,
+        379 │ + ······capacity:·plan.capacity·??·null,
+    380 380 │         captains: (plan['captainReport'] as { captains?: unknown } | undefined)?.captains ?? [],
+    381 381 │         citadelSnapshotAt: preview.citadelSnapshotAt?.toISOString() ?? null,
+  
+
+apps\web\src\routes\preview.ts:380:23 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+  
+    378 │       warnings: plan['warnings'] ?? [],
+    379 │       capacity: plan['capacity'] ?? null,
+  > 380 │       captains: (plan['captainReport'] as { captains?: unknown } | undefined)?.captains ?? [],
+        │                       ^^^^^^^^^^^^^^^
+    381 │       citadelSnapshotAt: preview.citadelSnapshotAt?.toISOString() ?? null,
+    382 │       expiresAt: preview.expiresAt?.toISOString() ?? null,
+  
+  i A literal key is easier to read, and tools such as type checkers and minifiers can understand the property name.
+  
+  i Unsafe fix: Use a literal key instead.
+  
+    378 378 │         warnings: plan['warnings'] ?? [],
+    379 379 │         capacity: plan['capacity'] ?? null,
+    380     │ - ······captains:·(plan['captainReport']·as·{·captains?:·unknown·}·|·undefined)?.captains·??·[],
+        380 │ + ······captains:·(plan.captainReport·as·{·captains?:·unknown·}·|·undefined)?.captains·??·[],
+    381 381 │         citadelSnapshotAt: preview.citadelSnapshotAt?.toISOString() ?? null,
+    382 382 │         expiresAt: preview.expiresAt?.toISOString() ?? null,
+  
+
+apps\web\src\version.ts:2:37 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+  
+    1 │ /** Version reported by /healthz. The image build supplies SOURCE_COMMIT. */
+  > 2 │ export const VERSION = (process.env['SOURCE_COMMIT'] ?? '').slice(0, 7) || '2.0.0';
+      │                                     ^^^^^^^^^^^^^^^
+    3 │ 
+  
+  i A literal key is easier to read, and tools such as type checkers and minifiers can understand the property name.
+  
+  i Unsafe fix: Use a literal key instead.
+  
+    1 1 │   /** Version reported by /healthz. The image build supplies SOURCE_COMMIT. */
+    2   │ - export·const·VERSION·=·(process.env['SOURCE_COMMIT']·??·'').slice(0,·7)·||·'2.0.0';
+      2 │ + export·const·VERSION·=·(process.env.SOURCE_COMMIT·??·'').slice(0,·7)·||·'2.0.0';
+    3 3 │   
+  
+
+apps\web\test\api.integration.test.ts:85:29 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+  
+    83 │     });
+    84 │     expect(callback.statusCode).toBe(302);
+  > 85 │     expect(callback.headers['location']).toBe('/');
+       │                             ^^^^^^^^^^
+    86 │ 
+    87 │     const session = cookieOf(callback.cookies, 'drawbridge_session');
+  
+  i A literal key is easier to read, and tools such as type checkers and minifiers can understand the property name.
+  
+  i Unsafe fix: Use a literal key instead.
+  
+     83  83 │       });
+     84  84 │       expect(callback.statusCode).toBe(302);
+     85     │ - ····expect(callback.headers['location']).toBe('/');
+         85 │ + ····expect(callback.headers.location).toBe('/');
+     86  86 │   
+     87  87 │       const session = cookieOf(callback.cookies, 'drawbridge_session');
+  
+
+apps\web\test\app.test.ts:140:32 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+  
+    138 │     const requestLines = lines
+    139 │       .map((line) => JSON.parse(line) as Record<string, unknown>)
+  > 140 │       .filter((entry) => entry['message'] === 'request');
+        │                                ^^^^^^^^^
+    141 │     expect(requestLines).toHaveLength(0);
+    142 │   });
+  
+  i A literal key is easier to read, and tools such as type checkers and minifiers can understand the property name.
+  
+  i Unsafe fix: Use a literal key instead.
+  
+    138 138 │       const requestLines = lines
+    139 139 │         .map((line) => JSON.parse(line) as Record<string, unknown>)
+    140     │ - ······.filter((entry)·=>·entry['message']·===·'request');
+        140 │ + ······.filter((entry)·=>·entry.message·===·'request');
+    141 141 │       expect(requestLines).toHaveLength(0);
+    142 142 │     });
+  
+
+apps\web\test\oauth.test.ts:53:20 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+  
+    51 │     );
+    52 │     const headers = calls[0]?.init?.headers as Record<string, string>;
+  > 53 │     expect(headers['authorization']).toBe(
+       │                    ^^^^^^^^^^^^^^^
+    54 │       `Basic ${Buffer.from('app-1:secret-1').toString('base64')}`,
+    55 │     );
+  
+  i A literal key is easier to read, and tools such as type checkers and minifiers can understand the property name.
+  
+  i Unsafe fix: Use a literal key instead.
+  
+    51 51 │       );
+    52 52 │       const headers = calls[0]?.init?.headers as Record<string, string>;
+    53    │ - ····expect(headers['authorization']).toBe(
+       53 │ + ····expect(headers.authorization).toBe(
+    54 54 │         `Basic ${Buffer.from('app-1:secret-1').toString('base64')}`,
+    55 55 │       );
+  
+
+apps\web\test\oauth.test.ts:71:22 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+  
+    69 │       expect(String(input)).toBe('https://discord.com/api/users/@me');
+    70 │       const headers = (init?.headers ?? {}) as Record<string, string>;
+  > 71 │       expect(headers['authorization']).toBe('Bearer token-abc');
+       │                      ^^^^^^^^^^^^^^^
+    72 │       return jsonResponse({
+    73 │         id: '1573554616371777546',
+  
+  i A literal key is easier to read, and tools such as type checkers and minifiers can understand the property name.
+  
+  i Unsafe fix: Use a literal key instead.
+  
+    69 69 │         expect(String(input)).toBe('https://discord.com/api/users/@me');
+    70 70 │         const headers = (init?.headers ?? {}) as Record<string, string>;
+    71    │ - ······expect(headers['authorization']).toBe('Bearer·token-abc');
+       71 │ + ······expect(headers.authorization).toBe('Bearer·token-abc');
+    72 72 │         return jsonResponse({
+    73 73 │           id: '1573554616371777546',
+  
+
+apps\worker\test\worker.test.ts:28:17 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+  
+    26 │ function testUrl(): string {
+    27 │   return (
+  > 28 │     process.env['TEST_DATABASE_URL'] ??
+       │                 ^^^^^^^^^^^^^^^^^^^
+    29 │     'postgres://drawbridge:drawbridge@127.0.0.1:5433/drawbridge_test'
+    30 │   );
+  
+  i A literal key is easier to read, and tools such as type checkers and minifiers can understand the property name.
+  
+  i Unsafe fix: Use a literal key instead.
+  
+     26  26 │   function testUrl(): string {
+     27  27 │     return (
+     28     │ - ····process.env['TEST_DATABASE_URL']·??
+         28 │ + ····process.env.TEST_DATABASE_URL·??
+     29  29 │       'postgres://drawbridge:drawbridge@127.0.0.1:5433/drawbridge_test'
+     30  30 │     );
+  
+
+apps\worker\test\worker.test.ts:98:33 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+  
+     96 │     const journal = await getJob(database.db, job.id);
+     97 │     expect(journal?.job.state).toBe('awaiting_decision');
+   > 98 │     expect(journal?.job.error?.['class']).toBe('invalid_input');
+        │                                 ^^^^^^^
+     99 │     expect(journal?.events.at(-1)?.message).toContain('no step executor is wired yet');
+    100 │   });
+  
+  i A literal key is easier to read, and tools such as type checkers and minifiers can understand the property name.
+  
+  i Unsafe fix: Use a literal key instead.
+  
+    98 │ ····expect(journal?.job.error?.['class']).toBe('invalid_input');
+       │                                --     --                        
+
+packages\db\drizzle.config.ts:11:19 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+  
+     9 │   dbCredentials: {
+    10 │     url:
+  > 11 │       process.env['DATABASE_URL'] ?? 'postgres://drawbridge:drawbridge@127.0.0.1:5433/drawbridge',
+       │                   ^^^^^^^^^^^^^^
+    12 │   },
+    13 │ });
+  
+  i A literal key is easier to read, and tools such as type checkers and minifiers can understand the property name.
+  
+  i Unsafe fix: Use a literal key instead.
+  
+     9  9 │     dbCredentials: {
+    10 10 │       url:
+    11    │ - ······process.env['DATABASE_URL']·??·'postgres://drawbridge:drawbridge@127.0.0.1:5433/drawbridge',
+       11 │ + ······process.env.DATABASE_URL·??·'postgres://drawbridge:drawbridge@127.0.0.1:5433/drawbridge',
+    12 12 │     },
+    13 13 │   });
+  
+
+packages\db\test\repos.integration.test.ts:205:42 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+  
+    203 │       ]);
+    204 │       const audit = await listAudit(db());
+  > 205 │       expect(audit.some((entry) => entry['action'] === 'league.create')).toBe(true);
+        │                                          ^^^^^^^^
+    206 │     });
+    207 │ 
+  
+  i A literal key is easier to read, and tools such as type checkers and minifiers can understand the property name.
+  
+  i Unsafe fix: Use a literal key instead.
+  
+    203 203 │         ]);
+    204 204 │         const audit = await listAudit(db());
+    205     │ - ······expect(audit.some((entry)·=>·entry['action']·===·'league.create')).toBe(true);
+        205 │ + ······expect(audit.some((entry)·=>·entry.action·===·'league.create')).toBe(true);
+    206 206 │       });
+    207 207 │   
+  
+
+packages\logging\src\index.ts:72:24 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+  
+    70 │     message: error.message,
+    71 │   };
+  > 72 │   if (error.stack) out['stack'] = error.stack;
+       │                        ^^^^^^^
+    73 │   const cause = (error as Error & { cause?: unknown }).cause;
+    74 │   if (cause !== undefined) out['cause'] = redactValue(cause, depth + 1, seen);
+  
+  i A literal key is easier to read, and tools such as type checkers and minifiers can understand the property name.
+  
+  i Unsafe fix: Use a literal key instead.
+  
+     70  70 │       message: error.message,
+     71  71 │     };
+     72     │ - ··if·(error.stack)·out['stack']·=·error.stack;
+         72 │ + ··if·(error.stack)·out.stack·=·error.stack;
+     73  73 │     const cause = (error as Error & { cause?: unknown }).cause;
+     74  74 │     if (cause !== undefined) out['cause'] = redactValue(cause, depth + 1, seen);
+  
+
+packages\logging\src\index.ts:74:32 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+  
+    72 │   if (error.stack) out['stack'] = error.stack;
+    73 │   const cause = (error as Error & { cause?: unknown }).cause;
+  > 74 │   if (cause !== undefined) out['cause'] = redactValue(cause, depth + 1, seen);
+       │                                ^^^^^^^
+    75 │   return out;
+    76 │ }
+  
+  i A literal key is easier to read, and tools such as type checkers and minifiers can understand the property name.
+  
+  i Unsafe fix: Use a literal key instead.
+  
+     72  72 │     if (error.stack) out['stack'] = error.stack;
+     73  73 │     const cause = (error as Error & { cause?: unknown }).cause;
+     74     │ - ··if·(cause·!==·undefined)·out['cause']·=·redactValue(cause,·depth·+·1,·seen);
+         74 │ + ··if·(cause·!==·undefined)·out.cause·=·redactValue(cause,·depth·+·1,·seen);
+     75  75 │     return out;
+     76  76 │   }
+  
+
+packages\logging\test\logging.test.ts:51:11 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+  
+    49 │       error: new Error('outer', { cause }),
+    50 │     };
+  > 51 │     value['self'] = value;
+       │           ^^^^^^
+    52 │     const out = redact(value) as any;
+    53 │     expect(out.when).toBe('2026-11-21T00:00:00.000Z');
+  
+  i A literal key is easier to read, and tools such as type checkers and minifiers can understand the property name.
+  
+  i Unsafe fix: Use a literal key instead.
+  
+     49  49 │         error: new Error('outer', { cause }),
+     50  50 │       };
+     51     │ - ····value['self']·=·value;
+         51 │ + ····value.self·=·value;
+     52  52 │       const out = redact(value) as any;
+     53  53 │       expect(out.when).toBe('2026-11-21T00:00:00.000Z');
+  
+
+packages\logging\test\logging.test.ts:74:18 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+  
+    72 │     expect(lines).toHaveLength(1);
+    73 │     const entry = entries()[0]!;
+  > 74 │     expect(entry['level']).toBe('info');
+       │                  ^^^^^^^
+    75 │     expect(entry['message']).toBe('hello');
+    76 │     expect(entry['requestId']).toBe('r1');
+  
+  i A literal key is easier to read, and tools such as type checkers and minifiers can understand the property name.
+  
+  i Unsafe fix: Use a literal key instead.
+  
+     72  72 │       expect(lines).toHaveLength(1);
+     73  73 │       const entry = entries()[0]!;
+     74     │ - ····expect(entry['level']).toBe('info');
+         74 │ + ····expect(entry.level).toBe('info');
+     75  75 │       expect(entry['message']).toBe('hello');
+     76  76 │       expect(entry['requestId']).toBe('r1');
+  
+
+packages\logging\test\logging.test.ts:75:18 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+  
+    73 │     const entry = entries()[0]!;
+    74 │     expect(entry['level']).toBe('info');
+  > 75 │     expect(entry['message']).toBe('hello');
+       │                  ^^^^^^^^^
+    76 │     expect(entry['requestId']).toBe('r1');
+    77 │     expect(typeof entry['time']).toBe('string');
+  
+  i A literal key is easier to read, and tools such as type checkers and minifiers can understand the property name.
+  
+  i Unsafe fix: Use a literal key instead.
+  
+     73  73 │       const entry = entries()[0]!;
+     74  74 │       expect(entry['level']).toBe('info');
+     75     │ - ····expect(entry['message']).toBe('hello');
+         75 │ + ····expect(entry.message).toBe('hello');
+     76  76 │       expect(entry['requestId']).toBe('r1');
+     77  77 │       expect(typeof entry['time']).toBe('string');
+  
+
+packages\testkit\src\index.ts:56:22 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+  
+    55 │ function testUrl(): string {
+  > 56 │   return process.env['TEST_DATABASE_URL'] ?? DEFAULT_TEST_URL;
+       │                      ^^^^^^^^^^^^^^^^^^^
+    57 │ }
+    58 │ 
+  
+  i A literal key is easier to read, and tools such as type checkers and minifiers can understand the property name.
+  
+  i Unsafe fix: Use a literal key instead.
+  
+     54  54 │   
+     55  55 │   function testUrl(): string {
+     56     │ - ··return·process.env['TEST_DATABASE_URL']·??·DEFAULT_TEST_URL;
+         56 │ + ··return·process.env.TEST_DATABASE_URL·??·DEFAULT_TEST_URL;
+     57  57 │   }
+     58  58 │   
+  
+
+The number of diagnostics exceeds the limit allowed. Use --max-diagnostics to increase it.
+Diagnostics not shown: 74.
+Checked 204 files in 89ms. No fixes applied.
+Found 1 warning.
+Found 93 infos.
+lint_exit=0
+=== build ===
+$ tsc -b && pnpm -F @drawbridge/panel build
+$ vite build
+[36mvite v8.3.8 [32mbuilding client environment for production...[36m[39m
+transforming...
+✓ 167 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.39 kB │ gzip:   0.26 kB
+dist/assets/index-CCgTlLlD.css    6.19 kB │ gzip:   1.83 kB
+dist/assets/index-C6ddkK2V.js   370.59 kB │ gzip: 114.14 kB
+
+[32m✓ built in 150ms[39m
+build_exit=0
